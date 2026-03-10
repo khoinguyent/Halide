@@ -94,4 +94,15 @@ class AuthService {
   Future<void> sendPasswordResetEmail(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
   }
+
+  // Logic to sync with backend
+  Future<void> syncWithBackend() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      final uid = user.uid;
+      final email = user.email;
+      // TODO: Call backend POST /users/sync { uid, email }
+      print('Syncing user with backend: UID=$uid, Email=$email');
+    }
+  }
 }

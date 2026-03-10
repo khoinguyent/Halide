@@ -39,7 +39,7 @@
 - **Safety**: Ensure the Firebase UID is passed to the Backend to sync with the `Users` table.
 
 ### [FE_2.1] Roll State Management
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: None
 - **Assignee**: FE_DEV_2
 - **Task**: Build the UI/State logic for changing a Roll's status (e.g., 'Shooting' -> 'At Lab'). Implement a bottom-sheet selector for status updates.
