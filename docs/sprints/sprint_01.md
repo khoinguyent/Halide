@@ -45,7 +45,7 @@
 - **Task**: Build the UI/State logic for changing a Roll's status (e.g., 'Shooting' -> 'At Lab'). Implement a bottom-sheet selector for status updates.
 
 ### [FE_2.2] Multi-Image Roll Uploader
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_1.2]
 - **Assignee**: FE_DEV_2
 - **Task**: Create the "Add Images" interface. Allow selecting multiple files from the gallery and piping them to the Backend `upload_roll_image` endpoint.
