@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/roll_provider.dart';
 import '../widgets/status_selector.dart';
+import '../widgets/image_uploader_widget.dart';
 import '../models/roll_status.dart';
 
 class RollDetailView extends ConsumerWidget {
@@ -18,7 +19,7 @@ class RollDetailView extends ConsumerWidget {
         title: Text('Roll Detail - ${roll.brand} ${roll.name}'),
         backgroundColor: roll.color.withOpacity(0.2),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,6 +48,10 @@ class RollDetailView extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
+            const SizedBox(height: 48),
+            const Divider(),
+            const SizedBox(height: 24),
+            ImageUploaderWidget(rollId: rollId),
           ],
         ),
       ),
