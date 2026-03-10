@@ -32,7 +32,7 @@
 - **Task**: Build the `UserDashboard` query. It must return the User profile, their linked `UserCameras`, and the last 30 `Rolls` sorted by `created_at`.
 
 ### [FE_1.1] Firebase Auth & Social Logic
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: None
 - **Assignee**: FE_DEV_1
 - **Task**: Implement full Firebase Auth UI. Support: 1. Email/Pass (Sign up/Forgot), 2. Google, 3. Facebook, 4. Apple ID.
