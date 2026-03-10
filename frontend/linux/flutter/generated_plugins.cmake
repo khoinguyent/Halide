@@ -3,6 +3,9 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  desktop_webview_auth
+  flutter_secure_storage_linux
+  gtk
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
