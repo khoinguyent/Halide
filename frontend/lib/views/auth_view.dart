@@ -4,6 +4,7 @@ import 'package:firebase_ui_oauth_facebook/firebase_ui_oauth_facebook.dart';
 import 'package:firebase_ui_oauth_apple/firebase_ui_oauth_apple.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../services/auth_service.dart';
 
 class AuthView extends StatelessWidget {
   const AuthView({super.key});
@@ -21,9 +22,13 @@ class AuthView extends StatelessWidget {
       providers: providers,
       actions: [
         AuthStateChangeAction<SignedIn>((context, state) {
+          final authService = AuthService();
+          authService.syncWithBackend();
           context.go('/');
         }),
         AuthStateChangeAction<UserCreated>((context, state) {
+          final authService = AuthService();
+          authService.syncWithBackend();
           context.go('/');
         }),
       ],
