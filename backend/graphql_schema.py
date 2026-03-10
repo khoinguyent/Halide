@@ -1,4 +1,5 @@
 import strawberry
+from strawberry.types import Info
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
@@ -8,6 +9,7 @@ import models
 from database import get_db
 from strawberry.fastapi import BaseContext
 from auth import get_current_user
+import enum
 
 class Context(BaseContext):
     def __init__(self, db: Session, user: models.User):
@@ -21,19 +23,19 @@ async def get_context(
     return Context(db=db, user=user)
 
 @strawberry.enum
-class FormatEnum(strawberry.Enum):
+class FormatEnum(enum.Enum):
     format_135 = '135/35mm'
     format_120 = '120/Medium Format'
     format_large = 'Large Format'
 
 @strawberry.enum
-class ColorTypeEnum(strawberry.Enum):
+class ColorTypeEnum(enum.Enum):
     color_negative = 'Color Negative'
     b_w = 'B&W'
     slide = 'Slide'
 
 @strawberry.enum
-class CameraTypeEnum(strawberry.Enum):
+class CameraTypeEnum(enum.Enum):
     slr = 'SLR'
     tlr = 'TLR'
     rangefinder = 'Rangefinder'
@@ -41,7 +43,7 @@ class CameraTypeEnum(strawberry.Enum):
     view_camera = 'View Camera'
 
 @strawberry.enum
-class RollStatusEnum(strawberry.Enum):
+class RollStatusEnum(enum.Enum):
     shooting = 'Shooting'
     finished = 'Finished Shooting'
     at_lab = 'At Lab'
@@ -82,14 +84,13 @@ class UserCameraType:
     id: UUID
     user_id: str
     camera_id: UUID
-    camera: CameraType
     rating_functional: Optional[int]
     rating_view: Optional[int]
     rating_looking: Optional[int]
     created_at: datetime
 
     @strawberry.field
-    def camera(self, info: strawberry.Info) -> CameraType:
+    def camera(self, info: Info) -> CameraType:
         db = info.context.db
         camera_model = db.query(models.Camera).filter(models.Camera.id == self.camera_id).first()
         return CameraType(
@@ -114,9 +115,15 @@ class RollType:
     created_at: datetime
 
 @strawberry.type
+class UserDashboardType:
+    user: UserType
+    cameras: List[UserCameraType]
+    recent_rolls: List[RollType]
+
+@strawberry.type
 class Query:
     @strawberry.field
-    def film_stocks(self, info: strawberry.Info) -> List[FilmStockType]:
+    def film_stocks(self, info: Info) -> List[FilmStockType]:
         db = info.context.db
         stocks = db.query(models.FilmStock).all()
         return [
@@ -134,7 +141,7 @@ class Query:
         ]
 
     @strawberry.field
-    def user_gear(self, info: strawberry.Info) -> List[UserCameraType]:
+    def user_gear(self, info: Info) -> List[UserCameraType]:
         db = info.context.db
         user = info.context.user
         gear = db.query(models.UserCamera).filter(models.UserCamera.user_id == user.id).all()
@@ -146,9 +153,60 @@ class Query:
                 rating_functional=g.rating_functional,
                 rating_view=g.rating_view,
                 rating_looking=g.rating_looking,
-                created_at=g.created_at,
-                camera=None # Resolved by the field resolver
+                created_at=g.created_at
             ) for g in gear
         ]
+
+    @strawberry.field
+    def user_dashboard(self, info: Info) -> UserDashboardType:
+        db = info.context.db
+        user_model = info.context.user
+        
+        # User Profile
+        user_type = UserType(
+            id=user_model.id,
+            email=user_model.email,
+            display_name=user_model.display_name,
+            avatar_url=user_model.avatar_url,
+            created_at=user_model.created_at
+        )
+
+        # User Cameras (Gear)
+        gear_models = db.query(models.UserCamera).filter(models.UserCamera.user_id == user_model.id).all()
+        cameras = [
+            UserCameraType(
+                id=g.id,
+                user_id=g.user_id,
+                camera_id=g.camera_id,
+                rating_functional=g.rating_functional,
+                rating_view=g.rating_view,
+                rating_looking=g.rating_looking,
+                created_at=g.created_at
+            ) for g in gear_models
+        ]
+
+        # Recent Rolls (last 30)
+        roll_models = db.query(models.Roll).filter(
+            models.Roll.user_id == user_model.id
+        ).order_by(models.Roll.created_at.desc()).limit(30).all()
+        
+        recent_rolls = [
+            RollType(
+                id=r.id,
+                user_id=r.user_id,
+                film_stock_id=r.film_stock_id,
+                user_camera_id=r.user_camera_id,
+                shot_at_iso=r.shot_at_iso,
+                expired_year=r.expired_year,
+                status=RollStatusEnum(r.status.value),
+                created_at=r.created_at
+            ) for r in roll_models
+        ]
+
+        return UserDashboardType(
+            user=user_type,
+            cameras=cameras,
+            recent_rolls=recent_rolls
+        )
 
 schema = strawberry.Schema(query=Query)

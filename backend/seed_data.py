@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 import models
 from uuid import uuid4
+import datetime
 
 def seed_master_data():
     models.Base.metadata.create_all(bind=engine)
@@ -82,6 +83,57 @@ def seed_master_data():
                 print(f"Camera exists skipping: {cam['brand']} {cam['model']}")
         
         db.commit()
+
+        # Seed Test User and Data
+        test_user_id = "test_user_123"
+        test_user = db.query(models.User).filter(models.User.id == test_user_id).first()
+        if not test_user:
+            test_user = models.User(
+                id=test_user_id,
+                email="test@example.com",
+                display_name="Test User",
+                avatar_url="https://example.com/avatar.jpg"
+            )
+            db.add(test_user)
+            print(f"Adding Test User: {test_user_id}")
+            db.commit()
+            db.refresh(test_user)
+        
+        # Link a camera to the test user
+        leica_m6 = db.query(models.Camera).filter(models.Camera.model == "M6").first()
+        if leica_m6:
+            user_cam = db.query(models.UserCamera).filter(
+                models.UserCamera.user_id == test_user_id,
+                models.UserCamera.camera_id == leica_m6.id
+            ).first()
+            if not user_cam:
+                user_cam = models.UserCamera(
+                    user_id=test_user_id,
+                    camera_id=leica_m6.id,
+                    rating_functional=9,
+                    rating_view=8,
+                    rating_looking=10
+                )
+                db.add(user_cam)
+                print(f"Linking Leica M6 to Test User")
+                db.commit()
+                db.refresh(user_cam)
+
+            # Add some test rolls
+            portra = db.query(models.FilmStock).filter(models.FilmStock.name == "Portra 400").first()
+            if portra:
+                for i in range(5):
+                    roll = models.Roll(
+                        user_id=test_user_id,
+                        film_stock_id=portra.id,
+                        user_camera_id=user_cam.id,
+                        shot_at_iso=400,
+                        status=models.RollStatusEnum.shooting
+                    )
+                    db.add(roll)
+                print(f"Added 5 Portra 400 rolls to Test User")
+                db.commit()
+
     finally:
         db.close()
 
