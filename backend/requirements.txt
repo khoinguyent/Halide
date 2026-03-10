@@ -9,3 +9,5 @@ passlib[bcrypt]
 pydantic
 pydantic-settings
 python-multipart
+firebase-admin
+boto3

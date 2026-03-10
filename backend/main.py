@@ -6,6 +6,10 @@ from typing import List
 
 import models, schemas, crud, auth
 from database import engine, get_db
+from firebase_config import init_firebase
+
+# Initialize Firebase
+init_firebase()
 
 # Make sure tables are created, though Alembic is doing it
 models.Base.metadata.create_all(bind=engine)
