@@ -13,7 +13,7 @@
 - **Safety**: Use `IF NOT EXISTS` logic for any new environment-specific database extensions.
 
 ### [BE_1.2] Cloud Storage Service (R2/S3)
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_1.1]
 - **Assignee**: BE_DEV_1
 - **Task**: Implement a `StorageService` using `boto3`. Create the logic for `upload_roll_image`. Ensure it generates unique keys following `users/{uid}/rolls/{roll_id}/{image_id}.jpg`.
