@@ -1,0 +1,22 @@
+# Halide Orchestrator - Cycle 01 Log
+Timestamp: 2026-03-10T22:01:02+07:00
+Status: Backend initialized, Frontend blocked.
+
+## BE_DEV_1
+- Created `docker-compose.yml` mapped to local port 5433 to avoid conflicts.
+- Configured PostgreSQL and Redis.
+- Initialized FastAPI project with SQLAlchemy.
+- Created declarative models for `Users`, `FilmStocks`, `Cameras`, `UserCameras`, `Rolls`, `Images`.
+- Created and executed Alembic metadata migrations. Database schema is now matching `/docs/specs/db_schema.md`.
+
+## BE_DEV_2
+- Implemented JWT token generation and validation flow using FastAPI's OAuth2PasswordBearer.
+- Added user registration and login endpoints.
+- Added CRUD endpoints for `GET /rolls`, `POST /rolls`, and `UserCameras` with required relationships.
+- Swagger UI started and tested successfully on `http://localhost:8000/docs`.
+
+## FE_DEV_1 & FE_DEV_2
+- **BLOCKED**: Flutter SDK is not installed on the system environment. Cannot initialize project, set up GoRouter, or create Riverpod instances.
+
+## Next Steps
+User needs to install the Flutter SDK to unblock the frontend initialize sprint. The current cycle concludes with Backend fully implemented according to specifications.
