@@ -1,0 +1,31 @@
+{
+    "project_name": "Halide",
+    "current_sprint": "sprint_01",
+    "sprints": [
+        "sprint_00",
+        "sprint_01"
+    ],
+    "status": {
+        "sprint_00": "DONE",
+        "sprint_01": "ACTIVE"
+    },
+    "git_config": {
+        "main_branch": "develop",
+        "feature_branch_prefix": "feat/",
+        "auto_commit": true,
+        "auto_merge_on_sprint_completion": true
+    },
+    "sprint_metadata": {
+        "sprint_01": {
+            "branch_name": "sprint_01_core_engine",
+            "start_date": "2026-03-10",
+            "target_merge": "develop"
+        }
+    },
+    "roles": {
+        "BE_DEV_1": "Backend Lead (Infra, DB Modeling, & Core Logic)",
+        "BE_DEV_2": "Backend Lead (Auth, API Design, & Feature Logic)",
+        "FE_DEV_1": "Frontend Lead (Architecture, Navigation, & State)",
+        "FE_DEV_2": "Frontend Lead (UI Components & Visual Design)"
+    }
+}
