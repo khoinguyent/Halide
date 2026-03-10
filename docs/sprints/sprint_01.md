@@ -19,14 +19,14 @@
 - **Task**: Implement a `StorageService` using `boto3`. Create the logic for `upload_roll_image`. Ensure it generates unique keys following `users/{uid}/rolls/{roll_id}/{image_id}.jpg`.
 
 ### [BE_2.1] Master Film Stock & Gear Query
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: None
 - **Assignee**: BE_DEV_2
 - **Task**: Create GraphQL Resolvers for `FilmStocks` (Master List) and `UserGear`. 
 - **Safety**: Ensure `FilmStocks` seeding script ignores duplicates if run multiple times.
 
 ### [BE_2.2] User Activity Dashboard (GraphQL)
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_2.1]
 - **Assignee**: BE_DEV_2
 - **Task**: Build the `UserDashboard` query. It must return the User profile, their linked `UserCameras`, and the last 30 `Rolls` sorted by `created_at`.

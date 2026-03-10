@@ -11,3 +11,4 @@ pydantic-settings
 python-multipart
 firebase-admin
 boto3
+strawberry-graphql[fastapi]
