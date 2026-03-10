@@ -6,7 +6,7 @@
 ## 📋 Task Breakdown
 
 ### [BE_1.1] Firebase & Environment Initialization
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: None
 - **Assignee**: BE_DEV_1
 - **Task**: Initialize Firebase Admin SDK. Setup `.env` validation for `FIREBASE_PROJECT_ID`, `S3_ENDPOINT` (R2), and `S3_ACCESS_KEY`.
