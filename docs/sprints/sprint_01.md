@@ -19,7 +19,7 @@
 - **Task**: Implement a `StorageService` using `boto3`. Create the logic for `upload_roll_image`. Ensure it generates unique keys following `users/{uid}/rolls/{roll_id}/{image_id}.jpg`.
 
 ### [BE_2.1] Master Film Stock & Gear Query
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: None
 - **Assignee**: BE_DEV_2
 - **Task**: Create GraphQL Resolvers for `FilmStocks` (Master List) and `UserGear`. 

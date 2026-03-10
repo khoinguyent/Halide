@@ -6,11 +6,16 @@ from typing import List
 
 import models, schemas, crud, auth
 from database import engine, get_db
+from strawberry.fastapi import GraphQLRouter
+from graphql_schema import schema, get_context
 
 # Make sure tables are created, though Alembic is doing it
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Halide API")
+
+graphql_app = GraphQLRouter(schema, context_getter=get_context)
+app.include_router(graphql_app, prefix="/graphql")
 
 @app.post("/register", response_model=schemas.UserOut)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):

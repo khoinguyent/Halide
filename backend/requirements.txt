@@ -9,3 +9,4 @@ passlib[bcrypt]
 pydantic
 pydantic-settings
 python-multipart
+strawberry-graphql[fastapi]
