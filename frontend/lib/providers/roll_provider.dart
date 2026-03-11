@@ -1,14 +1,17 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/roll.dart';
 import '../models/roll_status.dart';
-import 'package:flutter/material.dart';
 
-class RollNotifier extends FamilyNotifier<Roll, String> {
+class RollNotifier extends Notifier<Roll> {
+  final String rollId;
+
+  RollNotifier(this.rollId);
+
   @override
-  Roll build(String arg) {
-    // In a real app, this would fetch from a repository or initial state
+  Roll build() {
     return Roll(
-      id: arg,
+      id: rollId,
       brand: 'Kodak',
       name: 'Portra 400',
       color: Colors.yellow,
@@ -18,11 +21,14 @@ class RollNotifier extends FamilyNotifier<Roll, String> {
 
   void updateStatus(RollStatus newStatus) {
     state = state.copyWith(status: newStatus);
-    // TODO: Sync with backend
     print('Updating Roll ${state.id} status to ${newStatus.label}');
+  }
+
+  void addImages(List<String> urls) {
+    state = state.copyWith(imageUrls: [...state.imageUrls, ...urls]);
   }
 }
 
-final rollProvider = NotifierProvider.family<RollNotifier, Roll, String>(() {
-  return RollNotifier();
-});
+final rollProvider = NotifierProvider.family<RollNotifier, Roll, String>(
+  (rollId) => RollNotifier(rollId),
+);

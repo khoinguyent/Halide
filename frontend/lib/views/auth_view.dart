@@ -11,7 +11,7 @@ class AuthView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final providers = [
+    final providers = <AuthProvider>[
       EmailAuthProvider(),
       GoogleProvider(clientId: 'dummy-google-id'),
       FacebookProvider(clientId: 'dummy-facebook-id'),
