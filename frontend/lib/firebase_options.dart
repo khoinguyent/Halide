@@ -17,17 +17,26 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'DefaultFirebaseOptions have not been configured for web - '
+        'you can reconfigure this by running the FlutterFire CLI again.',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return android;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for android - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
         return macos;
       case TargetPlatform.windows:
-        return windows;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for windows - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -40,47 +49,21 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'dummy-api-key',
-    appId: '1:1234567890:web:abcdef123456',
-    messagingSenderId: '1234567890',
-    projectId: 'halide-dummy',
-    authDomain: 'halide-dummy.firebaseapp.com',
-    storageBucket: 'halide-dummy.appspot.com',
-  );
-
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'dummy-api-key',
-    appId: '1:1234567890:android:abcdef123456',
-    messagingSenderId: '1234567890',
-    projectId: 'halide-dummy',
-    storageBucket: 'halide-dummy.appspot.com',
-  );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'dummy-api-key',
-    appId: '1:1234567890:ios:abcdef123456',
-    messagingSenderId: '1234567890',
-    projectId: 'halide-dummy',
-    storageBucket: 'halide-dummy.appspot.com',
-    iosBundleId: 'com.example.frontend',
+    apiKey: 'AIzaSyAVq3cna6Ag-tH3fDvTHKxRRppOdX_5u7Y',
+    appId: '1:413280765346:ios:9c36be0af7015cfbc49efb',
+    messagingSenderId: '413280765346',
+    projectId: 'halide-ae374',
+    storageBucket: 'halide-ae374.firebasestorage.app',
+    iosBundleId: 'com.halide.halidemanagement',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'dummy-api-key',
-    appId: '1:1234567890:ios:abcdef123456',
-    messagingSenderId: '1234567890',
-    projectId: 'halide-dummy',
-    storageBucket: 'halide-dummy.appspot.com',
-    iosBundleId: 'com.example.frontend',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'dummy-api-key',
-    appId: '1:1234567890:web:abcdef123456',
-    messagingSenderId: '1234567890',
-    projectId: 'halide-dummy',
-    authDomain: 'halide-dummy.firebaseapp.com',
-    storageBucket: 'halide-dummy.appspot.com',
+    apiKey: 'AIzaSyAVq3cna6Ag-tH3fDvTHKxRRppOdX_5u7Y',
+    appId: '1:413280765346:ios:9c36be0af7015cfbc49efb',
+    messagingSenderId: '413280765346',
+    projectId: 'halide-ae374',
+    storageBucket: 'halide-ae374.firebasestorage.app',
+    iosBundleId: 'com.halide.halidemanagement',
   );
 }
