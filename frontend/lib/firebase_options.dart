@@ -24,10 +24,7 @@ class DefaultFirebaseOptions {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for android - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return android;
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
@@ -65,5 +62,14 @@ class DefaultFirebaseOptions {
     projectId: 'halide-ae374',
     storageBucket: 'halide-ae374.firebasestorage.app',
     iosBundleId: 'com.halide.halidemanagement',
+  );
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyCegamBHdba5DVFRmqUNsaFAzvLrXcSvkc',
+    appId: '1:413280765346:android:3e667aeaa450f02fc49efb',
+    messagingSenderId: '413280765346',
+    projectId: 'halide-ae374',
+    storageBucket: 'halide-ae374.firebasestorage.app',
+    androidClientId: 'com.halide.halidemanagement',
   );
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "413280765346",
+    "project_id": "halide-ae374",
+    "storage_bucket": "halide-ae374.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:413280765346:android:3e667aeaa450f02fc49efb",
+        "android_client_info": {
+          "package_name": "com.halide.halidemanagement"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCegamBHdba5DVFRmqUNsaFAzvLrXcSvkc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
