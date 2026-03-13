@@ -39,7 +39,7 @@ dependencies:
   firebase_core: ^4.5.0
   firebase_auth: ^6.2.0
   google_sign_in: ^6.3.0
-  flutter_facebook_auth: ^6.2.0
+  flutter_facebook_auth: ^7.1.1
   sign_in_with_apple: ^7.0.1
   firebase_ui_auth: ^3.0.1
   firebase_ui_oauth_google: ^2.0.1
@@ -48,6 +48,8 @@ dependencies:
   image_picker: ^1.2.1
   http_parser: ^4.1.2
   riverpod_annotation: ^4.0.2
+  flutter_bloc: ^9.1.0
+  bloc: ^9.1.0
 
 dev_dependencies:
   flutter_test:
