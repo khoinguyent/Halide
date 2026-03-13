@@ -125,7 +125,6 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                             style: TextStyle(color: Colors.white70, fontSize: 16),
                           ),
                           const SizedBox(height: 48),
-
                           // Glassmorphic Card
                           ClipRRect(
                             borderRadius: BorderRadius.circular(32),
@@ -159,10 +158,17 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                                             shape: const StadiumBorder(),
                                             elevation: 0,
                                           ),
-                                          child: const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                          child: const Text(
+                                            'Create Account',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -172,7 +178,10 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                             onPressed: () => context.pop(),
                             child: const Text(
                               'Already have an account? Sign In',
-                              style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],

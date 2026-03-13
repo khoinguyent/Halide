@@ -47,7 +47,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAVq3cna6Ag-tH3fDvTHKxRRppOdX_5u7Y',
+    apiKey: 'AIzaSyB78444k9k-0JOTcSC2iIllpa26i3G9fLQ',
     appId: '1:413280765346:ios:9c36be0af7015cfbc49efb',
     messagingSenderId: '413280765346',
     projectId: 'halide-ae374',
@@ -57,7 +57,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCegamBHdba5DVFRmqUNsaFAzvLrXcSvkc',
+    apiKey: 'AIzaSyBUjFL0ofEI9iBXkg_kPQf7-v284lsDsxg',
     appId: '1:413280765346:android:3e667aeaa450f02fc49efb',
     messagingSenderId: '413280765346',
     projectId: 'halide-ae374',
@@ -66,7 +66,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyAVq3cna6Ag-tH3fDvTHKxRRppOdX_5u7Y',
+    apiKey: 'AIzaSyB78444k9k-0JOTcSC2iIllpa26i3G9fLQ',
     appId: '1:413280765346:ios:9c36be0af7015cfbc49efb',
     messagingSenderId: '413280765346',
     projectId: 'halide-ae374',

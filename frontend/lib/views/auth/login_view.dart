@@ -149,13 +149,13 @@ class _LoginViewState extends ConsumerState<LoginView> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   children: [
                     _buildLogoHeader(),
-                    const SizedBox(height: 48),
-                    _buildGlassCard(),
                     const SizedBox(height: 32),
+                    _buildGlassCard(),
+                    const SizedBox(height: 24),
                     _buildFooter(),
                   ],
                 ),
@@ -215,15 +215,16 @@ class _LoginViewState extends ConsumerState<LoginView> {
   }
 
   Widget _buildGlassCard() {
+    final width = MediaQuery.of(context).size.width;
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
+        constraints: const BoxConstraints(maxWidth: 480),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(32),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              width: double.infinity,
+              width: width * 0.9,
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.07),
@@ -286,9 +287,19 @@ class _LoginViewState extends ConsumerState<LoginView> {
             Icon(icon, color: Colors.white70, size: 24),
             Expanded(
               child: Center(
-                child: Text(
-                  text,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    text,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -340,60 +351,102 @@ class _LoginViewState extends ConsumerState<LoginView> {
       context: context,
       builder: (context) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Email Sign In', style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(child: _buildTextField(_emailController, 'Email', Icons.email_outlined)),
-              const SizedBox(height: 16),
-              Flexible(child: _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true)),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: _BaseAuthModal(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Email Sign In',
+                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.left,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(_emailController, 'Email', Icons.email_outlined),
+                const SizedBox(height: 16),
+                _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _loginWithEmail();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.95),
+                          foregroundColor: Colors.black,
+                          shape: const StadiumBorder(),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                        ),
+                        child: const Text(
+                          'Login',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            _buildActionButton('Login', () {
-              Navigator.pop(context);
-              _loginWithEmail();
-            }),
-          ],
+          ),
         ),
       ),
     );
   }
 
   void _showPhoneInput() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: Container(
-          padding: const EdgeInsets.all(40),
-          decoration: const BoxDecoration(
-            color: Color(0xFF0F172A),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Continue with Phone', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              const Text('We will send a code to your number', style: TextStyle(color: Colors.white54)),
-              const SizedBox(height: 32),
-              _buildTextField(_phoneController, 'Phone Number', Icons.phone_outlined, keyboardType: TextInputType.phone),
-              const SizedBox(height: 40),
-              _buildActionButton('Send Verification Code', () {
-                Navigator.pop(context);
-                _verifyPhone();
-              }),
-            ],
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: _BaseAuthModal(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Continue with Phone',
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.left,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'We will send a code to your number',
+                    style: TextStyle(color: Colors.white54, fontSize: 14),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildTextField(
+                    _phoneController,
+                    'Phone Number',
+                    Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildActionButton('Send Verification Code', () {
+                    Navigator.pop(context);
+                    _verifyPhone();
+                  }),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -420,6 +473,26 @@ class _LoginViewState extends ConsumerState<LoginView> {
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.blueAccent)),
       ),
+    );
+  }
+}
+
+class _BaseAuthModal extends StatelessWidget {
+  final Widget child;
+
+  const _BaseAuthModal({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return Container(
+      width: width * 0.9,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1C29),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: child,
     );
   }
 }
