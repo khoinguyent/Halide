@@ -1,11 +1,11 @@
 from strawberry.types import Info
 from typing import List
-from ...db.models.film_stock import FilmStock
+from ...services import film_stock_service
 from ...graphql.types import FilmStockType, FormatEnum, ColorTypeEnum
 
 def resolve_film_stocks(root, info: Info) -> List[FilmStockType]:
     db = info.context["db"]
-    stocks = db.query(FilmStock).all()
+    stocks = film_stock_service.get_film_stocks(db)
     return [
         FilmStockType(
             id=s.id,

@@ -1,12 +1,12 @@
 from strawberry.types import Info
 from typing import List
-from ...db.models.camera import UserCamera
+from ...services import gear_service
 from ...graphql.types import UserCameraType
 
 def resolve_user_gear(root, info: Info) -> List[UserCameraType]:
     db = info.context["db"]
     user = info.context["user"]
-    gear = db.query(UserCamera).filter(UserCamera.user_id == user.id).all()
+    gear = gear_service.get_user_cameras(db, user_id=user.id)
     return [
         UserCameraType(
             id=g.id,

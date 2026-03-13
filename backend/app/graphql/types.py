@@ -28,10 +28,11 @@ class CameraTypeEnumGQL(enum.Enum):
 
 @strawberry.enum
 class RollStatusEnumGQL(enum.Enum):
-    shooting = 'Shooting'
-    finished = 'Finished Shooting'
-    at_lab = 'At Lab'
-    result_received = 'Result Received'
+    loaded = 'loaded'
+    shooting = 'shooting'
+    lab = 'lab'
+    scanned = 'scanned'
+    archived = 'archived'
 
 @strawberry.type
 class UserType:
