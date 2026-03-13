@@ -6,6 +6,7 @@ import '../views/home_view.dart';
 import '../views/roll_detail_view.dart';
 import '../views/profile_view.dart';
 import '../views/locker_view.dart';
+import '../views/add_gear_view.dart';
 import '../views/meter_view.dart';
 import '../views/main_shell.dart';
 import '../views/auth/login_view.dart';
@@ -49,6 +50,12 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/locker',
           builder: (context, state) => const LockerView(),
+          routes: [
+            GoRoute(
+              path: 'add-gear',
+              builder: (context, state) => const AddGearView(),
+            ),
+          ],
         ),
         GoRoute(
           path: '/meter',
