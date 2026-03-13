@@ -1,6 +1,6 @@
 from strawberry.types import Info
 from ...services import dashboard_service
-from ...graphql.types import UserDashboardType, UserType, UserCameraType, RollType, RollStatusEnumGQL
+from ...graphql.types import UserDashboardType, UserType, UserCameraType, UserLensType, RollType, RollStatusEnumGQL
 
 def resolve_user_dashboard(root, info: Info) -> UserDashboardType:
     db = info.context["db"]
@@ -24,10 +24,21 @@ def resolve_user_dashboard(root, info: Info) -> UserDashboardType:
             id=g.id,
             user_id=g.user_id,
             camera_id=g.camera_id,
+            gear_nickname=g.gear_nickname,
             rating_functional=g.rating_functional,
             rating_view=g.rating_view,
             rating_looking=g.rating_looking,
-            created_at=g.created_at
+            created_at=g.created_at,
+            lenses=[
+                UserLensType(
+                    id=l.id,
+                    user_id=l.user_id,
+                    lens_id=l.lens_id,
+                    parent_camera_id=l.parent_camera_id,
+                    gear_nickname=l.gear_nickname,
+                    created_at=l.created_at
+                ) for l in g.lenses
+            ]
         ) for g in dashboard_data["cameras"]
     ]
 
