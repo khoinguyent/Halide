@@ -2,20 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../features/auth/providers/auth_provider.dart'; // Adjusted path if needed, usually it's in a features folder now
 import '../features/shell/presentation/widgets/halide_scaffold.dart';
 import '../views/home_view.dart';
 import '../views/profile_view.dart';
+import '../views/locker_view.dart';
+import '../views/meter_view.dart';
 import '../views/auth/login_view.dart';
 import '../views/auth/register_view.dart';
 
 // Global keys for navigation
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorHomeKey = GlobalKey<NavigatorState>(debugLabel: 'home');
+final _shellNavigatorLockerKey = GlobalKey<NavigatorState>(debugLabel: 'locker');
+final _shellNavigatorMeterKey = GlobalKey<NavigatorState>(debugLabel: 'meter');
 final _shellNavigatorProfileKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
 
 /// A ChangeNotifier that listens to Firebase auth state changes
-/// and notifies GoRouter to re-evaluate its redirect logic.
 class AuthNotifier extends ChangeNotifier {
   AuthNotifier() {
     FirebaseAuth.instance.authStateChanges().listen((_) {
@@ -45,7 +47,7 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
-    // Auth routes (outside the scaffold)
+    // Auth routes (completely outside the shell)
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginView(),
@@ -55,7 +57,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RegisterView(),
     ),
 
-    // App Shell routes
+    // NEW Persistent App Shell (Glass Dock Navigation)
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return HalideScaffold(
@@ -65,6 +67,7 @@ final appRouter = GoRouter(
         );
       },
       branches: [
+        // Tab 1: Home
         StatefulShellBranch(
           navigatorKey: _shellNavigatorHomeKey,
           routes: [
@@ -74,24 +77,27 @@ final appRouter = GoRouter(
             ),
           ],
         ),
+        // Tab 2: Locker (Integration from your branch)
         StatefulShellBranch(
-          navigatorKey: GlobalKey<NavigatorState>(debugLabel: 'search'),
+          navigatorKey: _shellNavigatorLockerKey,
           routes: [
             GoRoute(
-              path: '/search',
-              builder: (context, state) => const Scaffold(body: Center(child: Text('Search'))),
+              path: '/locker',
+              builder: (context, state) => const LockerView(),
             ),
           ],
         ),
+        // Tab 3: Meter (Integration from your branch)
         StatefulShellBranch(
-          navigatorKey: GlobalKey<NavigatorState>(debugLabel: 'notifications'),
+          navigatorKey: _shellNavigatorMeterKey,
           routes: [
             GoRoute(
-              path: '/notifications',
-              builder: (context, state) => const Scaffold(body: Center(child: Text('Notifications'))),
+              path: '/meter',
+              builder: (context, state) => const MeterView(),
             ),
           ],
         ),
+        // Tab 4: Profile
         StatefulShellBranch(
           navigatorKey: _shellNavigatorProfileKey,
           routes: [

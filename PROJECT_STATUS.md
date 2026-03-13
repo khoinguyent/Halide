@@ -1,13 +1,16 @@
-# 🎞️ Halide Project Status: sprint_01
-**Last Sync:** 2026-03-13 21:37:55
+# 🎞️ Halide Project Status: sprint_02
+**Last Sync:** 2026-03-13 22:21:30
 
 | Task ID | Status | Owner | Spec Alignment |
 | :--- | :--- | :--- | :--- |
-| BE_1.1 | ✅ DONE | BE | Verified |
-| BE_1.2 | ✅ DONE | BE | Verified |
-| BE_2.1 | ✅ DONE | BE | Verified |
-| BE_2.2 | ✅ DONE | BE | Verified |
-| FE_1.1 | ✅ DONE | FE | Verified |
-| FE_2.1 | ✅ DONE | FE | Verified |
-| FE_2.2 | ✅ DONE | FE | Verified |
-| BE-REF-001 | ✅ DONE | BE | Verified |
+| BE_2.1 | 💤 TODO | BE | Verified |
+| BE_2.2 | 💤 TODO | BE | Verified |
+| BE_2.3 | 💤 TODO | BE | Verified |
+| BE_2.4 | 💤 TODO | BE | Verified |
+| BE_2.5 | 💤 TODO | BE | Verified |
+| BE_2.6 | 💤 TODO | BE | Verified |
+| FE_2.1 | 💤 TODO | FE | Verified |
+| FE_2.4 | 💤 TODO | FE | Verified |
+| FE_2.2 | 💤 TODO | FE | Verified |
+| FE_2.3 | 💤 TODO | FE | Verified |
+| FE_2.5 | 💤 TODO | FE | Verified |

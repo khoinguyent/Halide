@@ -17,6 +17,7 @@ class GlassNavigationDock extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
+        // Premium glass effect using BackdropFilter
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
@@ -33,10 +34,10 @@ class GlassNavigationDock extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildNavItem(Icons.home_outlined, 0),
-                _buildNavItem(Icons.search, 1),
-                const SizedBox(width: 48), // Space for FAB
-                _buildNavItem(Icons.notifications_none, 2),
-                _buildNavItem(Icons.person_outline, 3),
+                _buildNavItem(Icons.grid_view_outlined, 1), // Locker (Grid)
+                const SizedBox(width: 48), // central FAB space
+                _buildNavItem(Icons.exposure_outlined, 2),  // Meter (Exposure)
+                _buildNavItem(Icons.person_outline, 3),    // Profile
               ],
             ),
           ),

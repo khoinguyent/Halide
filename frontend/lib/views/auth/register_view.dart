@@ -149,19 +149,19 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                                       const SizedBox(height: 16),
                                       _buildTextField(_confirmPasswordController, 'Confirm Password', Icons.lock_outline, obscureText: true),
                                       const SizedBox(height: 40),
-                                    SizedBox(
-                                      height: 56,
-                                      child: ElevatedButton(
-                                        onPressed: _register,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white.withOpacity(0.95),
-                                          foregroundColor: Colors.black,
-                                          shape: const StadiumBorder(),
-                                          elevation: 0,
+                                      SizedBox(
+                                        height: 56,
+                                        child: ElevatedButton(
+                                          onPressed: _register,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.white.withOpacity(0.95),
+                                            foregroundColor: Colors.black,
+                                            shape: const StadiumBorder(),
+                                            elevation: 0,
+                                          ),
+                                          child: const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                                         ),
-                                        child: const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ),
