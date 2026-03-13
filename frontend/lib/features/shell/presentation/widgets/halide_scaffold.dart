@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/frame_logging_bloc.dart';
-import 'glass_navigation_dock.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/features/shell/presentation/bloc/frame_logging_bloc.dart';
+import 'package:frontend/features/shell/presentation/widgets/glass_navigation_dock.dart';
+import 'package:frontend/providers/rolls_provider.dart';
+import 'package:frontend/features/rolls/presentation/widgets/add_roll_form.dart';
+import 'package:frontend/features/rolls/presentation/bloc/rolls_bloc.dart';
 
-class HalideScaffold extends StatelessWidget {
+class HalideScaffold extends ConsumerWidget {
   final Widget child;
   final int currentIndex;
   final Function(int) onTabSelected;
@@ -16,7 +20,7 @@ class HalideScaffold extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return BlocProvider(
       create: (context) => FrameLoggingBloc(),
       child: Scaffold(
@@ -33,8 +37,16 @@ class HalideScaffold extends StatelessWidget {
                   if (isActive) {
                     context.read<FrameLoggingBloc>().add(LogFrame({}));
                   } else {
-                    // In a real app, we'd pick a roll ID
-                    context.read<FrameLoggingBloc>().add(StartFrameLogging('current_roll'));
+                    // Show premium glass Add Roll form
+                    showDialog(
+                      context: context,
+                      builder: (context) => AddRollForm(
+                        repository: ref.read(rollsRepositoryProvider),
+                        onRollAdded: () {
+                          ref.read(rollsBlocProvider).add(RefreshRolls());
+                        },
+                      ),
+                    );
                   }
                 },
                 backgroundColor: isActive ? Colors.redAccent : Colors.black,

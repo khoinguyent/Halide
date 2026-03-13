@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import 'lens.dart';
 
 class Camera {
@@ -17,10 +18,24 @@ class Camera {
     this.serialNumber,
     this.format,
     this.lenses = const [],
+=======
+class Camera {
+  final String id;
+  final String brand;
+  final String model;
+  final String cameraType;
+
+  Camera({
+    required this.id,
+    required this.brand,
+    required this.model,
+    required this.cameraType,
+>>>>>>> feat/sprint_03/fe_dev_1
   });
 
   factory Camera.fromJson(Map<String, dynamic> json) {
     return Camera(
+<<<<<<< HEAD
       id: json['id'] ?? '',
       nickname: json['nickname'] ?? '',
       brand: json['brand'] ?? '',
@@ -42,4 +57,14 @@ class Camera {
       'format': format,
     };
   }
+=======
+      id: json['id'],
+      brand: json['brand'],
+      model: json['model'],
+      cameraType: json['camera_type'],
+    );
+  }
+
+  String get displayName => '$brand $model';
+>>>>>>> feat/sprint_03/fe_dev_1
 }

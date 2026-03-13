@@ -410,3 +410,18 @@ fatal: Exiting because of an unresolved conflict.
 hint: Fix them up in the work tree, and then use 'git add/rm <file>'
 hint: as appropriate to mark resolution and make a commit.
 fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:21:15.165439] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:21:15.178736] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:21:15.190650] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:21:15.200510] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:21:38.647351] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:22:15.291732] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:22:38.866872] Git Error: 
+[2026-03-14 00:22:38.886957] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
