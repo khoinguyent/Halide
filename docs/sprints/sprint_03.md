@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
 # Sprint 3: Data Integration & Dynamic Forms
 
 Sprint 3 transitions the Halide app from static "Glass" mocks to a dynamic, database-driven experience. This includes implementing full CRUD forms for gear and film rolls, and seeding the database with realistic test data.
@@ -8,7 +6,7 @@ Sprint 3 transitions the Halide app from static "Glass" mocks to a dynamic, data
 
 ### [BE_3.1] Database Seeding Engine
 
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_2.1]
 - **Assignee**: BE_DEV_1
 
@@ -25,7 +23,7 @@ Create a seeding engine to populate the PostgreSQL database for the current user
 
 ### [BE_3.2] Film Master Registry
 
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_2.1]
 - **Assignee**: BE_DEV_1
 
@@ -43,7 +41,7 @@ Implement a "Master" film stock registry table to power the searchable picklists
 
 ### [BE_3.3] Gear Schema Refactor (Nesting Lenses)
 
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_2.4]
 - **Assignee**: BE_DEV_2
 
@@ -61,7 +59,7 @@ Modify the gear API and DB relationships to remove the global "Lenses" section. 
 
 ### [FE_3.1] Live Data Integration
 
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_3.1]
 - **Assignee**: FE_DEV_1
 
@@ -77,7 +75,7 @@ Refactor existing BLoCs to fetch real data from the backend APIs. Replace all ha
 
 ### [FE_3.2] Add New Roll Form Implementation
 
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_2.1], [BE_3.2]
 - **Assignee**: FE_DEV_1
 
@@ -96,7 +94,7 @@ Implement the "Add Roll" form triggered by the + button on the Rolls tab.
 
 ### [FE_3.3] Locker Screen Refinement
 
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_2.5]
 - **Assignee**: FE_DEV_2
 
@@ -112,7 +110,7 @@ Update the Locker screen to match the "Your Rolls" layout, adding the header and
 
 ### [FE_3.4] Add Gear Input Form
 
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_3.3], [BE_3.3]
 - **Assignee**: FE_DEV_2
 
@@ -125,40 +123,3 @@ Implement the input form for adding new cameras and lenses to the locker.
 - Fields: Nickname, Manufacturer, Model, Serial Number.
 - Toggle to specify if the gear item is a standalone lens.
 - Successful submission refreshes the Locker list immediately.
-=======
-# Sprint 3
-
-## Frontend – FE_DEV_2 (UI Components & Feature Screens)
-
-[FE_3.3] Locker Refinement
-- Status: TODO
-- Summary: Update the Locker screen to match the 'Your Rolls' header style. Move lenses inside the camera cards as sub-items, removing the global lenses category.
-- Acceptance Criteria:
-  - Header matches "Your Rolls" typography and spacing.
-  - Lenses are nested within their respective camera cards.
-  - Global "Lenses" section is removed.
-
-[FE_3.4] Add Gear Form
-- Status: TODO
-- Summary: Implement the form for adding cameras and lenses. Include fields for Nickname, Manufacturer, Model, and Serial Number.
-- Acceptance Criteria:
-  - Form exists for adding new gear.
-  - Fields for Nickname, Manufacturer, Model, and Serial Number are present.
-  - Form matches Halide visual standards (GlassPanel, HalideScaffold).
->>>>>>> feat/sprint_03/fe_dev_2
-=======
-# Sprint 03 - Seeding & Master Data
-
-## Backend Tasks (BE_DEV_1)
-
-### [BE_3.1] Seeding Engine
-- **Status**: DONE
-- **Description**: Create a robust seeding script/service that populates the PostgreSQL database for the current user with 3 cameras, 5 lenses, and 10 historical rolls. Use metadata-rich data (Aperture, Shutter, GPS) for at least 20 frames.
-
-### [BE_3.2] Master Registry
-- **Status**: DONE
-- **Description**: Implement the FilmStockMaster table and a searchable GET /api/v1/master/films endpoint to power the frontend picklists.
-- **Acceptance Criteria**:
-    - Queryable by name, brand, iso.
-    - Idempotent seeding of master film stocks.
->>>>>>> feat/sprint_03/be_dev_1

@@ -11,7 +11,7 @@
         "sprint_00": "DONE",
         "sprint_01": "DONE",
         "sprint_02": "DONE",
-        "sprint_03": "ACTIVE"
+        "sprint_03": "DONE"
     },
     "git_config": {
         "main_branch": "develop",

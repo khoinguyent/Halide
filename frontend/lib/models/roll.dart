@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import 'package:flutter/material.dart';
 import 'roll_status.dart';
 
@@ -70,39 +69,6 @@ class Roll {
       frameCount: json['frame_count'] ?? 0,
       maxFrames: json['max_frames'] ?? 36,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
-=======
-class Roll {
-  final String id;
-  final String userId;
-  final String filmStockId;
-  final String userCameraId;
-  final int? shotAtIso;
-  final int? expiredYear;
-  final String status;
-  final DateTime createdAt;
-
-  Roll({
-    required this.id,
-    required this.userId,
-    required this.filmStockId,
-    required this.userCameraId,
-    this.shotAtIso,
-    this.expiredYear,
-    required this.status,
-    required this.createdAt,
-  });
-
-  factory Roll.fromJson(Map<String, dynamic> json) {
-    return Roll(
-      id: json['id'],
-      userId: json['user_id'],
-      filmStockId: json['film_stock_id'],
-      userCameraId: json['user_camera_id'],
-      shotAtIso: json['shot_at_iso'],
-      expiredYear: json['expired_year'],
-      status: json['status'],
-      createdAt: DateTime.parse(json['created_at']),
->>>>>>> feat/sprint_03/fe_dev_1
     );
   }
 }
