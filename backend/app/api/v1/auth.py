@@ -7,6 +7,8 @@ from ...db.schemas.user import UserCreate, UserOut
 from ...db.schemas.auth import Token
 from ...services import auth_service
 from ...core import security
+from ...core.dependencies import get_current_user
+from ...db.models.user import User
 
 router = APIRouter()
 
@@ -28,3 +30,11 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
         )
     access_token = security.create_access_token(data={"sub": user.id})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/me", response_model=UserOut)
+def read_user_me(current_user: User = Depends(get_current_user)):
+    """
+    Returns the current authenticated user profile.
+    Creation is handled in get_current_user dependency.
+    """
+    return current_user

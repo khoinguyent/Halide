@@ -1,24 +1,66 @@
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
+from typing import List
+from sqlalchemy.orm import Session
+import uuid
+
 from ...db.models.user import User
+from ...db.models.roll import Roll
+from ...db.models.image import Image
+from ...db.session import get_db
+from ...db.schemas.image import ImageOut
 from ...core.dependencies import get_current_user
 from ...services.storage_service import storage_service
-import uuid
 
 router = APIRouter()
 
-@router.post("/upload_roll_image/{roll_id}")
-async def upload_roll_image(
+@router.post("/rolls/{roll_id}/images", response_model=List[ImageOut])
+async def upload_roll_images(
     roll_id: str,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    files: List[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    file_content = await file.read()
-    image_id = str(uuid.uuid4())
-    key = storage_service.upload_roll_image(
-        user_id=current_user.id,
-        roll_id=roll_id,
-        image_id=image_id,
-        file_content=file_content,
-        content_type=file.content_type
-    )
-    return {"key": key, "image_id": image_id}
+    # Verify roll ownership
+    roll = db.query(Roll).filter(Roll.id == roll_id).first()
+    if not roll:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Roll not found"
+        )
+    
+    if roll.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to upload to this roll"
+        )
+    
+    uploaded_images = []
+    for file in files:
+        file_content = await file.read()
+        image_id = str(uuid.uuid4())
+        
+        # Upload to Storage
+        key = storage_service.upload_roll_image(
+            user_id=current_user.id,
+            roll_id=roll_id,
+            image_id=image_id,
+            file_content=file_content,
+            content_type=file.content_type
+        )
+        
+        # Save to DB
+        # Note: In a real scenario we might derive URL from key or store key
+        # Here we follow the model's image_url field
+        db_image = Image(
+            roll_id=roll_id,
+            image_url=key,  # Storing the key as the URL for now
+            # frame_number, aperture, shutter_speed could be extracted from EXIF in later sprints
+        )
+        db.add(db_image)
+        uploaded_images.append(db_image)
+    
+    db.commit()
+    for img in uploaded_images:
+        db.refresh(img)
+        
+    return uploaded_images

@@ -17,6 +17,12 @@ Refactor existing backend files into the modular layout defined in `backend_stru
 - Packages created: `app/core`, `app/db/models`, `app/db/schemas`, `app/api/v1`, `app/services`, `app/graphql`.
 - All existing tests pass after the move.
 
+[BE_2.2] StorageService REST endpoint
+Status: IN_PROGRESS
+
+Depends On: [BE_1.2]
+
+Assignee: BE_DEV_1
 ### [BE_2.2] StorageService REST endpoint
 - **Status**: TODO
 - **Depends On**: [BE_1.2]
@@ -30,6 +36,12 @@ Expose storage upload logic via REST for the frontend multi-image uploader.
 - Uses path pattern: `users/{uid}/rolls/{roll_id}/{image_id}.jpg`.
 - Validates roll ownership; unauthorized access returns 403.
 
+[BE_2.3] Firebase-based auth integration layer
+Status: IN_PROGRESS
+
+Depends On: [BE_1.1], [BE_2.1]
+
+Assignee: BE_DEV_1
 ### [BE_2.3] Firebase Auth Integration
 - **Status**: TODO
 - **Depends On**: [BE_1.1], [BE_2.1]
