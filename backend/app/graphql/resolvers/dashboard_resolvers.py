@@ -1,12 +1,13 @@
 from strawberry.types import Info
-from ...db.models.user import User as UserModel
-from ...db.models.camera import UserCamera as UserCameraModel
-from ...db.models.roll import Roll as RollModel
+from ...services import dashboard_service
 from ...graphql.types import UserDashboardType, UserType, UserCameraType, RollType, RollStatusEnumGQL
 
 def resolve_user_dashboard(root, info: Info) -> UserDashboardType:
     db = info.context["db"]
     user_model = info.context["user"]
+    
+    dashboard_data = dashboard_service.get_user_dashboard(db, user_id=user_model.id)
+    user_model = dashboard_data["user"]
     
     # User Profile
     user_type = UserType(
@@ -18,7 +19,6 @@ def resolve_user_dashboard(root, info: Info) -> UserDashboardType:
     )
 
     # User Cameras (Gear)
-    gear_models = db.query(UserCameraModel).filter(UserCameraModel.user_id == user_model.id).all()
     cameras = [
         UserCameraType(
             id=g.id,
@@ -28,14 +28,10 @@ def resolve_user_dashboard(root, info: Info) -> UserDashboardType:
             rating_view=g.rating_view,
             rating_looking=g.rating_looking,
             created_at=g.created_at
-        ) for g in gear_models
+        ) for g in dashboard_data["cameras"]
     ]
 
-    # Recent Rolls (last 30)
-    roll_models = db.query(RollModel).filter(
-        RollModel.user_id == user_model.id
-    ).order_by(RollModel.created_at.desc()).limit(30).all()
-    
+    # Recent Rolls
     recent_rolls = [
         RollType(
             id=r.id,
@@ -46,7 +42,7 @@ def resolve_user_dashboard(root, info: Info) -> UserDashboardType:
             expired_year=r.expired_year,
             status=RollStatusEnumGQL(r.status.value),
             created_at=r.created_at
-        ) for r in roll_models
+        ) for r in dashboard_data["recent_rolls"]
     ]
 
     return UserDashboardType(

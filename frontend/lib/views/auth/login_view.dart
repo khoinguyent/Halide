@@ -121,12 +121,13 @@ class _LoginViewState extends ConsumerState<LoginView> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Background Image
+          // Local background image for premium aesthetic
           Positioned.fill(
-            child: Image.network(
-              'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?q=80&w=1938&auto=format&fit=crop',
+            child: Image.asset(
+              'assets/images/login_bg.png',
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(color: const Color(0xFF0F172A)),
+              height: double.infinity,
+              width: double.infinity,
             ),
           ),
           // Gradient Overlay
