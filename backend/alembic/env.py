@@ -20,8 +20,8 @@ import sys
 # Add the 'backend' directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from database import Base
-import models # Ensure models are loaded
+from app.db.base import Base
+from app.db.models import user, film_stock, camera, roll, image
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

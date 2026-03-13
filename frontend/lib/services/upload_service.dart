@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import '../config/app_config.dart';
 
 class UploadService {
-  final String _baseUrl = 'http://localhost:8000'; // Adjust for your environment
 
   Future<bool> uploadRollImage({
     required String rollId,
@@ -12,7 +12,7 @@ class UploadService {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('$_baseUrl/rolls/$rollId/images'),
+        Uri.parse('${AppConfig.apiUrl}/upload_roll_image/$rollId'),
       );
 
       // Add image file

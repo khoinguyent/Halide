@@ -1,0 +1,13 @@
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, text
+from sqlalchemy.dialects.postgresql import UUID
+from ..base import Base
+
+class Image(Base):
+    __tablename__ = "images"
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    roll_id = Column(UUID(as_uuid=True), ForeignKey("rolls.id"))
+    frame_number = Column(Integer)
+    image_url = Column(String, nullable=False)
+    aperture = Column(Float)
+    shutter_speed = Column(String(20))
+    notes = Column(String)

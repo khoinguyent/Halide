@@ -1,0 +1,31 @@
+import enum
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime, text, CheckConstraint
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+from ..base import Base
+
+class CameraTypeEnum(str, enum.Enum):
+    slr = 'SLR'
+    tlr = 'TLR'
+    rangefinder = 'Rangefinder'
+    point_shoot = 'Point & Shoot'
+    view_camera = 'View Camera'
+
+class Camera(Base):
+    __tablename__ = "cameras"
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    brand = Column(String(100), nullable=False)
+    model = Column(String(100), nullable=False)
+    camera_type = Column(Enum(CameraTypeEnum), nullable=False)
+    description = Column(String)
+    best_practice = Column(String)
+    image_urls = Column(JSONB)
+
+class UserCamera(Base):
+    __tablename__ = "user_cameras"
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    user_id = Column(String(255), ForeignKey("users.id"))
+    camera_id = Column(UUID(as_uuid=True), ForeignKey("cameras.id"))
+    rating_functional = Column(Integer, CheckConstraint('rating_functional BETWEEN 1 AND 10'))
+    rating_view = Column(Integer, CheckConstraint('rating_view BETWEEN 1 AND 10'))
+    rating_looking = Column(Integer, CheckConstraint('rating_looking BETWEEN 1 AND 10'))
+    created_at = Column(DateTime, server_default=text('NOW()'))

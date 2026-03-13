@@ -1,9 +1,6 @@
-import strawberry
-from strawberry.types import Info
-from sqlalchemy.orm import Session
-from database import SessionLocal
-import models
-from graphql_schema import schema, Query, Context
+from app.db.session import SessionLocal
+from app.db import models
+from app.graphql.schema import Query
 
 def test_user_dashboard():
     db = SessionLocal()
@@ -18,11 +15,11 @@ def test_user_dashboard():
             def __init__(self, context):
                 self.context = context
 
-        context = Context(db=db, user=user)
+        context = {"db": db, "user": user}
         info = MockInfo(context=context)
 
-        query = Query()
-        dashboard = query.user_dashboard(info)
+        from app.graphql.resolvers.dashboard_resolvers import resolve_user_dashboard
+        dashboard = resolve_user_dashboard(None, info)
 
         print(f"User: {dashboard.user.display_name}")
         print(f"Cameras: {len(dashboard.cameras)}")

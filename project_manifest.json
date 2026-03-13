@@ -3,11 +3,13 @@
     "current_sprint": "sprint_01",
     "sprints": [
         "sprint_00",
-        "sprint_01"
+        "sprint_01",
+        "sprint_02"
     ],
     "status": {
         "sprint_00": "DONE",
-        "sprint_01": "ACTIVE"
+        "sprint_01": "DONE",
+        "sprint_02": "ACTIVE"
     },
     "git_config": {
         "main_branch": "develop",
@@ -19,6 +21,11 @@
         "sprint_01": {
             "branch_name": "sprint_01_core_engine",
             "start_date": "2026-03-10",
+            "target_merge": "develop"
+        },
+        "sprint_02": {
+            "branch_name": "sprint_02_intelligence",
+            "start_date": "2026-03-13",
             "target_merge": "develop"
         }
     },

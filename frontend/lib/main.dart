@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'router/app_router.dart';
 
@@ -10,25 +11,52 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(
-    // Adding ProviderScope enables Riverpod for the entire project
     const ProviderScope(
       child: HalideApp(),
     ),
   );
 }
 
-class HalideApp extends ConsumerWidget {
+class HalideApp extends StatelessWidget {
   const HalideApp({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return MaterialApp.router(
-      title: 'Halide',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
-      routerConfig: appRouter,
+  Widget build(BuildContext context) {
+    return const AuthGate();
+  }
+}
+
+/// A gate widget that shows a loading spinner while Firebase
+/// resolves the initial auth state (avoids the router making
+/// a blind decision before authStateChanges fires the first event).
+class AuthGate extends StatelessWidget {
+  const AuthGate({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Still waiting for the first auth event
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+        // Auth resolved — let the router take over
+        return MaterialApp.router(
+          title: 'Halide',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            primarySwatch: Colors.blue,
+            useMaterial3: true,
+          ),
+          routerConfig: appRouter,
+        );
+      },
     );
   }
 }

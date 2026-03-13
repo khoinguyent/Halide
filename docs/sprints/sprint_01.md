@@ -49,3 +49,13 @@
 - **Depends On**: [BE_1.2]
 - **Assignee**: FE_DEV_2
 - **Task**: Create the "Add Images" interface. Allow selecting multiple files from the gallery and piping them to the Backend `upload_roll_image` endpoint.
+
+### [BE-REF-001] Align backend layout with structure spec
+- **Status**: DONE
+- **Depends On**: -
+- **Assignee**: BE_DEV_1
+- **Task**: Refactor existing backend files into the `app/core`, `app/db`, `app/api/v1`, `app/services`, and `app/graphql` layout defined in `docs/specs/backend_structure.md`.
+- **Acceptance Criteria**:
+    - No top-level `.py` files remain in `backend/` except `main.py` (or a thin wrapper).
+    - All tests pass.
+    - New endpoints and models created in later sprints follow this structure.

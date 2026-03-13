@@ -8,11 +8,26 @@ import '../views/profile_view.dart';
 import '../views/auth/login_view.dart';
 import '../views/auth/register_view.dart';
 
+/// A ChangeNotifier that listens to Firebase auth state changes
+/// and notifies GoRouter to re-evaluate its redirect logic.
+class AuthNotifier extends ChangeNotifier {
+  AuthNotifier() {
+    FirebaseAuth.instance.authStateChanges().listen((_) {
+      notifyListeners();
+    });
+  }
+}
+
+final _authNotifier = AuthNotifier();
+
 final appRouter = GoRouter(
   initialLocation: '/',
+  refreshListenable: _authNotifier,
   redirect: (context, state) {
     final user = FirebaseAuth.instance.currentUser;
-    final loggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/register';
+    final loggingIn =
+        state.matchedLocation == '/login' ||
+        state.matchedLocation == '/register';
 
     if (user == null && !loggingIn) {
       return '/login';

@@ -53,6 +53,16 @@ class DefaultFirebaseOptions {
     projectId: 'halide-ae374',
     storageBucket: 'halide-ae374.firebasestorage.app',
     iosBundleId: 'com.halide.halidemanagement',
+    iosClientId: '413280765346-2pq8udmspnct62nvojgpuafku9pq8som.apps.googleusercontent.com',
+  );
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyCegamBHdba5DVFRmqUNsaFAzvLrXcSvkc',
+    appId: '1:413280765346:android:3e667aeaa450f02fc49efb',
+    messagingSenderId: '413280765346',
+    projectId: 'halide-ae374',
+    storageBucket: 'halide-ae374.firebasestorage.app',
+    androidClientId: '413280765346-3s5avvjccsgvarbr1luvc3s75ro7i631.apps.googleusercontent.com',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -62,14 +72,6 @@ class DefaultFirebaseOptions {
     projectId: 'halide-ae374',
     storageBucket: 'halide-ae374.firebasestorage.app',
     iosBundleId: 'com.halide.halidemanagement',
-  );
-
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCegamBHdba5DVFRmqUNsaFAzvLrXcSvkc',
-    appId: '1:413280765346:android:3e667aeaa450f02fc49efb',
-    messagingSenderId: '413280765346',
-    projectId: 'halide-ae374',
-    storageBucket: 'halide-ae374.firebasestorage.app',
-    androidClientId: 'com.halide.halidemanagement',
+    iosClientId: '413280765346-2pq8udmspnct62nvojgpuafku9pq8som.apps.googleusercontent.com',
   );
 }

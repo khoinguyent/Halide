@@ -1,7 +1,7 @@
 import os
 from sqlalchemy.orm import Session
-from database import SessionLocal, engine
-import models
+from app.db.session import SessionLocal, engine
+from app.db import models
 from uuid import uuid4
 import datetime
 
