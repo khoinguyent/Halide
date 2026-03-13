@@ -38,6 +38,13 @@ class _HomeViewState extends ConsumerState<HomeView> {
         iconTheme: const IconThemeData(color: Colors.white, size: 26),
         actions: [
           IconButton(
+            icon: const Icon(Icons.add_rounded),
+            tooltip: 'Add roll',
+            onPressed: () {
+              // TODO: navigate to add-roll flow or show bottom sheet
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.person_outline),
             onPressed: () => context.push('/profile'),
           ),
@@ -78,15 +85,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
         error: (err, stack) => _ErrorState(
           error: err.toString(),
           onRetry: () => ref.refresh(dashboardRollsProvider),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: Colors.white.withOpacity(0.1),
-        shape: const CircleBorder(),
-        child: BackdropFilter(
-          filter: ColorFilter.mode(Colors.white.withOpacity(0.1), BlendMode.overlay),
-          child: const Icon(Icons.add, color: Colors.white),
         ),
       ),
     );
