@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime, text, CheckConstraint
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime, text, CheckConstraint, Float
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from ..base import Base
 
@@ -32,17 +32,25 @@ class UserCamera(Base):
     rating_view = Column(Integer, CheckConstraint('rating_view BETWEEN 1 AND 10'))
     rating_looking = Column(Integer, CheckConstraint('rating_looking BETWEEN 1 AND 10'))
     created_at = Column(DateTime, server_default=text('NOW()'))
+<<<<<<< HEAD
     
     # Relationships
     lenses = relationship("UserLens", back_populates="parent_camera", cascade="all, delete-orphan")
+=======
+>>>>>>> feat/sprint_03/be_dev_1
 
 class Lens(Base):
     __tablename__ = "lenses"
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     brand = Column(String(100), nullable=False)
     model = Column(String(100), nullable=False)
+<<<<<<< HEAD
     focal_length = Column(String(50))
     max_aperture = Column(String(20))
+=======
+    focal_length_mm = Column(Integer, nullable=False)
+    max_aperture = Column(Float, nullable=False)
+>>>>>>> feat/sprint_03/be_dev_1
     description = Column(String)
     image_urls = Column(JSONB)
 
@@ -51,9 +59,15 @@ class UserLens(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     user_id = Column(String(255), ForeignKey("users.id"))
     lens_id = Column(UUID(as_uuid=True), ForeignKey("lenses.id"))
+<<<<<<< HEAD
     parent_camera_id = Column(UUID(as_uuid=True), ForeignKey("user_cameras.id"), nullable=True)
     gear_nickname = Column(String(255))
     created_at = Column(DateTime, server_default=text('NOW()'))
 
     # Relationships
     parent_camera = relationship("UserCamera", back_populates="lenses")
+=======
+    serial_number = Column(String(100))
+    notes = Column(String)
+    created_at = Column(DateTime, server_default=text('NOW()'))
+>>>>>>> feat/sprint_03/be_dev_1

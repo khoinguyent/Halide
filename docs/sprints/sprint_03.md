@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Sprint 3: Data Integration & Dynamic Forms
 
 Sprint 3 transitions the Halide app from static "Glass" mocks to a dynamic, database-driven experience. This includes implementing full CRUD forms for gear and film rolls, and seeding the database with realistic test data.
@@ -145,3 +146,19 @@ Implement the input form for adding new cameras and lenses to the locker.
   - Fields for Nickname, Manufacturer, Model, and Serial Number are present.
   - Form matches Halide visual standards (GlassPanel, HalideScaffold).
 >>>>>>> feat/sprint_03/fe_dev_2
+=======
+# Sprint 03 - Seeding & Master Data
+
+## Backend Tasks (BE_DEV_1)
+
+### [BE_3.1] Seeding Engine
+- **Status**: DONE
+- **Description**: Create a robust seeding script/service that populates the PostgreSQL database for the current user with 3 cameras, 5 lenses, and 10 historical rolls. Use metadata-rich data (Aperture, Shutter, GPS) for at least 20 frames.
+
+### [BE_3.2] Master Registry
+- **Status**: DONE
+- **Description**: Implement the FilmStockMaster table and a searchable GET /api/v1/master/films endpoint to power the frontend picklists.
+- **Acceptance Criteria**:
+    - Queryable by name, brand, iso.
+    - Idempotent seeding of master film stocks.
+>>>>>>> feat/sprint_03/be_dev_1

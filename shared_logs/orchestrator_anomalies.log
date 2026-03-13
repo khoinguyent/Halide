@@ -425,3 +425,56 @@ Please, commit your changes before you merge.
 hint: Fix them up in the work tree, and then use 'git add/rm <file>'
 hint: as appropriate to mark resolution and make a commit.
 fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:24:15.410119] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:24:15.424759] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:24:15.448460] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:24:15.473656] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:25:15.563351] Git Error: 
+[2026-03-14 00:25:15.577058] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:25:15.592219] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:25:15.629497] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:25:39.121206] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:25:39.139850] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:25:39.157133] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:25:39.172636] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:26:15.670306] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:26:15.688741] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:26:15.702922] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:26:15.717438] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:26:39.222847] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:26:39.240561] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:26:39.257457] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
+[2026-03-14 00:26:39.273837] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.
