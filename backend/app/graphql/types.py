@@ -65,14 +65,50 @@ class CameraType:
     image_urls: Optional[List[str]]
 
 @strawberry.type
+class LensType:
+    id: UUID
+    brand: str
+    model: str
+    focal_length: Optional[str]
+    max_aperture: Optional[str]
+    description: Optional[str]
+    image_urls: Optional[List[str]]
+
+@strawberry.type
+class UserLensType:
+    id: UUID
+    user_id: str
+    lens_id: UUID
+    parent_camera_id: Optional[UUID]
+    gear_nickname: Optional[str]
+    created_at: datetime
+
+    @strawberry.field
+    def lens(self, info: Info) -> LensType:
+        from ..db.models.camera import Lens
+        db = info.context["db"]
+        lens_model = db.query(Lens).filter(Lens.id == self.lens_id).first()
+        return LensType(
+            id=lens_model.id,
+            brand=lens_model.brand,
+            model=lens_model.model,
+            focal_length=lens_model.focal_length,
+            max_aperture=lens_model.max_aperture,
+            description=lens_model.description,
+            image_urls=lens_model.image_urls
+        )
+
+@strawberry.type
 class UserCameraType:
     id: UUID
     user_id: str
     camera_id: UUID
+    gear_nickname: Optional[str]
     rating_functional: Optional[int]
     rating_view: Optional[int]
     rating_looking: Optional[int]
     created_at: datetime
+    lenses: List[UserLensType]
 
     @strawberry.field
     def camera(self, info: Info) -> CameraType:
