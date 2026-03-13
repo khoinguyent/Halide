@@ -47,11 +47,28 @@ class HalideOrchestrator:
             f.write(f"[{datetime.now()}] {message}\n")
 
     def sync_agent_branches(self, manifest):
-        """Merges agent work branches into development branch."""
+        """Merges agent work branches into development branch and updates sprint status."""
         current_sprint = manifest.get("current_sprint", "sprint_01")
+        sprint_file = os.path.join(SPRINTS_DIR, f"{current_sprint}.md")
+        
         for role_id in manifest.get("roles", {}).keys():
             branch_name = f"feat/{current_sprint}/{role_id.lower()}"
-            self.run_git(["git", "merge", branch_name, "--no-edit", "-m", f"auto-sync: {role_id} updates"])
+            result = self.run_git(["git", "merge", branch_name, "--no-edit", "-m", f"auto-sync: {role_id} updates"])
+            
+            # If merge was successful, try to mark the task as DONE in the sprint file
+            if result is not None and os.path.exists(sprint_file):
+                with open(sprint_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                
+                # Update status for the specific role's main task if found
+                # Pattern: ### [role_id...] ... - **Status**: TODO
+                pattern = rf"(### \[({role_id}.*?)\].*?-\s*\*\*Status\*\*:\s*)TODO"
+                new_content = re.sub(pattern, r"\1DONE", content, flags=re.DOTALL | re.IGNORECASE)
+                
+                if new_content != content:
+                    with open(sprint_file, "w", encoding="utf-8") as f:
+                        f.write(new_content)
+                    print(f"✅ Sprint File Updated: Marked tasks for {role_id} as DONE.")
 
     def update_dashboard(self, manifest):
         """Parses sprint file and refreshes PROJECT_STATUS.md."""
@@ -78,6 +95,20 @@ class HalideOrchestrator:
                 icon = "✅" if status == "DONE" else "⏳" if status == "IN_PROGRESS" else "❌" if status == "BLOCKED" else "💤"
                 f.write(f"| {tid} | {icon} {status} | {owner} | Verified |\n")
         
+        # If all tasks are DONE, update the manifest status
+        if tasks and all(s == "DONE" for _, s in tasks):
+            try:
+                with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+                    manifest_data = json.load(f)
+                
+                if manifest_data["status"].get(current_sprint) != "DONE":
+                    manifest_data["status"][current_sprint] = "DONE"
+                    with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
+                        json.dump(manifest_data, f, indent=4)
+                    print(f"🎊 Sprint Complete! Updated {current_sprint} to DONE in manifest.")
+            except Exception as e:
+                self._log_anomaly(f"Failed to update manifest status: {e}")
+
         print(f"📊 Dashboard Updated: {len(tasks)} tasks processed.")
 
     def main_loop(self):

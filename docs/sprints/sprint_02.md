@@ -5,7 +5,7 @@ Sprint 2 focuses on establishing the modular backend structure, bridging Firebas
 ## Backend – BE_DEV_1 (Infra & Storage / Auth)
 
 ### [BE_2.1] Backend structure refactor
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_1.1]
 - **Assignee**: BE_DEV_1
 
@@ -17,14 +17,8 @@ Refactor existing backend files into the modular layout defined in `backend_stru
 - Packages created: `app/core`, `app/db/models`, `app/db/schemas`, `app/api/v1`, `app/services`, `app/graphql`.
 - All existing tests pass after the move.
 
-[BE_2.2] StorageService REST endpoint
-Status: IN_PROGRESS
-
-Depends On: [BE_1.2]
-
-Assignee: BE_DEV_1
 ### [BE_2.2] StorageService REST endpoint
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_1.2]
 - **Assignee**: BE_DEV_1
 
@@ -36,14 +30,8 @@ Expose storage upload logic via REST for the frontend multi-image uploader.
 - Uses path pattern: `users/{uid}/rolls/{roll_id}/{image_id}.jpg`.
 - Validates roll ownership; unauthorized access returns 403.
 
-[BE_2.3] Firebase-based auth integration layer
-Status: IN_PROGRESS
-
-Depends On: [BE_1.1], [BE_2.1]
-
-Assignee: BE_DEV_1
 ### [BE_2.3] Firebase Auth Integration
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_1.1], [BE_2.1]
 - **Assignee**: BE_DEV_1
 
@@ -58,7 +46,7 @@ Bridge Firebase Auth to the internal User system via JWT verification in `core/s
 ## Backend – BE_DEV_2 (Domain & GraphQL)
 
 ### [BE_2.4] Film Stock & Gear GraphQL Alignment
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_2.1]
 - **Assignee**: BE_DEV_2
 
@@ -70,7 +58,7 @@ Refine GraphQL queries to match the REST models and include the new `nickname` r
 - Resolvers call the service layer, not raw DB sessions.
 
 ### [BE_2.5] User Dashboard Service + API
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_2.4]
 - **Assignee**: BE_DEV_2
 
@@ -83,7 +71,7 @@ Create the unified dashboard data provider for the mobile home screen.
 - REST `GET /api/v1/dashboard` and GQL `userDashboard` both implemented.
 
 ### [BE_2.6] Film roll status transitions
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_2.1]
 - **Assignee**: BE_DEV_2
 
@@ -97,7 +85,7 @@ Implement strict logic for roll states: loaded, shooting, lab, scanned, archived
 ## Frontend – FE_DEV_1 (Architecture & Navigation)
 
 ### [FE_2.1] MainShell + Bottom Nav (Glass Dock)
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_1.1], [BE_2.3]
 - **Assignee**: FE_DEV_1
 
@@ -110,7 +98,7 @@ Implement the post-login shell with the glass bottom navigation dock exactly as 
 - `HalideScaffold` used for background photo and blur consistency.
 
 ### [FE_2.4] FAB -> Frame Logging Hook
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_2.1], [BE_2.6]
 - **Assignee**: FE_DEV_1
 
@@ -124,7 +112,7 @@ Connect the central FAB to a quick-log interaction that increments the frame cou
 ## Frontend – FE_DEV_2 (UI & Dashboard)
 
 ### [FE_2.2] Rolls Home Screen Layout
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_2.1], [BE_2.5]
 - **Assignee**: FE_DEV_2
 
@@ -137,7 +125,7 @@ Create the "Your Rolls" screen using dynamic glass cards that reflect roll lifec
 - Status 'Shooting' shows a progress bar and frame count.
 
 ### [FE_2.3] Rolls Tab BLoC Integration
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_2.2], [BE_2.5]
 - **Assignee**: FE_DEV_2
 
@@ -149,7 +137,7 @@ Wire the Rolls UI to the Dashboard API using the BLoC pattern for state manageme
 - Empty state shows "Add first roll" glass card CTA.
 
 ### [FE_2.5] Locker & Tab Placeholders
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_2.1]
 - **Assignee**: FE_DEV_2
 
@@ -159,3 +147,4 @@ Implement placeholder content for Locker, Meter, and Profile tabs using the shar
 **Acceptance Criteria**
 - Locker tab displays cards for saved gear including their nicknames.
 - Meter and Profile show "Coming Soon" panels in the translucent glass style.
+t glass style.

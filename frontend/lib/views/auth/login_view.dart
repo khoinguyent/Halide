@@ -224,44 +224,46 @@ class _LoginViewState extends ConsumerState<LoginView> {
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
               width: double.infinity,
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.07),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: Colors.white.withOpacity(0.15)),
-          ),
-          child: Column(
-            children: [
-              const Text(
-                'Sign in to Halide',
-                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Start capturing analog moments again.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white60, fontSize: 14),
-              ),
-              const SizedBox(height: 40),
+              child: Column(
+                children: [
+                  const Text(
+                    'Sign in to Halide',
+                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Start capturing analog moments again.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white60, fontSize: 14),
+                  ),
+                  const SizedBox(height: 40),
 
-              if (!_showOTPField) ...[
-                _buildContinueButton('Continue with Email', Icons.email_outlined, _showEmailDialog),
-                const SizedBox(height: 16),
-                _buildContinueButton('Continue with Phone', Icons.phone_android_outlined, _showPhoneInput),
-                const SizedBox(height: 16),
-                _buildContinueButton('Continue with Google', Icons.g_mobiledata_rounded, _loginWithGoogle),
-                const SizedBox(height: 16),
-                _buildContinueButton('Continue with Apple', Icons.apple_rounded, _loginWithApple),
-              ] else ...[
-                _buildTextField(_otpController, 'Verification Code', Icons.sms_outlined),
-                const SizedBox(height: 24),
-                _buildActionButton('Verify & Login', _signInWithOTP),
-                TextButton(
-                  onPressed: () => setState(() => _showOTPField = false),
-                  child: const Text('Back to options', style: TextStyle(color: Colors.white60)),
-                ),
-              ],
-            ],
+                  if (!_showOTPField) ...[
+                    _buildContinueButton('Continue with Email', Icons.email_outlined, _showEmailDialog),
+                    const SizedBox(height: 16),
+                    _buildContinueButton('Continue with Phone', Icons.phone_android_outlined, _showPhoneInput),
+                    const SizedBox(height: 16),
+                    _buildContinueButton('Continue with Google', Icons.g_mobiledata_rounded, _loginWithGoogle),
+                    const SizedBox(height: 16),
+                    _buildContinueButton('Continue with Apple', Icons.apple_rounded, _loginWithApple),
+                  ] else ...[
+                    _buildTextField(_otpController, 'Verification Code', Icons.sms_outlined),
+                    const SizedBox(height: 24),
+                    _buildActionButton('Verify & Login', _signInWithOTP),
+                    TextButton(
+                      onPressed: () => setState(() => _showOTPField = false),
+                      child: const Text('Back to options', style: TextStyle(color: Colors.white60)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
