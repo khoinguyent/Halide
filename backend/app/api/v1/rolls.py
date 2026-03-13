@@ -25,3 +25,13 @@ def create_roll(
     current_user: User = Depends(get_current_user)
 ):
     return roll_service.create_roll(db=db, roll=roll, user_id=current_user.id)
+
+@router.patch("/rolls/{id}/status", response_model=RollOut)
+def update_roll_status(
+    id: UUID,
+    status_update: RollStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return roll_service.update_roll_status(db, roll_id=id, new_status=status_update.status, user_id=current_user.id)
+

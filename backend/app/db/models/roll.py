@@ -4,10 +4,11 @@ from sqlalchemy.dialects.postgresql import UUID
 from ..base import Base
 
 class RollStatusEnum(str, enum.Enum):
-    shooting = 'Shooting'
-    finished = 'Finished Shooting'
-    at_lab = 'At Lab'
-    result_received = 'Result Received'
+    loaded = 'loaded'
+    shooting = 'shooting'
+    lab = 'lab'
+    scanned = 'scanned'
+    archived = 'archived'
 
 class Roll(Base):
     __tablename__ = "rolls"

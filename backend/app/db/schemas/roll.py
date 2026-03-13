@@ -20,3 +20,6 @@ class RollOut(RollBase):
     created_at: datetime
     class Config:
         from_attributes = True
+
+class RollStatusUpdate(BaseModel):
+    status: RollStatusEnum
