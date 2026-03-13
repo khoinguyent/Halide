@@ -60,3 +60,27 @@ class UserCameraOut(BaseModel):
     created_at: datetime
     class Config:
         from_attributes = True
+
+class FilmStockOut(BaseModel):
+    id: UUID
+    brand: str
+    name: str
+    iso: int
+    format: FormatEnum
+    color_type: ColorTypeEnum
+    description: Optional[str]
+    best_practice: Optional[str]
+    image_urls: Optional[dict]
+    class Config:
+        from_attributes = True
+
+class CameraOut(BaseModel):
+    id: UUID
+    brand: str
+    model: str
+    camera_type: CameraTypeEnum
+    description: Optional[str]
+    best_practice: Optional[str]
+    image_urls: Optional[dict]
+    class Config:
+        from_attributes = True

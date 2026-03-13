@@ -56,6 +56,14 @@ def read_user_cameras(skip: int = 0, limit: int = 100, db: Session = Depends(get
 def create_user_camera(user_camera: schemas.UserCameraCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     return crud.create_user_camera(db=db, user_camera=user_camera, user_id=current_user.id)
 
+@app.get("/film_stocks", response_model=List[schemas.FilmStockOut])
+def read_film_stocks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_film_stocks(db, skip=skip, limit=limit)
+
+@app.get("/cameras", response_model=List[schemas.CameraOut])
+def read_cameras(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud.get_cameras(db, skip=skip, limit=limit)
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Halide API"}

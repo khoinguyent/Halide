@@ -36,3 +36,9 @@ def create_user_camera(db: Session, user_camera: schemas.UserCameraCreate, user_
     db.commit()
     db.refresh(db_user_camera)
     return db_user_camera
+
+def get_film_stocks(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.FilmStock).offset(skip).limit(limit).all()
+
+def get_cameras(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Camera).offset(skip).limit(limit).all()
