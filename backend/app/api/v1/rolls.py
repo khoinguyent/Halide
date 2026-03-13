@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 from ...db.session import get_db
-from ...db.schemas.roll import RollCreate, RollOut
+from ...db.schemas.roll import RollCreate, RollOut, RollStatusUpdate
 from ...db.models.user import User
+from uuid import UUID
 from ...core.dependencies import get_current_user
 from ...services import roll_service
 

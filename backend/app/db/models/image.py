@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, text
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, text, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from ..base import Base
 
@@ -11,3 +11,6 @@ class Image(Base):
     aperture = Column(Float)
     shutter_speed = Column(String(20))
     notes = Column(String)
+    location_lat = Column(Float)
+    location_lng = Column(Float)
+    created_at = Column(DateTime, server_default=text('NOW()'))

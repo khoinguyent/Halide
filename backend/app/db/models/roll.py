@@ -16,6 +16,7 @@ class Roll(Base):
     user_id = Column(String(255), ForeignKey("users.id"))
     film_stock_id = Column(UUID(as_uuid=True), ForeignKey("film_stocks.id"))
     user_camera_id = Column(UUID(as_uuid=True), ForeignKey("user_cameras.id"))
+    user_lens_id = Column(UUID(as_uuid=True), ForeignKey("user_lenses.id"))
     shot_at_iso = Column(Integer)
     expired_year = Column(Integer)
     status = Column(Enum(RollStatusEnum), server_default='shooting')
