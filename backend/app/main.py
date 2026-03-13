@@ -17,7 +17,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Halide API")
 
 # REST Routers
-app.include_router(auth.router, tags=["Authentication"])
+app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(gear.router, prefix="/api/v1", tags=["Gear"])
 app.include_router(rolls.router, prefix="/api/v1", tags=["Rolls"])
 app.include_router(storage.router, prefix="/api/v1", tags=["Storage"])

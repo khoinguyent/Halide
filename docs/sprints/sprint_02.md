@@ -2,7 +2,7 @@ Sprint 2 should deepen the core flows already started: gear/roll CRUD + film sto
 
 Backend – BE_DEV_1 (Infra & Storage / Auth)
 [BE_2.1] Backend structure refactor
-Status: TODO
+Status: IN_PROGRESS
 
 Depends On: [BE_1.1]
 
@@ -20,7 +20,7 @@ New packages exist: app/core, app/db/models, app/db/schemas, app/api/v1, app/ser
 All existing tests and endpoints still work.
 
 [BE_2.2] StorageService REST endpoint
-Status: TODO
+Status: IN_PROGRESS
 
 Depends On: [BE_1.2]
 
@@ -41,7 +41,7 @@ Returns Image JSON objects per upload.
 Validates ownership of roll_id by current user; unauthorized access returns 403.
 
 [BE_2.3] Firebase-based auth integration layer
-Status: TODO
+Status: IN_PROGRESS
 
 Depends On: [BE_1.1], [BE_2.1]
 
