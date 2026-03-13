@@ -65,13 +65,15 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
       body: Stack(
         children: [
           // Background Image (Consistent with LoginView)
-          Positioned.fill(
-            child: Image.network(
-              'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?q=80&w=1938&auto=format&fit=crop',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(color: const Color(0xFF0F172A)),
+          // Local background image for premium aesthetic
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/register_bg.png',
+                fit: BoxFit.cover,
+                height: double.infinity,
+                width: double.infinity,
+              ),
             ),
-          ),
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
