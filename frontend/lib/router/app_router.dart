@@ -5,11 +5,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../views/home_view.dart';
 import '../views/roll_detail_view.dart';
 import '../views/profile_view.dart';
+import '../views/locker_view.dart';
+import '../views/meter_view.dart';
+import '../views/main_shell.dart';
 import '../views/auth/login_view.dart';
 import '../views/auth/register_view.dart';
 
-/// A ChangeNotifier that listens to Firebase auth state changes
-/// and notifies GoRouter to re-evaluate its redirect logic.
 class AuthNotifier extends ChangeNotifier {
   AuthNotifier() {
     FirebaseAuth.instance.authStateChanges().listen((_) {
@@ -38,9 +39,26 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const HomeView(),
+    ShellRoute(
+      builder: (context, state, child) => MainShell(child: child),
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const HomeView(),
+        ),
+        GoRoute(
+          path: '/locker',
+          builder: (context, state) => const LockerView(),
+        ),
+        GoRoute(
+          path: '/meter',
+          builder: (context, state) => const MeterView(),
+        ),
+        GoRoute(
+          path: '/profile',
+          builder: (context, state) => const ProfileView(),
+        ),
+      ],
     ),
     GoRoute(
       path: '/login',
@@ -56,10 +74,6 @@ final appRouter = GoRouter(
         final id = state.pathParameters['id']!;
         return RollDetailView(rollId: id);
       },
-    ),
-    GoRoute(
-      path: '/profile',
-      builder: (context, state) => const ProfileView(),
     ),
   ],
 );
