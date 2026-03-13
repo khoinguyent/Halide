@@ -37,7 +37,18 @@ class _MainShellState extends State<MainShell> {
         onTap: _onItemTapped,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: _GlassFAB(),
+      floatingActionButton: _GlassFAB(
+        onTap: () {
+          if (_currentIndex == 0) {
+            context.go('/locker/add-gear');
+          } else {
+            // Default behavior for other tabs (Log Frame)
+             ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Logging frame...')),
+            );
+          }
+        },
+      ),
     );
   }
 }
@@ -156,8 +167,14 @@ class _NavItem extends StatelessWidget {
 }
 
 class _GlassFAB extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _GlassFAB({Key? key, required this.onTap}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
     return Container(
       width: 64,
       height: 64,

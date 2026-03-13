@@ -1,41 +1,67 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
+import '../providers/gear_provider.dart';
+import '../models/camera.dart';
+import '../models/lens.dart';
 
-class LockerView extends StatelessWidget {
+class LockerView extends ConsumerWidget {
   const LockerView({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gearAsync = ref.watch(userGearProvider);
+
     return HalideScaffold(
-      appBar: AppBar(
-        title: const Text(
-          'YOUR LOCKER',
-          style: TextStyle(
-            letterSpacing: 2,
-            fontWeight: FontWeight.w300,
-            fontSize: 24,
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 120,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+              title: const Text(
+                'YOUR LOCKER',
+                style: TextStyle(
+                  letterSpacing: 4,
+                  fontWeight: FontWeight.w200,
+                  fontSize: 28,
+                  color: Colors.white,
+                ),
+              ),
+              centerTitle: false,
+            ),
           ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        children: const [
-          _GearCard(
-            nickname: 'Main Shooter',
-            model: 'Leica M6',
-            serial: '2468135',
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            sliver: gearAsync.when(
+              data: (cameras) => SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final camera = cameras[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: _GearCard(camera: camera),
+                    );
+                  },
+                  childCount: cameras.length,
+                ),
+              ),
+              loading: () => const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator(color: Colors.white24)),
+              ),
+              error: (err, stack) => SliverFillRemaining(
+                child: Center(
+                  child: Text(
+                    'Error: $err',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ),
+            ),
           ),
-          SizedBox(height: 20),
-          _GearCard(
-            nickname: 'Pocket Beast',
-            model: 'Contax T2',
-            serial: '9876543',
-          ),
-          SizedBox(height: 40),
-          _ComingSoonCard(title: 'Lenses'),
         ],
       ),
     );
@@ -43,86 +69,125 @@ class LockerView extends StatelessWidget {
 }
 
 class _GearCard extends StatelessWidget {
-  final String nickname;
-  final String model;
-  final String serial;
+  final Camera camera;
 
   const _GearCard({
     Key? key,
-    required this.nickname,
-    required this.model,
-    required this.serial,
+    required this.camera,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return GlassPanel(
-      child: Row(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.camera_alt_outlined, color: Colors.white54),
-          ),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                nickname,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  child: const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 28),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                model,
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'S/N: $serial',
-                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
-              ),
-            ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        camera.nickname.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${camera.brand} ${camera.model}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      if (camera.serialNumber != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'S/N: ${camera.serialNumber}',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.3),
+                            fontSize: 11,
+                            fontFamily: 'Courier',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+          if (camera.lenses.isNotEmpty) ...[
+            Divider(color: Colors.white.withOpacity(0.05), height: 1),
+            Padding(
+              padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'MOUNTED LENSES',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...camera.lenses.map((lens) => _LensItem(lens: lens)).toList(),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _ComingSoonCard extends StatelessWidget {
-  final String title;
+class _LensItem extends StatelessWidget {
+  final Lens lens;
 
-  const _ComingSoonCard({Key? key, required this.title}) : super(key: key);
+  const _LensItem({Key? key, required this.lens}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: 0.6,
-      child: GlassPanel(
-        child: Center(
-          child: Column(
-            children: [
-              Text(
-                title,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Coming Soon',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(Icons.trip_origin, color: Colors.white.withOpacity(0.2), size: 12),
+          const SizedBox(width: 12),
+          Text(
+            lens.nickname,
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
           ),
-        ),
+          const SizedBox(width: 8),
+          Text(
+            '${lens.brand} ${lens.model}',
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
+          ),
+        ],
       ),
     );
   }

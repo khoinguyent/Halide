@@ -336,3 +336,77 @@ fatal: Exiting because of an unresolved conflict.
 hint: Fix them up in the work tree, and then use 'git add/rm <file>'
 hint: as appropriate to mark resolution and make a commit.
 fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:10:13.925318] Git Error: merge: feat/sprint_03/be_dev_1 - not something we can merge
+[2026-03-14 00:10:13.945370] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:10:13.957946] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:10:13.970907] Git Error: merge: feat/sprint_03/fe_dev_2 - not something we can merge
+[2026-03-14 00:11:13.952267] Git Error: merge: feat/sprint_03/be_dev_1 - not something we can merge
+[2026-03-14 00:11:13.967726] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:11:13.981914] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:11:13.998449] Git Error: merge: feat/sprint_03/fe_dev_2 - not something we can merge
+[2026-03-14 00:11:37.635493] Git Error: merge: feat/sprint_03/be_dev_1 - not something we can merge
+[2026-03-14 00:11:37.655598] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:11:37.668074] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:11:37.678355] Git Error: merge: feat/sprint_03/fe_dev_2 - not something we can merge
+[2026-03-14 00:12:14.044176] Git Error: merge: feat/sprint_03/be_dev_1 - not something we can merge
+[2026-03-14 00:12:14.061288] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:12:14.077407] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:12:14.093318] Git Error: merge: feat/sprint_03/fe_dev_2 - not something we can merge
+[2026-03-14 00:12:37.700315] Git Error: merge: feat/sprint_03/be_dev_1 - not something we can merge
+[2026-03-14 00:12:37.710171] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:12:37.723976] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:12:37.734006] Git Error: merge: feat/sprint_03/fe_dev_2 - not something we can merge
+[2026-03-14 00:13:14.130813] Git Error: merge: feat/sprint_03/be_dev_1 - not something we can merge
+[2026-03-14 00:13:14.154646] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:13:14.175254] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:13:14.193742] Git Error: merge: feat/sprint_03/fe_dev_2 - not something we can merge
+[2026-03-14 00:13:37.773108] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:13:37.786080] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:14:14.280311] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:14:14.324303] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:14:37.944829] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:14:37.959489] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:15:14.651583] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:15:14.670646] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:15:38.139551] Git Error: merge: feat/sprint_03/be_dev_2 - not something we can merge
+[2026-03-14 00:15:38.157435] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:16:14.779273] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:16:38.258194] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:17:14.894906] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:17:38.329588] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:18:14.998144] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:18:38.420405] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:19:15.066005] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:19:38.498672] Git Error: merge: feat/sprint_03/fe_dev_1 - not something we can merge
+[2026-03-14 00:20:15.107071] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:20:15.120300] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:20:15.132361] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:20:15.144723] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:20:38.539488] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:20:38.549869] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:20:38.561478] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 00:20:38.574502] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.

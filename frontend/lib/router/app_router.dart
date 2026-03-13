@@ -6,6 +6,7 @@ import '../features/shell/presentation/widgets/halide_scaffold.dart';
 import '../views/home_view.dart';
 import '../views/profile_view.dart';
 import '../views/locker_view.dart';
+import '../views/add_gear_view.dart';
 import '../views/meter_view.dart';
 import '../views/auth/login_view.dart';
 import '../views/auth/register_view.dart';
@@ -47,7 +48,33 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
-    // Auth routes (completely outside the shell)
+    ShellRoute(
+      builder: (context, state, child) => MainShell(child: child),
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const HomeView(),
+        ),
+        GoRoute(
+          path: '/locker',
+          builder: (context, state) => const LockerView(),
+          routes: [
+            GoRoute(
+              path: 'add-gear',
+              builder: (context, state) => const AddGearView(),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: '/meter',
+          builder: (context, state) => const MeterView(),
+        ),
+        GoRoute(
+          path: '/profile',
+          builder: (context, state) => const ProfileView(),
+        ),
+      ],
+    ),
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginView(),
