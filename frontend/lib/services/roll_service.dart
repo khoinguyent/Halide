@@ -19,6 +19,39 @@ class RollService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchRoll(String token, String rollId) async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiUrl}/rolls/$rollId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else if (response.statusCode == 404) {
+      throw Exception('Roll not found');
+    } else {
+      throw Exception('Failed to fetch roll: ${response.body}');
+    }
+  }
+
+  Future<void> updateRollStatus(String token, String rollId, String status) async {
+    final response = await http.patch(
+      Uri.parse('${AppConfig.apiUrl}/rolls/$rollId/status'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'status': status}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update roll status: ${response.body}');
+    }
+  }
+
   Future<Map<String, dynamic>> createRoll(String token, Map<String, dynamic> rollData) async {
     final response = await http.post(
       Uri.parse('${AppConfig.apiUrl}/rolls'),

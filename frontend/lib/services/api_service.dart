@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../config/app_config.dart';
+
 class ApiService {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://localhost:8000', // Update with actual backend URL
+    baseUrl: AppConfig.baseUrl,
     connectTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 3),
   ));

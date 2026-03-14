@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'config/app_config.dart';
 import 'firebase_options.dart';
 import 'router/app_router.dart';
 
@@ -10,6 +11,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  debugPrint('[Halide] Backend: ${AppConfig.baseUrl} | API: ${AppConfig.apiUrl}');
   runApp(
     const ProviderScope(
       child: HalideApp(),

@@ -8,6 +8,7 @@ class Camera {
   final String? serialNumber;
   final String? format;
   final List<Lens> lenses;
+  final List<String> imageUrls;
 
   Camera({
     required this.id,
@@ -17,19 +18,26 @@ class Camera {
     this.serialNumber,
     this.format,
     this.lenses = const [],
+    this.imageUrls = const [],
   });
 
+  String? get imageUrl => imageUrls.isNotEmpty ? imageUrls.first : null;
+
   factory Camera.fromJson(Map<String, dynamic> json) {
+    final camera = json['camera'] as Map<String, dynamic>?;
+    final urls = json['image_urls'] ?? camera?['image_urls'];
+    final urlList = urls is List ? urls.map((e) => e.toString()).toList() : <String>[];
     return Camera(
-      id: json['id'] ?? '',
-      nickname: json['nickname'] ?? '',
-      brand: json['brand'] ?? '',
-      model: json['model'] ?? '',
+      id: json['id']?.toString() ?? '',
+      nickname: json['gear_nickname'] ?? json['nickname'] ?? '',
+      brand: json['brand'] ?? camera?['brand'] ?? '',
+      model: json['model'] ?? camera?['model'] ?? '',
       serialNumber: json['serial_number'],
-      format: json['format'],
+      format: json['format'] ?? camera?['format'],
       lenses: (json['lenses'] as List? ?? [])
           .map((l) => Lens.fromJson(l as Map<String, dynamic>))
           .toList(),
+      imageUrls: urlList,
     );
   }
 

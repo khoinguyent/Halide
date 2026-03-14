@@ -1,0 +1,16 @@
+# Environment and secrets (never commit)
+.env
+.env.local
+.env.*.local
+.env.*.example.local
+
+# Keys and credentials (never commit)
+**/keys/
+**/secrets/
+**/credentials/
+*.pem
+*.p12
+*.p8
+*-service-account*.json
+*firebase*adminsdk*.json
+**/key.properties

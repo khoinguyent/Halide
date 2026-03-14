@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/roll_card.dart';
 import '../providers/dashboard_provider.dart';
+import 'package:frontend/providers/rolls_provider.dart';
+import 'package:frontend/features/rolls/presentation/widgets/add_roll_form.dart';
+import 'package:frontend/core/widgets/halide_dialog.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 import '../models/roll_status.dart';
@@ -24,7 +27,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     return HalideScaffold(
       appBar: AppBar(
         title: const Text(
-          'YOUR ROLLS',
+          'THE ARCHIVE',
           style: TextStyle(
             letterSpacing: 2,
             fontWeight: FontWeight.w600,
@@ -41,7 +44,16 @@ class _HomeViewState extends ConsumerState<HomeView> {
             icon: const Icon(Icons.add_rounded),
             tooltip: 'Add roll',
             onPressed: () {
-              // TODO: navigate to add-roll flow or show bottom sheet
+              showHalideDialog(
+                context: context,
+                builder: (context) => AddRollForm(
+                  repository: ref.read(rollsRepositoryProvider),
+                  onRollAdded: () {
+                    Navigator.of(context).pop();
+                    ref.refresh(dashboardRollsProvider);
+                  },
+                ),
+              );
             },
           ),
           IconButton(

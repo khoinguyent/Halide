@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/upload_service.dart';
-import '../providers/roll_provider.dart';
 
 class ImageUploaderWidget extends ConsumerStatefulWidget {
   final String rollId;
+  final VoidCallback? onUploadComplete;
 
-  const ImageUploaderWidget({super.key, required this.rollId});
+  const ImageUploaderWidget({
+    super.key,
+    required this.rollId,
+    this.onUploadComplete,
+  });
 
   @override
   ConsumerState<ImageUploaderWidget> createState() =>
@@ -59,9 +63,8 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
       }
     }
 
-    // Update the Roll's state with the new image URLs
     if (succeededPaths.isNotEmpty) {
-      ref.read(rollProvider(widget.rollId).notifier).addImages(succeededPaths);
+      widget.onUploadComplete?.call();
     }
 
     setState(() {

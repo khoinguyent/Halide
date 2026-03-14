@@ -23,7 +23,7 @@ class LockerView extends ConsumerWidget {
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
               title: const Text(
-                'YOUR LOCKER',
+                'THE GEARS',
                 style: TextStyle(
                   letterSpacing: 4,
                   fontWeight: FontWeight.w200,
@@ -87,15 +87,25 @@ class _GearCard extends StatelessWidget {
             padding: const EdgeInsets.all(20.0),
             child: Row(
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: camera.imageUrl != null
+                        ? Image.network(
+                            camera.imageUrl!,
+                            fit: BoxFit.cover,
+                            width: 56,
+                            height: 56,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 28),
+                          )
+                        : const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 28),
                   ),
-                  child: const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Expanded(

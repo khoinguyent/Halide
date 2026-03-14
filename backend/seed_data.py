@@ -49,26 +49,29 @@ def seed_master_data():
             else:
                 print(f"FilmStock exists skipping: {fs['brand']} {fs['name']}")
 
-        # Seed Cameras
+        # Seed Cameras (with seed images for locker UI)
         cameras = [
             {
                 "brand": "Leica",
                 "model": "M6",
                 "camera_type": models.CameraTypeEnum.rangefinder,
-                "description": "The quintessential mechanical rangefinder camera."
+                "description": "The quintessential mechanical rangefinder camera.",
+                "image_urls": ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32"],
             },
             {
                 "brand": "Canon",
                 "model": "AE-1",
                 "camera_type": models.CameraTypeEnum.slr,
-                "description": "The classic starter SLR of the 70s/80s."
+                "description": "The classic starter SLR of the 70s/80s.",
+                "image_urls": ["https://images.unsplash.com/photo-1606983340126-99ab4feaa64a"],
             },
             {
                 "brand": "Pentax",
                 "model": "67",
                 "camera_type": models.CameraTypeEnum.slr,
-                "description": "The legendary medium format SLR."
-            }
+                "description": "The legendary medium format SLR.",
+                "image_urls": ["https://images.unsplash.com/photo-1492691527719-9d1e07e534b4"],
+            },
         ]
 
         for cam in cameras:
@@ -80,6 +83,8 @@ def seed_master_data():
                 db.add(models.Camera(**cam))
                 print(f"Adding Camera: {cam['brand']} {cam['model']}")
             else:
+                if not db_cam.image_urls:
+                    db_cam.image_urls = cam.get("image_urls")
                 print(f"Camera exists skipping: {cam['brand']} {cam['model']}")
         
         db.commit()

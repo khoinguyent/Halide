@@ -1,3 +1,14 @@
+# Environment and secrets (never commit)
+.env
+.env.local
+.env.*.local
+**/keys/
+**/secrets/
+**/credentials/
+*.pem
+*.p12
+*.p8
+
 # Miscellaneous
 *.class
 *.log

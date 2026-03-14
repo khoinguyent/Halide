@@ -19,5 +19,6 @@ class Roll(Base):
     user_lens_id = Column(UUID(as_uuid=True), ForeignKey("user_lenses.id"))
     shot_at_iso = Column(Integer)
     expired_year = Column(Integer)
+    max_frames = Column(Integer, server_default=text('36'))  # total frames (user input when creating roll)
     status = Column(Enum(RollStatusEnum), server_default='shooting')
     created_at = Column(DateTime, server_default=text('NOW()'))

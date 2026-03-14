@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/widgets/halide_dialog.dart';
 import '../../providers/auth_provider.dart';
 
 class LoginView extends ConsumerStatefulWidget {
@@ -47,6 +48,11 @@ class _LoginViewState extends ConsumerState<LoginView> {
       await action();
       // Sync with backend to ensure user record exists
       await ref.read(authServiceProvider).syncWithBackend();
+      // Log current user so you can verify login worked (see debug console)
+      final user = ref.read(authServiceProvider).currentUser;
+      if (user != null) {
+        debugPrint('[Auth] Login OK — uid: ${user.uid}, email: ${user.email}, displayName: ${user.displayName}');
+      }
       // On success, GoRouter will handle redirection via AuthNotifier
     } catch (e) {
       if (mounted) _showError(e.toString());
@@ -347,7 +353,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
   }
 
   void _showEmailDialog() {
-    showDialog(
+    showHalideDialog(
       context: context,
       builder: (context) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -408,7 +414,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
   }
 
   void _showPhoneInput() {
-    showDialog(
+    showHalideDialog(
       context: context,
       builder: (context) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),

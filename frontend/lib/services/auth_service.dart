@@ -127,7 +127,7 @@ class AuthService {
 
       try {
         final response = await http.post(
-          Uri.parse('${AppConfig.authUrl}/register'),
+          Uri.parse('${AppConfig.apiUrl}/register'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'id': uid,

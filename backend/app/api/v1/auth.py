@@ -16,7 +16,7 @@ router = APIRouter()
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = auth_service.get_user(db, user_id=user.id)
     if db_user:
-        raise HTTPException(status_code=400, detail="User already registered")
+        return db_user
     return auth_service.create_user(db=db, user=user)
 
 @router.post("/login", response_model=Token)

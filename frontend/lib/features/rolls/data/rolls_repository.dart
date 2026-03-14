@@ -9,19 +9,19 @@ class RollsRepository {
   RollsRepository(this._apiService);
 
   Future<List<Roll>> getRolls() async {
-    final response = await _apiService.get('/rolls');
+    final response = await _apiService.get('/api/v1/rolls');
     final List data = response.data;
     return data.map((json) => Roll.fromJson(json)).toList();
   }
 
   Future<List<FilmStock>> getFilmStocks() async {
-    final response = await _apiService.get('/film_stocks');
+    final response = await _apiService.get('/api/v1/master/films');
     final List data = response.data;
     return data.map((json) => FilmStock.fromJson(json)).toList();
   }
 
   Future<List<Camera>> getCameras() async {
-    final response = await _apiService.get('/cameras');
+    final response = await _apiService.get('/api/v1/user_cameras');
     final List data = response.data;
     return data.map((json) => Camera.fromJson(json)).toList();
   }
@@ -31,12 +31,14 @@ class RollsRepository {
     required String userCameraId,
     int? shotAtIso,
     int? expiredYear,
+    int? maxFrames,
   }) async {
-    final response = await _apiService.post('/rolls', data: {
+    final response = await _apiService.post('/api/v1/rolls', data: {
       'film_stock_id': filmStockId,
       'user_camera_id': userCameraId,
       'shot_at_iso': shotAtIso,
       'expired_year': expiredYear,
+      'max_frames': maxFrames ?? 36,
     });
     return Roll.fromJson(response.data);
   }

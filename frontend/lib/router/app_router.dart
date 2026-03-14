@@ -48,33 +48,6 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
-    ShellRoute(
-      builder: (context, state, child) => MainShell(child: child),
-      routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => const HomeView(),
-        ),
-        GoRoute(
-          path: '/locker',
-          builder: (context, state) => const LockerView(),
-          routes: [
-            GoRoute(
-              path: 'add-gear',
-              builder: (context, state) => const AddGearView(),
-            ),
-          ],
-        ),
-        GoRoute(
-          path: '/meter',
-          builder: (context, state) => const MeterView(),
-        ),
-        GoRoute(
-          path: '/profile',
-          builder: (context, state) => const ProfileView(),
-        ),
-      ],
-    ),
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginView(),
@@ -83,8 +56,6 @@ final appRouter = GoRouter(
       path: '/register',
       builder: (context, state) => const RegisterView(),
     ),
-
-    // NEW Persistent App Shell (Glass Dock Navigation)
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return HalideScaffold(
@@ -111,6 +82,12 @@ final appRouter = GoRouter(
             GoRoute(
               path: '/locker',
               builder: (context, state) => const LockerView(),
+              routes: [
+                GoRoute(
+                  path: 'add-gear',
+                  builder: (context, state) => const AddGearView(),
+                ),
+              ],
             ),
           ],
         ),

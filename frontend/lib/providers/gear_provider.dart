@@ -6,35 +6,13 @@ import '../models/camera.dart';
 final gearServiceProvider = Provider<GearService>((ref) => GearService());
 
 final userGearProvider = FutureProvider<List<Camera>>((ref) async {
-  final authService = ref.watch(authServiceProvider);
+  final user = ref.watch(userProvider);
+  if (user == null) return [];
+
   final gearService = ref.watch(gearServiceProvider);
-  
-  final user = authService.currentUser;
-  if (user == null) {
-     // Return mock data for development
-    return [
-      Camera(
-        id: '1',
-        nickname: 'Main Shooter',
-        brand: 'Leica',
-        model: 'M6',
-        serialNumber: '2468135',
-        lenses: [],
-      ),
-      Camera(
-        id: '2',
-        nickname: 'Pocket Beast',
-        brand: 'Contax',
-        model: 'T2',
-        serialNumber: '9876543',
-        lenses: [],
-      ),
-    ];
-  }
-  
-  final token = await user.getIdToken();
-  if (token == null) return [];
-  
+  final token = await user.getIdToken(true);
+  if (token == null || token.isEmpty) return [];
+
   final rawData = await gearService.fetchUserGear(token);
   return rawData.map((json) => Camera.fromJson(json as Map<String, dynamic>)).toList();
 });

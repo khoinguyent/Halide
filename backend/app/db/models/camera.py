@@ -34,6 +34,7 @@ class UserCamera(Base):
     created_at = Column(DateTime, server_default=text('NOW()'))
 
     # Relationships
+    camera = relationship("Camera", foreign_keys=[camera_id])
     lenses = relationship("UserLens", back_populates="parent_camera", cascade="all, delete-orphan")
 
 class Lens(Base):
@@ -41,8 +42,9 @@ class Lens(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     brand = Column(String(100), nullable=False)
     model = Column(String(100), nullable=False)
-    focal_length_mm = Column(Integer, nullable=True)
-    max_aperture = Column(Float, nullable=True)
+    # DB column focal_length may be varchar in some DBs
+    focal_length_mm = Column("focal_length", String(20), nullable=True)
+    max_aperture = Column("max_aperture", String(20), nullable=True)  # DB may be varchar
     description = Column(String)
     image_urls = Column(JSONB)
 

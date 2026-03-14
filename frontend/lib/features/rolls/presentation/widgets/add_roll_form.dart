@@ -25,6 +25,7 @@ class _AddRollFormState extends State<AddRollForm> {
   Camera? _selectedCamera;
   int? _shotAtIso;
   int? _expiredYear;
+  int _maxFrames = 36;
 
   List<FilmStock> _stocks = [];
   List<Camera> _cameras = [];
@@ -98,6 +99,8 @@ class _AddRollFormState extends State<AddRollForm> {
                                 Expanded(child: _buildNumberField('EXPIRED YEAR', (val) => _expiredYear = val)),
                               ],
                             ),
+                            const SizedBox(height: 16),
+                            _buildNumberField('TOTAL FRAMES (e.g. 36)', (val) => _maxFrames = val ?? 36),
                             const SizedBox(height: 32),
                             ElevatedButton(
                               onPressed: _submit,
@@ -246,6 +249,7 @@ class _AddRollFormState extends State<AddRollForm> {
       userCameraId: _selectedCamera!.id,
       shotAtIso: _shotAtIso,
       expiredYear: _expiredYear,
+      maxFrames: _maxFrames,
     );
     widget.onRollAdded();
     Navigator.of(context).pop();

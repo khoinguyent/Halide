@@ -76,15 +76,15 @@ class RollCard extends StatelessWidget {
   Widget _buildStateContent() {
     switch (roll.status) {
       case RollStatus.shooting:
-        return _ShootingContent(
-          current: roll.frameCount,
-          max: roll.maxFrames,
-          color: roll.color,
-        );
+        return _ShootingContent(maxFrames: roll.maxFrames);
       case RollStatus.lab:
-        return const _LabContent();
+        return _LabContent(maxFrames: roll.maxFrames);
       case RollStatus.scanned:
-        return _ScannedContent(imageUrls: roll.imageUrls);
+        return _ScannedContent(
+          imageUrls: roll.imageUrls,
+          actualFrames: roll.imageUrls.length,
+          totalFrames: roll.maxFrames,
+        );
       case RollStatus.archived:
         return const SizedBox.shrink();
     }
@@ -130,132 +130,136 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
+/// Not scanned: show total frames only (user input when creating roll).
 class _ShootingContent extends StatelessWidget {
-  final int current;
-  final int max;
-  final Color color;
+  final int maxFrames;
 
-  const _ShootingContent({
-    Key? key, 
-    required this.current, 
-    required this.max, 
-    required this.color
+  const _ShootingContent({Key? key, required this.maxFrames}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Text(
+        '$maxFrames Frames',
+        style: const TextStyle(color: Colors.white70, fontSize: 13),
+      ),
+    );
+  }
+}
+
+/// Not scanned: show total frames only.
+class _LabContent extends StatelessWidget {
+  final int maxFrames;
+
+  const _LabContent({Key? key, required this.maxFrames}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Text(
+        '$maxFrames Frames',
+        style: const TextStyle(color: Colors.white70, fontSize: 13),
+      ),
+    );
+  }
+}
+
+/// Scanned: show actual/total frames (e.g. 38/36 or 20/36).
+class _ScannedContent extends StatelessWidget {
+  final List<String> imageUrls;
+  final int actualFrames;
+  final int totalFrames;
+
+  const _ScannedContent({
+    Key? key,
+    required this.imageUrls,
+    required this.actualFrames,
+    required this.totalFrames,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    double progress = (current / max).clamp(0.0, 1.0);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Frame $current/$max',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              Text(
-                '${(progress * 100).toInt()}%',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.white.withOpacity(0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-              minHeight: 8,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LabContent extends StatefulWidget {
-  const _LabContent({Key? key}) : super(key: key);
-
-  @override
-  State<_LabContent> createState() => _LabContentState();
-}
-
-class _LabContentState extends State<_LabContent> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: Tween<double>(begin: 0.3, end: 0.7).animate(_controller),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Row(
-          children: List.generate(3, (index) => Expanded(
-            child: Container(
-              margin: EdgeInsets.only(right: index == 2 ? 0 : 8),
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          )),
-        ),
-      ),
-    );
-  }
-}
-
-class _ScannedContent extends StatelessWidget {
-  final List<String> imageUrls;
-
-  const _ScannedContent({Key? key, required this.imageUrls}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
+    final urls = imageUrls.isEmpty ? <String>[] : imageUrls;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Text(
+            '$actualFrames/$totalFrames Frames',
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+        ),
+        const SizedBox(height: 12),
         SizedBox(
           height: 100,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: imageUrls.length,
-            itemBuilder: (context, index) {
-              return Container(
-                margin: const EdgeInsets.only(right: 8),
-                width: 140,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  image: DecorationImage(
-                    image: NetworkImage(imageUrls[index]),
-                    fit: BoxFit.cover,
+          child: urls.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Text(
+                      'No preview images',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: urls.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      width: 140,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.white.withOpacity(0.08),
+                      ),
+                      child: Image.network(
+                        urls[index],
+                        fit: BoxFit.cover,
+                        width: 140,
+                        height: 100,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.white.withOpacity(0.05),
+                            child: Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white38,
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                            (loadingProgress.expectedTotalBytes ?? 1)
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.white.withOpacity(0.05),
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              color: Colors.white38,
+                              size: 32,
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
         const SizedBox(height: 16),
         Padding(

@@ -3,6 +3,15 @@ from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
+class CameraRef(BaseModel):
+    """Minimal camera info for embedding in UserCameraOut."""
+    id: UUID
+    brand: str
+    model: str
+    image_urls: Optional[List[str]] = None
+    class Config:
+        from_attributes = True
+
 class LensBase(BaseModel):
     brand: str
     model: str
@@ -47,5 +56,6 @@ class UserCameraOut(UserCameraBase):
     user_id: str
     created_at: datetime
     lenses: List[UserLensOut] = []
+    camera: Optional[CameraRef] = None
     class Config:
         from_attributes = True

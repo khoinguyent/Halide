@@ -1,6 +1,6 @@
 {
     "project_name": "Halide",
-    "current_sprint": "sprint_03",
+    "current_sprint": "sprint_04",
     "sprints": [
         "sprint_00",
         "sprint_01",
@@ -11,7 +11,8 @@
         "sprint_00": "DONE",
         "sprint_01": "DONE",
         "sprint_02": "DONE",
-        "sprint_03": "DONE"
+        "sprint_03": "DONE",
+        "sprint_04": "ACTIVE"
     },
     "git_config": {
         "main_branch": "develop",
@@ -28,6 +29,16 @@
         "sprint_02": {
             "branch_name": "sprint_02_intelligence",
             "start_date": "2026-03-13",
+            "target_merge": "develop"
+        },
+        "sprint_03": {
+            "branch_name": "sprint_03_data_integration",
+            "start_date": "2026-03-13",
+            "target_merge": "develop"
+        },
+        "sprint_04": {
+            "branch_name": "sprint_04_dynamic_forms",
+            "start_date": "2026-03-14",
             "target_merge": "develop"
         }
     },

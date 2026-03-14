@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/widgets/halide_dialog.dart';
 import 'package:frontend/features/shell/presentation/bloc/frame_logging_bloc.dart';
 import 'package:frontend/features/shell/presentation/widgets/glass_navigation_dock.dart';
 import 'package:frontend/providers/rolls_provider.dart';
@@ -38,7 +39,7 @@ class HalideScaffold extends ConsumerWidget {
                     context.read<FrameLoggingBloc>().add(LogFrame({}));
                   } else {
                     // Show premium glass Add Roll form
-                    showDialog(
+                    showHalideDialog(
                       context: context,
                       builder: (context) => AddRollForm(
                         repository: ref.read(rollsRepositoryProvider),

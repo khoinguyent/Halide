@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/widgets/halide_dialog.dart';
+import '../models/roll.dart';
 import '../models/roll_status.dart';
 import '../providers/roll_provider.dart';
 import '../widgets/status_selector.dart';
@@ -13,8 +15,56 @@ class RollDetailView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final roll = ref.watch(rollProvider(rollId));
+    final rollAsync = ref.watch(rollDetailProvider(rollId));
 
+    return rollAsync.when(
+      loading: () => Scaffold(
+        backgroundColor: const Color(0xFFF5F5F5),
+        appBar: AppBar(backgroundColor: Colors.white, foregroundColor: Colors.black87),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (err, _) => Scaffold(
+        backgroundColor: const Color(0xFFF5F5F5),
+        appBar: AppBar(backgroundColor: Colors.white, foregroundColor: Colors.black87),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(err.toString(), textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => ref.refresh(rollDetailProvider(rollId)),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      data: (roll) => _RollDetailBody(
+        rollId: rollId,
+        roll: roll,
+        onRefresh: () => ref.refresh(rollDetailProvider(rollId)),
+      ),
+    );
+  }
+}
+
+class _RollDetailBody extends ConsumerWidget {
+  final String rollId;
+  final Roll roll;
+  final VoidCallback onRefresh;
+
+  const _RollDetailBody({
+    required this.rollId,
+    required this.roll,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -36,13 +86,12 @@ class RollDetailView extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             onPressed: () {
-              showModalBottomSheet(
+              showHalideModalBottomSheet(
                 context: context,
                 backgroundColor: Colors.transparent,
                 builder: (_) => StatusSelector(
                   currentStatus: roll.status,
-                  onStatusSelected: (s) =>
-                      ref.read(rollProvider(rollId).notifier).updateStatus(s),
+                  onStatusSelected: (s) => _onStatusSelected(context, ref, s),
                 ),
               );
             },
@@ -54,7 +103,6 @@ class RollDetailView extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Uploader card
             Card(
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -62,11 +110,12 @@ class RollDetailView extends ConsumerWidget {
               color: Colors.white,
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: ImageUploaderWidget(rollId: rollId),
+                child: ImageUploaderWidget(
+                  rollId: rollId,
+                  onUploadComplete: onRefresh,
+                ),
               ),
             ),
-
-            // Uploaded images grid
             if (roll.imageUrls.isNotEmpty) ...[
               const SizedBox(height: 24),
               const Text(
@@ -100,6 +149,24 @@ class RollDetailView extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _onStatusSelected(BuildContext context, WidgetRef ref, RollStatus newStatus) async {
+    final rollService = ref.read(rollServiceProvider);
+    final user = ref.read(userProvider);
+    if (user == null) return;
+    final token = await user.getIdToken();
+    if (token == null) return;
+    try {
+      await rollService.updateRollStatus(token, rollId, newStatus.name);
+      onRefresh();
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update status')),
+        );
+      }
+    }
   }
 }
 
