@@ -8,6 +8,7 @@ import '../views/auth/register_view.dart';
 import '../views/roll_detail_view.dart';
 import '../providers/auth_provider.dart';
 import '../features/shell/presentation/widgets/halide_scaffold.dart';
+import '../features/storage/presentation/views/storage_account_list_view.dart';
 
 // Global keys for navigation
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -75,6 +76,10 @@ final appRouter = GoRouter(
             GoRoute(
               path: '/profile',
               builder: (context, state) => const ProfileView(),
+            ),
+            GoRoute(
+              path: '/storage',
+              builder: (context, state) => const StorageAccountListView(),
             ),
           ],
         ),
