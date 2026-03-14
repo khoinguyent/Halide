@@ -48,7 +48,7 @@ class RollsRepository {
   }
 
   Future<Roll> updateRollStatus(String rollId, String status) async {
-    final response = await _apiService.patch('/rolls/$rollId/status', data: {
+    final response = await _apiService.patch('/api/v1/rolls/$rollId/status', data: {
       'status': status,
     });
     return Roll.fromJson(response.data);

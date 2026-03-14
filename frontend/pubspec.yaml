@@ -46,6 +46,7 @@ dependencies:
   firebase_ui_oauth_facebook: ^2.0.1
   firebase_ui_oauth_apple: ^2.0.1
   image_picker: ^1.2.1
+  path_provider: ^2.1.5
   http_parser: ^4.1.2
   riverpod_annotation: ^4.0.2
   dio: ^5.7.0

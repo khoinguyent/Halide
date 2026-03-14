@@ -43,18 +43,20 @@ class StorageService:
 
     def upload_avatar(self, user_id: str, file_content: bytes, content_type: str = "image/jpeg"):
         """
-        Uploads a user avatar to S3/R2.
-        Key format: users/{uid}/profile/avatar.jpg
+        Uploads a user avatar to S3/R2 when configured.
+        When S3 is not configured (local storage mode), returns "local" so the app
+        uses the image stored on the device; no cloud upload is performed.
+        Key format when S3 used: users/{uid}/profile/avatar.jpg
         """
+        if self._s3 is None:
+            return "local"
         key = f"users/{user_id}/profile/avatar.jpg"
-        
-        self.s3.put_object(
+        self._s3.put_object(
             Bucket=self.bucket_name,
             Key=key,
             Body=file_content,
-            ContentType=content_type
+            ContentType=content_type,
         )
-        
         return key
 
 

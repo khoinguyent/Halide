@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # Set to "true" or "1" to decode JWT payload without verification. Insecure; never use in production.
     DEV_SKIP_FIREBASE_VERIFY: bool = False
 
+    # Google Drive OAuth (for personal cloud storage)
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+
     # Cloud Storage (R2/S3)
     S3_ENDPOINT: str
     S3_ACCESS_KEY: str

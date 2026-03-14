@@ -13,6 +13,7 @@ class AddRollEvent extends RollsEvent {
   final String? description;
   final int? shotAtIso;
   final int? expiredYear;
+  final int? maxFrames;
 
   AddRollEvent({
     required this.filmStockId,
@@ -21,6 +22,7 @@ class AddRollEvent extends RollsEvent {
     this.description,
     this.shotAtIso,
     this.expiredYear,
+    this.maxFrames,
   });
 }
 class UpdateRollStatusEvent extends RollsEvent {
@@ -77,6 +79,7 @@ class RollsBloc extends Bloc<RollsEvent, RollsState> {
           description: event.description,
           shotAtIso: event.shotAtIso,
           expiredYear: event.expiredYear,
+          maxFrames: event.maxFrames,
         );
         emit(RollActionSuccess());
         add(RefreshRolls());

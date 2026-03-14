@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, Form, File, UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -9,6 +10,7 @@ from ...core.dependencies import get_current_user
 from ...services.storage_service import storage_service
 from ...core.config import settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.patch("/profile", response_model=UserOut)
@@ -32,32 +34,30 @@ async def update_profile(
         current_user.bio = bio
         
     if avatar:
-        if not avatar.content_type.startswith("image/"):
+        if not avatar.content_type or not avatar.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="File provided is not an image.")
-            
         content = await avatar.read()
-        storage_service.upload_avatar(
+        result = storage_service.upload_avatar(
             user_id=current_user.id,
             file_content=content,
-            content_type=avatar.content_type
+            content_type=avatar.content_type or "image/jpeg",
         )
-        # Note: Depending on your S3 setup you might want to prepend the endpoint/bucket url,
-        # but storing the key or relative path is sometimes preferred.
-        # Here we'll construct a full CDN/S3 URL if needed, or just set it:
-        # Constructing a generic URL based on S3_ENDPOINT and S3_BUCKET_NAME as fallback
-        
-        base_url = settings.S3_ENDPOINT.rstrip('/')
-        bucket = settings.S3_BUCKET_NAME
-        # Very simple URL construction - adjust strictly according to your actual setup if different.
-        if "r2.cloudflarestorage.com" in base_url or "amazonaws.com" in base_url:
-            # Often virtual hosted style or path style. Let's use path style as a safe default for dev.
-            avatar_url = f"{base_url}/{bucket}/users/{current_user.id}/profile/avatar.jpg"
+        if result == "local":
+            # Local storage mode: no cloud; app loads image from device. Store sentinel so app uses local file.
+            current_user.avatar_url = "local"
+            logger.info("avatar_url set to 'local' (no cloud); device stores file, DB stores sentinel")
         else:
-             avatar_url = f"{base_url}/{bucket}/users/{current_user.id}/profile/avatar.jpg"
-             
-        current_user.avatar_url = avatar_url
+            base_url = (settings.S3_ENDPOINT or "").rstrip("/")
+            bucket = settings.S3_BUCKET_NAME or ""
+            if "r2.cloudflarestorage.com" in base_url or "amazonaws.com" in base_url:
+                avatar_url = f"{base_url}/{bucket}/users/{current_user.id}/profile/avatar.jpg"
+            else:
+                avatar_url = f"{base_url}/{bucket}/users/{current_user.id}/profile/avatar.jpg"
+            current_user.avatar_url = avatar_url
+            logger.info("avatar_url set to cloud URL: %s", avatar_url)
 
     db.commit()
+    logger.debug("profile after update: avatar_url=%s", getattr(current_user, "avatar_url", None))
     db.refresh(current_user)
     
     return current_user

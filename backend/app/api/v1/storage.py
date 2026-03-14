@@ -62,7 +62,8 @@ async def upload_roll_images(
     db.commit()
     return uploaded_images
 
-from ...db.models.storage_credential import StorageCredential
+import json
+from ...db.models.storage_credential import StorageCredential, StorageProviderEnum
 from ...db.schemas.storage_credential import StorageCredentialCreate, StorageCredentialOut
 from ...core.encryption import encrypt_credential
 
@@ -72,9 +73,18 @@ def connect_storage(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Depending on provider, you would typically run OAuth flow here.
-    # For now we save the incoming config directly.
-    encrypted_data = encrypt_credential(data.auth_data)
+    auth_data_to_store = data.auth_data
+    if data.provider == StorageProviderEnum.gdrive:
+        try:
+            from ...services.google_drive_service import exchange_server_auth_code
+            payload = json.loads(data.auth_data)
+            if payload.get("server_auth_code"):
+                tokens = exchange_server_auth_code(payload["server_auth_code"])
+                auth_data_to_store = json.dumps(tokens)
+            # else: access_token-only payload stored as-is (will expire without refresh)
+        except (json.JSONDecodeError, RuntimeError):
+            pass  # store raw auth_data
+    encrypted_data = encrypt_credential(auth_data_to_store)
     cred = StorageCredential(
         user_id=current_user.id,
         provider=data.provider,
@@ -82,7 +92,9 @@ def connect_storage(
         host=data.host,
         username=data.username,
         encrypted_auth_data=encrypted_data,
-        is_archive=data.is_archive
+        is_archive=data.is_archive,
+        display_label=data.display_label,
+        is_primary=data.is_primary,
     )
     db.add(cred)
     db.commit()

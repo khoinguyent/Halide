@@ -10,12 +10,18 @@ class SettingsView extends StatelessWidget {
   Widget build(BuildContext context) {
     return HalideScaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+          color: Colors.white,
+        ),
+        centerTitle: true,
         title: const Text(
           'SETTINGS',
           style: TextStyle(
-            letterSpacing: 2,
-            fontWeight: FontWeight.w300,
-            fontSize: 20,
+            letterSpacing: 4,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
             color: Colors.white,
           ),
         ),
@@ -30,25 +36,9 @@ class SettingsView extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _SettingsOption(
-                icon: Icons.privacy_tip_outlined,
-                label: 'Privacy Policy',
-                onTap: () => context.go('/profile/privacy'),
-              ),
-              const Divider(color: Colors.white12, height: 1),
-              _SettingsOption(
-                icon: Icons.description_outlined,
-                label: 'Terms & Conditions',
-                onTap: () => context.go('/profile/terms'),
-              ),
-              const Divider(color: Colors.white12, height: 1),
-              _SettingsOption(
-                icon: Icons.help_outline,
-                label: 'Support',
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Support coming soon')),
-                  );
-                },
+                icon: Icons.folder_special_outlined,
+                label: 'Storage Strategy',
+                onTap: () => context.push('/profile/settings/storage-strategy'),
               ),
             ],
           ),

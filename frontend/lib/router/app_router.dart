@@ -15,6 +15,10 @@ import '../views/roll_detail_view.dart';
 import '../views/legal/privacy_policy_view.dart';
 import '../views/legal/terms_conditions_view.dart';
 import '../views/settings_view.dart';
+import '../providers/auth_provider.dart';
+import '../features/storage/presentation/views/storage_account_list_view.dart';
+import '../features/storage/presentation/views/storage_strategy_view.dart';
+import '../views/edit_profile_view.dart';
 
 // Global keys for navigation
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -136,6 +140,16 @@ final appRouter = GoRouter(
                 GoRoute(
                   path: 'settings',
                   builder: (context, state) => const SettingsView(),
+                  routes: [
+                    GoRoute(
+                      path: 'storage-strategy',
+                      builder: (context, state) => const StorageStrategyView(),
+                    ),
+                  ],
+                ),
+                GoRoute(
+                  path: 'edit',
+                  builder: (context, state) => const EditProfileView(),
                 ),
                 GoRoute(
                   path: 'privacy',
@@ -146,6 +160,10 @@ final appRouter = GoRouter(
                   builder: (context, state) => const TermsConditionsView(),
                 ),
               ],
+            ),
+            GoRoute(
+              path: '/storage',
+              builder: (context, state) => const StorageAccountListView(),
             ),
           ],
         ),

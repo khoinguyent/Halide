@@ -32,4 +32,8 @@ class ApiService {
   Future<Response> post(String path, {dynamic data}) async {
     return _dio.post(path, data: data);
   }
+
+  Future<Response> patch(String path, {dynamic data}) async {
+    return _dio.patch(path, data: data);
+  }
 }
