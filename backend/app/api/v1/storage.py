@@ -60,7 +60,38 @@ async def upload_roll_images(
         uploaded_images.append(db_image)
     
     db.commit()
-    for img in uploaded_images:
-        db.refresh(img)
-        
     return uploaded_images
+
+from ...db.models.storage_credential import StorageCredential
+from ...db.schemas.storage_credential import StorageCredentialCreate, StorageCredentialOut
+from ...core.encryption import encrypt_credential
+
+@router.post("/connect", response_model=StorageCredentialOut)
+def connect_storage(
+    data: StorageCredentialCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Depending on provider, you would typically run OAuth flow here.
+    # For now we save the incoming config directly.
+    encrypted_data = encrypt_credential(data.auth_data)
+    cred = StorageCredential(
+        user_id=current_user.id,
+        provider=data.provider,
+        identifier=data.identifier,
+        host=data.host,
+        username=data.username,
+        encrypted_auth_data=encrypted_data,
+        is_archive=data.is_archive
+    )
+    db.add(cred)
+    db.commit()
+    db.refresh(cred)
+    return cred
+
+@router.get("/connections", response_model=List[StorageCredentialOut])
+def list_connections(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return db.query(StorageCredential).filter(StorageCredential.user_id == current_user.id).all()
