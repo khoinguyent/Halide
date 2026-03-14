@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from strawberry.fastapi import GraphQLRouter
 
+<<<<<<< HEAD
 from .api.v1 import auth, gear, rolls, storage, master, dashboard
+=======
+from .api.v1 import auth, gear, rolls, storage, dashboard, user
+>>>>>>> feat/sprint_04/be_dev_2
 from .graphql.schema import schema, get_context
 from .core.firebase import init_firebase
 from .db.base import Base
@@ -23,6 +27,7 @@ app.include_router(rolls.router, prefix="/api/v1", tags=["Rolls"])
 app.include_router(storage.router, prefix="/api/v1", tags=["Storage"])
 app.include_router(master.router, prefix="/api/v1", tags=["Master Data"])
 app.include_router(dashboard.router, prefix="/api/v1", tags=["Dashboard"])
+app.include_router(user.router, prefix="/api/v1/user", tags=["User Profile"])
 
 # GraphQL Router
 graphql_app = GraphQLRouter(schema, context_getter=get_context)

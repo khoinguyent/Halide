@@ -478,3 +478,142 @@ Please, commit your changes before you merge.
 Please, commit your changes before you merge.
 [2026-03-14 00:26:39.273837] Git Error: fatal: You have not concluded your merge (MERGE_HEAD exists).
 Please, commit your changes before you merge.
+[2026-03-14 11:08:10.432244] Git Error: merge: feat/sprint_04/be_dev_1 - not something we can merge
+[2026-03-14 11:08:10.451568] Git Error: merge: feat/sprint_04/be_dev_2 - not something we can merge
+[2026-03-14 11:08:10.466823] Git Error: merge: feat/sprint_04/fe_dev_1 - not something we can merge
+[2026-03-14 11:08:10.480625] Git Error: merge: feat/sprint_04/fe_dev_2 - not something we can merge
+[2026-03-14 11:08:30.845127] Git Error: merge: feat/sprint_04/be_dev_1 - not something we can merge
+[2026-03-14 11:08:30.867629] Git Error: merge: feat/sprint_04/be_dev_2 - not something we can merge
+[2026-03-14 11:08:30.882617] Git Error: merge: feat/sprint_04/fe_dev_1 - not something we can merge
+[2026-03-14 11:08:30.896521] Git Error: merge: feat/sprint_04/fe_dev_2 - not something we can merge
+[2026-03-14 11:09:10.524097] Git Error: merge: feat/sprint_04/be_dev_1 - not something we can merge
+[2026-03-14 11:09:10.541288] Git Error: merge: feat/sprint_04/be_dev_2 - not something we can merge
+[2026-03-14 11:09:10.556040] Git Error: merge: feat/sprint_04/fe_dev_1 - not something we can merge
+[2026-03-14 11:09:10.570338] Git Error: merge: feat/sprint_04/fe_dev_2 - not something we can merge
+[2026-03-14 11:09:30.947916] Git Error: merge: feat/sprint_04/be_dev_1 - not something we can merge
+[2026-03-14 11:09:31.062307] Git Error: merge: feat/sprint_04/be_dev_2 - not something we can merge
+[2026-03-14 11:09:31.087527] Git Error: merge: feat/sprint_04/fe_dev_1 - not something we can merge
+[2026-03-14 11:09:31.104356] Git Error: merge: feat/sprint_04/fe_dev_2 - not something we can merge
+[2026-03-14 11:10:10.615231] Git Error: merge: feat/sprint_04/be_dev_1 - not something we can merge
+[2026-03-14 11:10:10.631546] Git Error: merge: feat/sprint_04/be_dev_2 - not something we can merge
+[2026-03-14 11:10:10.652281] Git Error: merge: feat/sprint_04/fe_dev_1 - not something we can merge
+[2026-03-14 11:10:10.675051] Git Error: merge: feat/sprint_04/fe_dev_2 - not something we can merge
+[2026-03-14 11:10:31.130115] Git Error: merge: feat/sprint_04/be_dev_1 - not something we can merge
+[2026-03-14 11:10:31.151253] Git Error: merge: feat/sprint_04/be_dev_2 - not something we can merge
+[2026-03-14 11:10:31.164851] Git Error: merge: feat/sprint_04/fe_dev_1 - not something we can merge
+[2026-03-14 11:10:31.181299] Git Error: merge: feat/sprint_04/fe_dev_2 - not something we can merge
+[2026-03-14 11:11:10.719608] Git Error: merge: feat/sprint_04/be_dev_1 - not something we can merge
+[2026-03-14 11:11:10.737574] Git Error: merge: feat/sprint_04/be_dev_2 - not something we can merge
+[2026-03-14 11:11:10.754366] Git Error: merge: feat/sprint_04/fe_dev_1 - not something we can merge
+[2026-03-14 11:11:10.768408] Git Error: merge: feat/sprint_04/fe_dev_2 - not something we can merge
+[2026-03-14 11:11:31.225721] Git Error: merge: feat/sprint_04/be_dev_1 - not something we can merge
+[2026-03-14 11:11:31.241427] Git Error: merge: feat/sprint_04/be_dev_2 - not something we can merge
+[2026-03-14 11:11:31.255784] Git Error: merge: feat/sprint_04/fe_dev_1 - not something we can merge
+[2026-03-14 11:11:31.268304] Git Error: merge: feat/sprint_04/fe_dev_2 - not something we can merge
+[2026-03-14 11:12:10.810431] Git Error: merge: feat/sprint_04/fe_dev_1 - not something we can merge
+[2026-03-14 11:12:10.824561] Git Error: merge: feat/sprint_04/fe_dev_2 - not something we can merge
+[2026-03-14 11:16:31.738603] Git Error: 
+[2026-03-14 11:16:31.747281] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:16:31.756279] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:17:11.338168] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:17:11.357459] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:17:11.377621] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:17:11.391256] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:17:31.803645] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:17:31.825011] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:17:31.839297] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:17:31.852225] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:18:11.415644] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:18:11.428443] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:18:11.439942] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:18:11.453153] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:18:31.890495] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:18:31.909605] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:18:31.930867] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:18:31.943166] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:19:11.493669] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:19:11.516269] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:19:11.536045] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:19:11.552939] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:19:31.979473] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:19:32.000802] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:19:32.018086] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[2026-03-14 11:19:32.030716] Git Error: error: Merging is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
