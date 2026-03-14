@@ -29,6 +29,8 @@ class RollsRepository {
   Future<Roll> createRoll({
     required String filmStockId,
     required String userCameraId,
+    String? title,
+    String? description,
     int? shotAtIso,
     int? expiredYear,
     int? maxFrames,
@@ -36,9 +38,18 @@ class RollsRepository {
     final response = await _apiService.post('/api/v1/rolls', data: {
       'film_stock_id': filmStockId,
       'user_camera_id': userCameraId,
+      'title': title,
+      'description': description,
       'shot_at_iso': shotAtIso,
       'expired_year': expiredYear,
       'max_frames': maxFrames ?? 36,
+    });
+    return Roll.fromJson(response.data);
+  }
+
+  Future<Roll> updateRollStatus(String rollId, String status) async {
+    final response = await _apiService.patch('/rolls/$rollId/status', data: {
+      'status': status,
     });
     return Roll.fromJson(response.data);
   }

@@ -6,6 +6,7 @@ class Camera {
   final String nickname;
   final String brand;
   final String model;
+  final String cameraType;
   final String? serialNumber;
   final String? format;
   final GearStatus status;
@@ -19,6 +20,7 @@ class Camera {
     required this.nickname,
     required this.brand,
     required this.model,
+    this.cameraType = 'Unknown',
     this.serialNumber,
     this.format,
     this.status = GearStatus.active,
@@ -31,6 +33,7 @@ class Camera {
     String? nickname,
     String? brand,
     String? model,
+    String? cameraType,
     String? serialNumber,
     String? format,
     GearStatus? status,
@@ -43,6 +46,7 @@ class Camera {
       nickname: nickname ?? this.nickname,
       brand: brand ?? this.brand,
       model: model ?? this.model,
+      cameraType: cameraType ?? this.cameraType,
       serialNumber: serialNumber ?? this.serialNumber,
       format: format ?? this.format,
       status: status ?? this.status,
@@ -66,11 +70,13 @@ class Camera {
     final primaryIdx = json['primary_image_index'] is int
         ? json['primary_image_index'] as int
         : 0;
+    
     return Camera(
       id: json['id']?.toString() ?? '',
       nickname: json['gear_nickname'] ?? json['nickname'] ?? '',
       brand: json['brand'] ?? camera?['brand'] ?? '',
       model: json['model'] ?? camera?['model'] ?? '',
+      cameraType: json['camera_type'] ?? 'Unknown',
       serialNumber: json['serial_number'],
       format: json['format'] ?? camera?['format'],
       status: gearStatusFromString(json['status'] ?? 'active'),
@@ -87,6 +93,7 @@ class Camera {
       'nickname': nickname,
       'brand': brand,
       'model': model,
+      'camera_type': cameraType,
       'serial_number': serialNumber,
       'format': format,
       'status': status.name,
@@ -95,5 +102,10 @@ class Camera {
     };
   }
 
-  String get displayName => '$brand $model';
+  String get displayName {
+    if (nickname.isNotEmpty) {
+      return '$nickname - $model';
+    }
+    return '$brand $model';
+  }
 }

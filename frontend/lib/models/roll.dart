@@ -3,9 +3,16 @@ import 'roll_status.dart';
 
 class Roll {
   final String id;
+  final String userId;
+  final String filmStockId;
+  final String userCameraId;
   final String brand;
   final String name;
   final Color color;
+  final String? title;
+  final String? description;
+  final int? shotAtIso;
+  final int? expiredYear;
   final RollStatus status;
   final List<String> imageUrls;
   final String? nickname;
@@ -13,13 +20,20 @@ class Roll {
   final String? lensName;
   final int frameCount;
   final int maxFrames;
-  final DateTime? createdAt;
+  final DateTime createdAt;
 
   Roll({
     required this.id,
+    required this.userId,
+    required this.filmStockId,
+    required this.userCameraId,
     required this.brand,
     required this.name,
     required this.color,
+    this.title,
+    this.description,
+    this.shotAtIso,
+    this.expiredYear,
     this.status = RollStatus.shooting,
     this.imageUrls = const [],
     this.nickname,
@@ -27,7 +41,7 @@ class Roll {
     this.lensName,
     this.frameCount = 0,
     this.maxFrames = 36,
-    this.createdAt,
+    required this.createdAt,
   });
 
   Roll copyWith({
@@ -38,9 +52,16 @@ class Roll {
     String? lensName,
     int? frameCount,
     int? maxFrames,
+    String? title,
+    String? description,
+    int? shotAtIso,
+    int? expiredYear,
   }) {
     return Roll(
       id: id,
+      userId: userId,
+      filmStockId: filmStockId,
+      userCameraId: userCameraId,
       brand: brand,
       name: name,
       color: color,
@@ -52,15 +73,26 @@ class Roll {
       frameCount: frameCount ?? this.frameCount,
       maxFrames: maxFrames ?? this.maxFrames,
       createdAt: createdAt,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      shotAtIso: shotAtIso ?? this.shotAtIso,
+      expiredYear: expiredYear ?? this.expiredYear,
     );
   }
 
   factory Roll.fromJson(Map<String, dynamic> json) {
     return Roll(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      filmStockId: json['film_stock_id']?.toString() ?? '',
+      userCameraId: json['user_camera_id']?.toString() ?? '',
       brand: json['brand'] ?? '',
       name: json['name'] ?? '',
       color: Color(int.parse(json['color']?.replaceFirst('#', '0xff') ?? '0xffcccccc')),
+      title: json['title'],
+      description: json['description'],
+      shotAtIso: json['shot_at_iso'],
+      expiredYear: json['expired_year'],
       status: statusFromString(json['status'] ?? 'shooting'),
       imageUrls: List<String>.from(json['image_urls'] ?? []),
       nickname: json['nickname'],
@@ -68,7 +100,7 @@ class Roll {
       lensName: json['lens_name'],
       frameCount: json['frame_count'] ?? 0,
       maxFrames: json['max_frames'] ?? 36,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
     );
   }
 }

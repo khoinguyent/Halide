@@ -1,14 +1,20 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
 import '../core/widgets/glass_panel.dart';
 import '../models/roll.dart';
 import '../models/roll_status.dart';
+import '../models/film_stock.dart';
+import '../models/camera.dart';
 import '../providers/auth_provider.dart';
 import '../providers/roll_provider.dart';
+import '../providers/rolls_provider.dart';
+import '../features/rolls/presentation/bloc/rolls_bloc.dart';
 import '../widgets/status_selector.dart';
 import '../widgets/image_uploader_widget.dart';
+import '../widgets/full_screen_viewer.dart';
 
 class RollDetailView extends ConsumerWidget {
   final String rollId;
@@ -67,11 +73,14 @@ class _RollDetailBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // If scanned, show gallery grid, otherwise show status detail
+    final isScanned = roll.status == RollStatus.scanned;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
       appBar: AppBar(
         title: Text(
-          '${roll.brand} ${roll.name}',
+          roll.title ?? '${roll.brand} ${roll.name}',
           style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: Colors.transparent,
@@ -100,56 +109,90 @@ class _RollDetailBody extends ConsumerWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GlassPanel(
+      body: isScanned 
+          ? _buildGalleryGrid(context, roll)
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
-              child: ImageUploaderWidget(
-                rollId: rollId,
-                onUploadComplete: onRefresh,
-                darkMode: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GlassPanel(
+                    padding: const EdgeInsets.all(20),
+                    child: ImageUploaderWidget(
+                      rollId: rollId,
+                      onUploadComplete: onRefresh,
+                      darkMode: true,
+                    ),
+                  ),
+                  if (roll.imageUrls.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      'UPLOADED IMAGES',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildGalleryGrid(context, roll, shrinkWrap: true),
+                  ],
+                ],
               ),
             ),
-            if (roll.imageUrls.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              Text(
-                'UPLOADED IMAGES',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                  color: Colors.white.withOpacity(0.5),
-                ),
-              ),
-              const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: roll.imageUrls.length,
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemBuilder: (context, index) {
-                  final path = roll.imageUrls[index];
-                  final isLocal = path.startsWith('/');
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: isLocal
-                        ? Image.file(File(path), fit: BoxFit.cover)
-                        : Image.network(path, fit: BoxFit.cover),
-                  );
-                },
-              ),
-            ],
-          ],
-        ),
+    );
+  }
+
+  Widget _buildGalleryGrid(BuildContext context, Roll roll, {bool shrinkWrap = false}) {
+    // If scanned but no images, we show dummy images as requested in Sprint 05 requirements for preview
+    final images = roll.imageUrls.isNotEmpty 
+        ? roll.imageUrls 
+        : (roll.status == RollStatus.scanned 
+            ? List.generate(24, (i) => 'https://picsum.photos/seed/${roll.id}_$i/800/600')
+            : <String>[]);
+
+    return GridView.builder(
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(12),
+      itemCount: images.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
       ),
+      itemBuilder: (context, index) {
+        final path = images[index];
+        final isLocal = path.startsWith('/');
+        final isNetwork = path.startsWith('http');
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => FullScreenViewer(
+                  imageUrls: images,
+                  initialIndex: index,
+                  iso: roll.shotAtIso,
+                  dateScanned: roll.createdAt,
+                  filmStock: FilmStock(id: roll.filmStockId, brand: roll.brand, name: roll.name, iso: roll.shotAtIso ?? 400, format: '135', colorType: 'Color'),
+                  camera: Camera(id: roll.userCameraId, brand: roll.brand, model: roll.cameraName ?? 'Unknown', nickname: roll.nickname ?? ''),
+                ),
+              ),
+            );
+          },
+          child: Hero(
+            tag: path,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: isNetwork
+                  ? Image.network(path, fit: BoxFit.cover)
+                  : (isLocal ? Image.file(File(path), fit: BoxFit.cover) : Container(color: Colors.white10)),
+            ),
+          ),
+        );
+      },
     );
   }
 

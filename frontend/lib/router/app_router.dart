@@ -75,6 +75,7 @@ final appRouter = GoRouter(
         return HalideScaffold(
           currentIndex: navigationShell.currentIndex,
           onTabSelected: (index) {
+            // Using go for top-level tabs ensures state preservation in the shell
             context.go(branchPaths[index]);
           },
           child: navigationShell,

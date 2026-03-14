@@ -41,11 +41,12 @@ class HalideScaffold extends ConsumerWidget {
                     // Show premium glass Add Roll form
                     showHalideDialog(
                       context: context,
-                      builder: (context) => AddRollForm(
-                        repository: ref.read(rollsRepositoryProvider),
-                        onRollAdded: () {
-                          ref.read(rollsBlocProvider).add(RefreshRolls());
-                        },
+                      builder: (context) => BlocProvider.value(
+                        value: ref.read(rollsBlocProvider),
+                        child: AddRollForm(
+                          repository: ref.read(rollsRepositoryProvider),
+                          onRollAdded: () {},
+                        ),
                       ),
                     );
                   }
