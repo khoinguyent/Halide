@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime, text, Boolean
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime, text, Boolean, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from ..base import Base
 
@@ -25,8 +25,21 @@ class StorageCredential(Base):
     # Used for OAuth (Google/OneDrive) or NAS (password). Encrypted at rest.
     encrypted_auth_data = Column(String, nullable=False)
     
+    display_label = Column(String(255), nullable=True)
+    is_primary = Column(Boolean, default=False, server_default=text('FALSE'))
+    
     # Flag to designate this storage as the archive destination
     is_archive = Column(Boolean, default=False, server_default=text('FALSE'))
     
     created_at = Column(DateTime, server_default=text('NOW()'))
     updated_at = Column(DateTime, server_default=text('NOW()'), onupdate=text('NOW()'))
+
+    __table_args__ = (
+        Index(
+            "ix_storage_credentials_primary_user",
+            "user_id",
+            "is_primary",
+            unique=True,
+            postgresql_where=text("is_primary = True")
+        ),
+    )

@@ -10,6 +10,8 @@ class StorageCredentialCreate(BaseModel):
     username: Optional[str] = None
     auth_data: str
     is_archive: bool = False
+    display_label: Optional[str] = None
+    is_primary: bool = False
 
 class StorageCredentialOut(BaseModel):
     id: UUID
@@ -18,6 +20,8 @@ class StorageCredentialOut(BaseModel):
     host: Optional[str]
     username: Optional[str]
     is_archive: bool
+    display_label: Optional[str]
+    is_primary: bool
 
     class Config:
         orm_mode = True
