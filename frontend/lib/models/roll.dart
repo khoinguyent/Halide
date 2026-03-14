@@ -3,6 +3,8 @@ class Roll {
   final String userId;
   final String filmStockId;
   final String userCameraId;
+  final String? title;
+  final String? description;
   final int? shotAtIso;
   final int? expiredYear;
   final String status;
@@ -13,6 +15,8 @@ class Roll {
     required this.userId,
     required this.filmStockId,
     required this.userCameraId,
+    this.title,
+    this.description,
     this.shotAtIso,
     this.expiredYear,
     required this.status,
@@ -25,6 +29,8 @@ class Roll {
       userId: json['user_id'],
       filmStockId: json['film_stock_id'],
       userCameraId: json['user_camera_id'],
+      title: json['title'],
+      description: json['description'],
       shotAtIso: json['shot_at_iso'],
       expiredYear: json['expired_year'],
       status: json['status'],

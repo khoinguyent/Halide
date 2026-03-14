@@ -5,6 +5,7 @@ import '../views/home_view.dart';
 import '../views/profile_view.dart';
 import '../views/auth/login_view.dart';
 import '../views/auth/register_view.dart';
+import '../views/roll_detail_view.dart';
 import '../providers/auth_provider.dart';
 import '../features/shell/presentation/widgets/halide_scaffold.dart';
 
@@ -28,6 +29,10 @@ final appRouter = GoRouter(
     ),
 
     // App Shell routes
+    GoRoute(
+      path: '/roll/:id',
+      builder: (context, state) => RollDetailView(rollId: state.pathParameters['id']!),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return HalideScaffold(

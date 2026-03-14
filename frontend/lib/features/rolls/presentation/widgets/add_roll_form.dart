@@ -1,8 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/models/film_stock.dart';
 import 'package:frontend/models/camera.dart';
 import 'package:frontend/features/rolls/data/rolls_repository.dart';
+import 'package:frontend/features/rolls/presentation/bloc/rolls_bloc.dart';
 
 class AddRollForm extends StatefulWidget {
   final RollsRepository repository;
@@ -23,6 +25,8 @@ class _AddRollFormState extends State<AddRollForm> {
   
   FilmStock? _selectedStock;
   Camera? _selectedCamera;
+  String? _title;
+  String? _description;
   int? _shotAtIso;
   int? _expiredYear;
 
@@ -52,9 +56,18 @@ class _AddRollFormState extends State<AddRollForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
+    return BlocListener<RollsBloc, RollsState>(
+      listener: (context, state) {
+        if (state is RollActionSuccess) {
+          widget.onRollAdded();
+          Navigator.of(context).pop();
+        } else if (state is RollsError) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
+        }
+      },
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: BackdropFilter(
@@ -87,6 +100,10 @@ class _AddRollFormState extends State<AddRollForm> {
                               ),
                             ),
                             const SizedBox(height: 24),
+                            _buildTextField('TITLE', (val) => _title = val),
+                            const SizedBox(height: 16),
+                            _buildTextField('DESCRIPTION', (val) => _description = val, maxLines: 3),
+                            const SizedBox(height: 16),
                             _buildSearchableStockPicker(),
                             const SizedBox(height: 16),
                             _buildSearchableCameraPicker(),
@@ -220,6 +237,15 @@ class _AddRollFormState extends State<AddRollForm> {
     );
   }
 
+  Widget _buildTextField(String label, Function(String?) onSaved, {int maxLines = 1}) {
+    return TextField(
+      maxLines: maxLines,
+      style: const TextStyle(color: Colors.white),
+      onChanged: onSaved,
+      decoration: _inputDecoration(label),
+    );
+  }
+
   Widget _buildNumberField(String label, Function(int?) onSaved) {
     return TextField(
       keyboardType: TextInputType.number,
@@ -238,16 +264,16 @@ class _AddRollFormState extends State<AddRollForm> {
     );
   }
 
-  void _submit() async {
+  void _submit() {
     if (_selectedStock == null || _selectedCamera == null) return;
     
-    await widget.repository.createRoll(
+    context.read<RollsBloc>().add(AddRollEvent(
       filmStockId: _selectedStock!.id,
       userCameraId: _selectedCamera!.id,
+      title: _title,
+      description: _description,
       shotAtIso: _shotAtIso,
       expiredYear: _expiredYear,
-    );
-    widget.onRollAdded();
-    Navigator.of(context).pop();
+    ));
   }
 }

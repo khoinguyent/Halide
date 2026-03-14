@@ -3,12 +3,14 @@ class Camera {
   final String brand;
   final String model;
   final String cameraType;
+  final String? nickname;
 
   Camera({
     required this.id,
     required this.brand,
     required this.model,
     required this.cameraType,
+    this.nickname,
   });
 
   factory Camera.fromJson(Map<String, dynamic> json) {
@@ -17,8 +19,14 @@ class Camera {
       brand: json['brand'],
       model: json['model'],
       cameraType: json['camera_type'],
+      nickname: json['nickname'],
     );
   }
 
-  String get displayName => '$brand $model';
+  String get displayName {
+    if (nickname != null && nickname!.isNotEmpty) {
+      return '$nickname - $model';
+    }
+    return '$brand $model';
+  }
 }
