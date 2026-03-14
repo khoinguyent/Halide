@@ -6,6 +6,8 @@ class UserBase(BaseModel):
     email: EmailStr
     display_name: str
     avatar_url: Optional[str] = None
+    professional_nickname: Optional[str] = None
+    bio: Optional[str] = None
 
 class UserCreate(UserBase):
     id: str  # Firebase UID

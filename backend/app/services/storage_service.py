@@ -30,4 +30,21 @@ class StorageService:
         
         return key
 
+    def upload_avatar(self, user_id: str, file_content: bytes, content_type: str = "image/jpeg"):
+        """
+        Uploads a user avatar to S3/R2.
+        Key format: users/{uid}/profile/avatar.jpg
+        """
+        key = f"users/{user_id}/profile/avatar.jpg"
+        
+        self.s3.put_object(
+            Bucket=self.bucket_name,
+            Key=key,
+            Body=file_content,
+            ContentType=content_type
+        )
+        
+        return key
+
+
 storage_service = StorageService()
