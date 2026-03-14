@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
@@ -58,6 +59,16 @@ class ProfileView extends ConsumerWidget {
                     icon: Icons.help_outline,
                     label: 'Support',
                     onTap: () {},
+                  ),
+                  _ProfileOption(
+                    icon: Icons.privacy_tip_outlined,
+                    label: 'Privacy Policy',
+                    onTap: () => context.go('/profile/privacy'),
+                  ),
+                  _ProfileOption(
+                    icon: Icons.description_outlined,
+                    label: 'Terms & Conditions',
+                    onTap: () => context.go('/profile/terms'),
                   ),
                   _ProfileOption(
                     icon: Icons.logout,

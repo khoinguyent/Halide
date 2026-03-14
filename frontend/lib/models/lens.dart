@@ -1,3 +1,5 @@
+import 'gear_status.dart';
+
 class Lens {
   final String id;
   final String nickname;
@@ -6,6 +8,8 @@ class Lens {
   final String? serialNumber;
   final String? focalLength;
   final String? maxAperture;
+  final GearStatus status;
+  final List<String> imageUrls;
 
   Lens({
     required this.id,
@@ -15,7 +19,26 @@ class Lens {
     this.serialNumber,
     this.focalLength,
     this.maxAperture,
+    this.status = GearStatus.active,
+    this.imageUrls = const [],
   });
+
+  Lens copyWith({
+    GearStatus? status,
+    List<String>? imageUrls,
+  }) {
+    return Lens(
+      id: id,
+      nickname: nickname,
+      brand: brand,
+      model: model,
+      serialNumber: serialNumber,
+      focalLength: focalLength,
+      maxAperture: maxAperture,
+      status: status ?? this.status,
+      imageUrls: imageUrls ?? this.imageUrls,
+    );
+  }
 
   factory Lens.fromJson(Map<String, dynamic> json) {
     return Lens(
@@ -26,6 +49,8 @@ class Lens {
       serialNumber: json['serial_number'],
       focalLength: json['focal_length'],
       maxAperture: json['max_aperture'],
+      status: gearStatusFromString(json['status'] ?? 'active'),
+      imageUrls: List<String>.from(json['image_urls'] ?? []),
     );
   }
 
@@ -37,6 +62,8 @@ class Lens {
       'serial_number': serialNumber,
       'focal_length': focalLength,
       'max_aperture': maxAperture,
+      'status': status.name,
+      'image_urls': imageUrls,
     };
   }
 }

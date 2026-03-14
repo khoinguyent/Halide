@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 import '../providers/gear_provider.dart';
@@ -78,9 +79,11 @@ class _GearCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      padding: EdgeInsets.zero,
-      child: Column(
+    return GestureDetector(
+      onTap: () => context.go('/locker/camera/${camera.id}'),
+      child: GlassPanel(
+        padding: EdgeInsets.zero,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
@@ -160,8 +163,9 @@ class _GearCard extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
+      ), // closes Column
+      ), // closes GlassPanel
+    ); // closes GestureDetector
   }
 }
 

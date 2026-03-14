@@ -11,6 +11,9 @@ import '../views/meter_view.dart';
 import '../views/main_shell.dart';
 import '../views/auth/login_view.dart';
 import '../views/auth/register_view.dart';
+import '../views/camera_detail_view.dart';
+import '../views/legal/privacy_policy_view.dart';
+import '../views/legal/terms_conditions_view.dart';
 
 class AuthNotifier extends ChangeNotifier {
   AuthNotifier() {
@@ -55,6 +58,13 @@ final appRouter = GoRouter(
               path: 'add-gear',
               builder: (context, state) => const AddGearView(),
             ),
+            GoRoute(
+              path: 'camera/:id',
+              builder: (context, state) {
+                final id = state.pathParameters['id']!;
+                return CameraDetailView(cameraId: id);
+              },
+            ),
           ],
         ),
         GoRoute(
@@ -64,6 +74,16 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/profile',
           builder: (context, state) => const ProfileView(),
+          routes: [
+            GoRoute(
+              path: 'privacy',
+              builder: (context, state) => const PrivacyPolicyView(),
+            ),
+            GoRoute(
+              path: 'terms',
+              builder: (context, state) => const TermsConditionsView(),
+            ),
+          ],
         ),
       ],
     ),
