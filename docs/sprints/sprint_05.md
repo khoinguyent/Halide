@@ -5,7 +5,7 @@ Sprint 5 focuses on giving users total control over their data residency. It imp
 ## Backend – BE_DEV_1 (Storage Logic & Routing)
 
 ### [BE_5.1] Multi-Instance Storage Schema
-- **Status**: TO DO
+- **Status**: DONE
 - **Depends On**: [BE_4.1]
 - **Assignee**: BE_DEV_1
 
@@ -18,7 +18,7 @@ Update the PostgreSQL schema to allow multiple instances of the same provider (e
 - API endpoints updated to handle labeling (e.g., "Work Archive").
 
 ### [BE_5.2] Routing Engine: Cloud vs. Local vs. System
-- **Status**: TO DO
+- **Status**: DONE
 - **Depends On**: [BE_4.2]
 - **Assignee**: BE_DEV_1
 
@@ -31,7 +31,7 @@ Modify the Transfer Service to check the user's `storage_strategy` before proces
 - If strategy is `SYSTEM_CLOUD`, images are routed to the managed Halide S3 bucket (requires active subscription).
 
 ### [BE_5.3] Managed "System Cloud" Storage Provider
-- **Status**: TO DO
+- **Status**: DONE
 - **Depends On**: [BE_4.3]
 - **Assignee**: BE_DEV_1
 
@@ -46,7 +46,7 @@ Implement the internal storage provider for the System Cloud tier, including sub
 ## Frontend – FE_DEV_1 (Storage UX)
 
 ### [FE_5.1] Multi-Account Management & Primary Toggle
-- **Status**: TO DO
+- **Status**: DONE
 - **Depends On**: [FE_4.5]
 - **Assignee**: FE_DEV_1
 
@@ -59,7 +59,7 @@ Implement the UI for managing multiple accounts and setting a Primary destinatio
 - \"Set as Primary\" interaction that triggers an atomic update in the UI.
 
 ### [FE_5.2] Storage Tier Selector (Local / Personal / System)
-- **Status**: TO DO
+- **Status**: DONE
 - **Depends On**: [FE_5.1]
 - **Assignee**: FE_DEV_1
 
@@ -74,7 +74,7 @@ Implement a premium UI/UX for selecting the primary storage strategy with a thre
 ## Frontend – FE_DEV_2 (Local Archiving & Profile)
 
 ### [FE_5.3] Local Device Storage Handler
-- **Status**: TO DO
+- **Status**: DONE
 - **Depends On**: [FE_4.3]
 - **Assignee**: FE_DEV_2
 
@@ -87,7 +87,7 @@ Implement the Flutter logic for saving scanned rolls directly to the mobile devi
 - \"Move to Cloud\" option for individual rolls even if global strategy is LOCAL.
 
 ### [FE_5.4] Profile Customization & Avatar Upload
-- **Status**: TO DO
+- **Status**: DONE
 - **Depends On**: [FE_4.5], [BE_4.3]
 - **Assignee**: FE_DEV_2
 
@@ -101,7 +101,7 @@ Implement the frontend interface for editing user metadata and handling the avat
 - Visual feedback (progress bar/spinner) during image upload to S3.
 
 ### [FE_5.5] Unified Image Source Resolver & Cache
-- **Status**: TO DO
+- **Status**: DONE
 - **Depends On**: [FE_5.2], [FE_5.3]
 - **Assignee**: FE_DEV_2
 

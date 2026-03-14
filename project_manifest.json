@@ -5,7 +5,9 @@
         "sprint_00",
         "sprint_01",
         "sprint_02",
-        "sprint_03"
+        "sprint_03",
+        "sprint_04",
+        "sprint_05"
     ],
     "status": {
         "sprint_00": "DONE",
@@ -13,7 +15,7 @@
         "sprint_02": "DONE",
         "sprint_03": "DONE",
         "sprint_04": "DONE",
-        "sprint_05": "ACTIVE"
+        "sprint_05": "DONE"
     },
     "git_config": {
         "main_branch": "develop",
