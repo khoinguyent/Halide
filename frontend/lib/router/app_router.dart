@@ -10,6 +10,9 @@ import '../views/add_gear_view.dart';
 import '../views/meter_view.dart';
 import '../views/auth/login_view.dart';
 import '../views/auth/register_view.dart';
+import '../views/camera_detail_view.dart';
+import '../views/legal/privacy_policy_view.dart';
+import '../views/legal/terms_conditions_view.dart';
 
 // Global keys for navigation
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -56,6 +59,7 @@ final appRouter = GoRouter(
       path: '/register',
       builder: (context, state) => const RegisterView(),
     ),
+
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return HalideScaffold(
@@ -75,7 +79,7 @@ final appRouter = GoRouter(
             ),
           ],
         ),
-        // Tab 2: Locker (Integration from your branch)
+        // Tab 2: Locker
         StatefulShellBranch(
           navigatorKey: _shellNavigatorLockerKey,
           routes: [
@@ -87,11 +91,18 @@ final appRouter = GoRouter(
                   path: 'add-gear',
                   builder: (context, state) => const AddGearView(),
                 ),
+                GoRoute(
+                  path: 'camera/:id',
+                  builder: (context, state) {
+                    final id = state.pathParameters['id']!;
+                    return CameraDetailView(cameraId: id);
+                  },
+                ),
               ],
             ),
           ],
         ),
-        // Tab 3: Meter (Integration from your branch)
+        // Tab 3: Meter
         StatefulShellBranch(
           navigatorKey: _shellNavigatorMeterKey,
           routes: [
@@ -108,6 +119,16 @@ final appRouter = GoRouter(
             GoRoute(
               path: '/profile',
               builder: (context, state) => const ProfileView(),
+              routes: [
+                GoRoute(
+                  path: 'privacy',
+                  builder: (context, state) => const PrivacyPolicyView(),
+                ),
+                GoRoute(
+                  path: 'terms',
+                  builder: (context, state) => const TermsConditionsView(),
+                ),
+              ],
             ),
           ],
         ),
