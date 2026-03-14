@@ -18,8 +18,17 @@ init_firebase()
 # This is a fallback for initial setup/dev.
 Base.metadata.create_all(bind=engine)
 
+from .tasks.transfer_worker import start_worker, stop_worker
+
 app = FastAPI(title="Halide API")
 
+@app.on_event("startup")
+def startup_event():
+    start_worker()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    stop_worker()
 # REST Routers
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(gear.router, prefix="/api/v1", tags=["Gear"])
