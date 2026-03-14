@@ -175,7 +175,7 @@ class _GlassFAB extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-    return Container(
+      child: Container(
       width: 64,
       height: 64,
       margin: const EdgeInsets.only(bottom: 10),
@@ -202,6 +202,6 @@ class _GlassFAB extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }

@@ -1,5 +1,10 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+
+# Resolve .env relative to backend/ so it loads regardless of cwd
+_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+_ENV_FILE = _BACKEND_DIR / ".env"
 
 class Settings(BaseSettings):
     # Database
@@ -19,6 +24,6 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str
     S3_REGION: str = "auto"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 
 settings = Settings()

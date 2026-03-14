@@ -35,4 +35,33 @@ class GearService {
       throw Exception('Failed to add camera: ${response.body}');
     }
   }
+
+  /// Update user camera (e.g. image_urls, primary_image_index, gear_nickname).
+  Future<Map<String, dynamic>> updateUserCamera(
+    String token,
+    String userCameraId, {
+    List<String>? imageUrls,
+    int? primaryImageIndex,
+    String? gearNickname,
+  }) async {
+    final body = <String, dynamic>{};
+    if (imageUrls != null) body['image_urls'] = imageUrls;
+    if (primaryImageIndex != null) body['primary_image_index'] = primaryImageIndex;
+    if (gearNickname != null) body['gear_nickname'] = gearNickname;
+
+    final response = await http.patch(
+      Uri.parse('${AppConfig.apiUrl}/user_cameras/$userCameraId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to update camera: ${response.body}');
+    }
+  }
 }

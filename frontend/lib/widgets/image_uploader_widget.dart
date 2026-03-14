@@ -7,11 +7,13 @@ import '../services/upload_service.dart';
 class ImageUploaderWidget extends ConsumerStatefulWidget {
   final String rollId;
   final VoidCallback? onUploadComplete;
+  final bool darkMode;
 
   const ImageUploaderWidget({
     super.key,
     required this.rollId,
     this.onUploadComplete,
+    this.darkMode = false,
   });
 
   @override
@@ -87,14 +89,15 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
   @override
   Widget build(BuildContext context) {
     final total = _selectedImages.length;
+    final fg = widget.darkMode ? Colors.white : Colors.black87;
+    final fgMuted = widget.darkMode ? Colors.white.withOpacity(0.6) : Colors.grey.shade600;
+    final borderColor = widget.darkMode ? Colors.white.withOpacity(0.2) : Colors.grey.shade300;
+    final bgColor = widget.darkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Add Images',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+        Text('Add Images', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: fg)),
         const SizedBox(height: 16),
         if (_selectedImages.isEmpty)
           GestureDetector(
@@ -104,17 +107,15 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
               height: 120,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300, width: 2),
-                color: Colors.grey.shade50,
+                border: Border.all(color: borderColor, width: 2),
+                color: bgColor,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_photo_alternate_outlined,
-                      size: 40, color: Colors.grey.shade400),
+                  Icon(Icons.add_photo_alternate_outlined, size: 40, color: fgMuted),
                   const SizedBox(height: 8),
-                  Text('Tap to select photos',
-                      style: TextStyle(color: Colors.grey.shade500)),
+                  Text('Tap to select photos', style: TextStyle(color: fgMuted)),
                 ],
               ),
             ),
@@ -166,20 +167,23 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
             LinearProgressIndicator(
               value: total > 0 ? _uploadedCount / total : null,
               borderRadius: BorderRadius.circular(4),
+              backgroundColor: widget.darkMode ? Colors.white.withOpacity(0.2) : null,
+              valueColor: widget.darkMode ? const AlwaysStoppedAnimation<Color>(Colors.white) : null,
             ),
             const SizedBox(height: 8),
-            Text('Uploading $_uploadedCount / $total...',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            Text('Uploading $_uploadedCount / $total...', style: TextStyle(color: fgMuted, fontSize: 13)),
             const SizedBox(height: 12),
           ],
           Row(
             children: [
               OutlinedButton(
                 onPressed: _isUploading ? null : _pickImages,
+                style: widget.darkMode ? OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white38)) : null,
                 child: const Text('Add More'),
               ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
+                style: widget.darkMode ? ElevatedButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.2), foregroundColor: Colors.white) : null,
                 onPressed: _isUploading ? null : _uploadImages,
                 icon: _isUploading
                     ? const SizedBox(

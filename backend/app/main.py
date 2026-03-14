@@ -1,21 +1,18 @@
 from fastapi import FastAPI
 from strawberry.fastapi import GraphQLRouter
 
-<<<<<<< HEAD
-from .api.v1 import auth, gear, rolls, storage, master, dashboard
-=======
-from .api.v1 import auth, gear, rolls, storage, dashboard, user
->>>>>>> feat/sprint_04/be_dev_2
+from .api.v1 import auth, gear, rolls, storage, master, dashboard, user
 from .graphql.schema import schema, get_context
 from .core.firebase import init_firebase
 from .db.base import Base
 from .db.session import engine
+from .db import models  # noqa: F401 - ensure all models registered before create_all
 
 # Initialize Firebase
 init_firebase()
 
 # Note: In production, migrations should be handled by Alembic. 
-# This is a fallback for initial setup/dev.
+# This is a fallback so all current models have tables if migrations not run.
 Base.metadata.create_all(bind=engine)
 
 from .tasks.transfer_worker import start_worker, stop_worker

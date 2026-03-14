@@ -6,22 +6,16 @@ import '../models/gear_status.dart';
 
 final gearServiceProvider = Provider<GearService>((ref) => GearService());
 
-class UserGearNotifier extends StateNotifier<AsyncValue<List<Camera>>> {
-  final Ref ref;
-
-  UserGearNotifier(this.ref) : super(const AsyncValue.loading()) {
-    _fetchGear();
-  }
-
-  Future<void> _fetchGear() async {
+class UserGearNotifier extends AsyncNotifier<List<Camera>> {
+  @override
+  Future<List<Camera>> build() async {
     try {
       final authService = ref.read(authServiceProvider);
       final gearService = ref.read(gearServiceProvider);
 
       final user = authService.currentUser;
       if (user == null) {
-        // Mock data
-        state = AsyncValue.data([
+        return [
           Camera(
             id: '1',
             nickname: 'Main Shooter',
@@ -38,69 +32,128 @@ class UserGearNotifier extends StateNotifier<AsyncValue<List<Camera>>> {
             serialNumber: '9876543',
             lenses: [],
           ),
-        ]);
-        return;
+        ];
       }
 
       final token = await user.getIdToken();
-      if (token == null) {
-        state = const AsyncValue.data([]);
-        return;
-      }
+      if (token == null) return [];
 
       final rawData = await gearService.fetchUserGear(token);
-      final cameras = rawData.map((json) => Camera.fromJson(json as Map<String, dynamic>)).toList();
-      state = AsyncValue.data(cameras);
+      return rawData.map((json) => Camera.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e, stackTrace) {
-      state = AsyncValue.error(e, stackTrace);
+      throw AsyncError(e, stackTrace);
     }
   }
 
   void updateCameraStatus(String id, GearStatus newStatus) {
-    if (state.value == null) return;
-    final cameras = state.value!;
-    final index = cameras.indexWhere((c) => c.id == id);
-    if (index == -1) return;
-
-    final List<Camera> updatedCameras = List.from(cameras);
-    updatedCameras[index] = cameras[index].copyWith(status: newStatus);
-    state = AsyncValue.data(updatedCameras);
-
-    // In a real app we would call gearService.updateCamera(id, newStatus) here
+    state.whenData((cameras) {
+      final index = cameras.indexWhere((c) => c.id == id);
+      if (index == -1) return;
+      final updated = List<Camera>.from(cameras);
+      updated[index] = cameras[index].copyWith(status: newStatus);
+      state = AsyncValue.data(updated);
+    });
   }
 
-  void addCameraImages(String id, List<String> newPaths) {
-    if (state.value == null) return;
-    final cameras = state.value!;
-    final index = cameras.indexWhere((c) => c.id == id);
-    if (index == -1) return;
+  void updateCameraDetails(String id, {
+    String? nickname,
+    String? brand,
+    String? model,
+    String? serialNumber,
+    String? format,
+    GearStatus? status,
+  }) {
+    state.whenData((cameras) {
+      final index = cameras.indexWhere((c) => c.id == id);
+      if (index == -1) return;
+      final c = cameras[index];
+      final updated = List<Camera>.from(cameras);
+      updated[index] = c.copyWith(
+        nickname: nickname ?? c.nickname,
+        brand: brand ?? c.brand,
+        model: model ?? c.model,
+        serialNumber: serialNumber ?? c.serialNumber,
+        format: format ?? c.format,
+        status: status ?? c.status,
+      );
+      state = AsyncValue.data(updated);
+    });
+  }
 
-    final camera = cameras[index];
-    final updatedUrls = List<String>.from(camera.imageUrls)..addAll(newPaths);
+  void addCameraImages(String id, List<String> newPathsOrUrls) {
+    state.whenData((cameras) {
+      final index = cameras.indexWhere((c) => c.id == id);
+      if (index == -1) return;
+      final camera = cameras[index];
+      final updatedUrls = List<String>.from(camera.imageUrls)..addAll(newPathsOrUrls);
+      final updated = List<Camera>.from(cameras);
+      updated[index] = camera.copyWith(imageUrls: updatedUrls);
+      state = AsyncValue.data(updated);
+      _persistCameraImages(id, updatedUrls);
+    });
+  }
 
-    final List<Camera> updatedCameras = List.from(cameras);
-    updatedCameras[index] = camera.copyWith(imageUrls: updatedUrls);
-    state = AsyncValue.data(updatedCameras);
-    
-    // In a real app we'd trigger an API update as well if needed
+  /// Replace all gear images (e.g. after remove or reorder). Persists to backend.
+  void setCameraImages(String id, List<String> imageUrls) {
+    state.whenData((cameras) {
+      final index = cameras.indexWhere((c) => c.id == id);
+      if (index == -1) return;
+      final camera = cameras[index];
+      final updated = List<Camera>.from(cameras);
+      updated[index] = camera.copyWith(imageUrls: imageUrls);
+      state = AsyncValue.data(updated);
+      _persistCameraImages(id, imageUrls);
+    });
+  }
+
+  /// Set which image is used as the card thumbnail (0-based index).
+  void setPrimaryImage(String id, int primaryImageIndex) {
+    state.whenData((cameras) {
+      final index = cameras.indexWhere((c) => c.id == id);
+      if (index == -1) return;
+      final camera = cameras[index];
+      final updated = List<Camera>.from(cameras);
+      updated[index] = camera.copyWith(primaryImageIndex: primaryImageIndex.clamp(0, camera.imageUrls.length - 1));
+      state = AsyncValue.data(updated);
+      _persistPrimaryImage(id, primaryImageIndex);
+    });
+  }
+
+  Future<void> _persistCameraImages(String id, List<String> imageUrls) async {
+    try {
+      final user = ref.read(authServiceProvider).currentUser;
+      final token = user == null ? null : await user.getIdToken();
+      if (token == null) return;
+      await ref.read(gearServiceProvider).updateUserCamera(token, id, imageUrls: imageUrls);
+    } catch (_) {
+      // Optimistic update already applied; backend sync will retry on next fetch
+    }
+  }
+
+  Future<void> _persistPrimaryImage(String id, int primaryImageIndex) async {
+    try {
+      final user = ref.read(authServiceProvider).currentUser;
+      final token = user == null ? null : await user.getIdToken();
+      if (token == null) return;
+      await ref.read(gearServiceProvider).updateUserCamera(token, id, primaryImageIndex: primaryImageIndex);
+    } catch (_) {}
   }
 }
 
-final userGearProvider = StateNotifierProvider<UserGearNotifier, AsyncValue<List<Camera>>>((ref) {
-  return UserGearNotifier(ref);
-});
+final userGearProvider = AsyncNotifierProvider<UserGearNotifier, List<Camera>>(UserGearNotifier.new);
 
 final cameraProvider = Provider.family<Camera?, String>((ref, id) {
-  final gearList = ref.watch(userGearProvider).value;
+  final gearAsync = ref.watch(userGearProvider);
+  final gearList = gearAsync.value;
   if (gearList == null) return null;
-  return gearList.firstWhere(
-    (camera) => camera.id == id,
-    orElse: () => Camera(
+  try {
+    return gearList.firstWhere((c) => c.id == id);
+  } catch (_) {
+    return Camera(
       id: id,
       nickname: 'Unknown Camera',
       brand: 'Unknown',
       model: 'Model',
-    ),
-  );
+    );
+  }
 });
-  

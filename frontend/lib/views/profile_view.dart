@@ -53,7 +53,7 @@ class ProfileView extends ConsumerWidget {
                    _ProfileOption(
                     icon: Icons.settings_outlined,
                     label: 'Settings',
-                    onTap: () {},
+                    onTap: () => context.go('/profile/settings'),
                   ),
                   _ProfileOption(
                     icon: Icons.help_outline,

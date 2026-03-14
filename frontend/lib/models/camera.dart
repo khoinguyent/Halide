@@ -10,8 +10,9 @@ class Camera {
   final String? format;
   final GearStatus status;
   final List<String> imageUrls;
+  /// Index of the image to use as card thumbnail (0-based). Clamped to valid range.
+  final int primaryImageIndex;
   final List<Lens> lenses;
-  final List<String> imageUrls;
 
   Camera({
     required this.id,
@@ -22,48 +23,62 @@ class Camera {
     this.format,
     this.status = GearStatus.active,
     this.imageUrls = const [],
+    this.primaryImageIndex = 0,
     this.lenses = const [],
-    this.imageUrls = const [],
   });
 
   Camera copyWith({
+    String? nickname,
+    String? brand,
+    String? model,
+    String? serialNumber,
+    String? format,
     GearStatus? status,
     List<String>? imageUrls,
+    int? primaryImageIndex,
     List<Lens>? lenses,
   }) {
     return Camera(
       id: id,
-      nickname: nickname,
-      brand: brand,
-      model: model,
-      serialNumber: serialNumber,
-      format: format,
+      nickname: nickname ?? this.nickname,
+      brand: brand ?? this.brand,
+      model: model ?? this.model,
+      serialNumber: serialNumber ?? this.serialNumber,
+      format: format ?? this.format,
       status: status ?? this.status,
       imageUrls: imageUrls ?? this.imageUrls,
+      primaryImageIndex: primaryImageIndex ?? this.primaryImageIndex,
       lenses: lenses ?? this.lenses,
     );
   }
 
-  String? get imageUrl => imageUrls.isNotEmpty ? imageUrls.first : null;
+  /// Primary image URL for card thumbnail. Uses [primaryImageIndex] when in range, else first image.
+  String? get imageUrl {
+    if (imageUrls.isEmpty) return null;
+    final idx = primaryImageIndex.clamp(0, imageUrls.length - 1);
+    return imageUrls[idx];
+  }
 
   factory Camera.fromJson(Map<String, dynamic> json) {
     final camera = json['camera'] as Map<String, dynamic>?;
     final urls = json['image_urls'] ?? camera?['image_urls'];
     final urlList = urls is List ? urls.map((e) => e.toString()).toList() : <String>[];
+    final primaryIdx = json['primary_image_index'] is int
+        ? json['primary_image_index'] as int
+        : 0;
     return Camera(
       id: json['id']?.toString() ?? '',
       nickname: json['gear_nickname'] ?? json['nickname'] ?? '',
       brand: json['brand'] ?? camera?['brand'] ?? '',
       model: json['model'] ?? camera?['model'] ?? '',
       serialNumber: json['serial_number'],
-      format: json['format'],
-      status: gearStatusFromString(json['status'] ?? 'active'),
-      imageUrls: List<String>.from(json['image_urls'] ?? []),
       format: json['format'] ?? camera?['format'],
+      status: gearStatusFromString(json['status'] ?? 'active'),
+      imageUrls: urlList,
+      primaryImageIndex: primaryIdx >= 0 ? primaryIdx : 0,
       lenses: (json['lenses'] as List? ?? [])
           .map((l) => Lens.fromJson(l as Map<String, dynamic>))
           .toList(),
-      imageUrls: urlList,
     );
   }
 
@@ -76,6 +91,7 @@ class Camera {
       'format': format,
       'status': status.name,
       'image_urls': imageUrls,
+      'primary_image_index': primaryImageIndex,
     };
   }
 

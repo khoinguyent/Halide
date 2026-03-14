@@ -31,6 +31,12 @@ class GearStatusSelector extends StatelessWidget {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Mark this gear as Active, In Repair, or Sold so you can filter and track it.',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 24),
           ...GearStatus.values.map((status) {
             final isSelected = status == currentStatus;

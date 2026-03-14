@@ -11,8 +11,10 @@ import '../views/meter_view.dart';
 import '../views/auth/login_view.dart';
 import '../views/auth/register_view.dart';
 import '../views/camera_detail_view.dart';
+import '../views/roll_detail_view.dart';
 import '../views/legal/privacy_policy_view.dart';
 import '../views/legal/terms_conditions_view.dart';
+import '../views/settings_view.dart';
 
 // Global keys for navigation
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -59,12 +61,22 @@ final appRouter = GoRouter(
       path: '/register',
       builder: (context, state) => const RegisterView(),
     ),
+    GoRoute(
+      path: '/roll/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return RollDetailView(rollId: id);
+      },
+    ),
 
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
+        const branchPaths = ['/', '/locker', '/meter', '/profile'];
         return HalideScaffold(
           currentIndex: navigationShell.currentIndex,
-          onTabSelected: (index) => navigationShell.goBranch(index),
+          onTabSelected: (index) {
+            context.go(branchPaths[index]);
+          },
           child: navigationShell,
         );
       },
@@ -120,6 +132,10 @@ final appRouter = GoRouter(
               path: '/profile',
               builder: (context, state) => const ProfileView(),
               routes: [
+                GoRoute(
+                  path: 'settings',
+                  builder: (context, state) => const SettingsView(),
+                ),
                 GoRoute(
                   path: 'privacy',
                   builder: (context, state) => const PrivacyPolicyView(),

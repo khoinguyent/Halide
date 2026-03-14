@@ -32,6 +32,8 @@ class UserCamera(Base):
     rating_view = Column(Integer, CheckConstraint('rating_view BETWEEN 1 AND 10'))
     rating_looking = Column(Integer, CheckConstraint('rating_looking BETWEEN 1 AND 10'))
     created_at = Column(DateTime, server_default=text('NOW()'))
+    image_urls = Column(JSONB)  # user-uploaded gear photo URLs; first or primary_image_index used as card thumb
+    primary_image_index = Column(Integer, server_default=text('0'), nullable=False)  # which image to show as thumbnail
 
     # Relationships
     camera = relationship("Camera", foreign_keys=[camera_id])

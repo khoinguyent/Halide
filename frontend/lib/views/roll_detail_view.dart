@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
+import '../core/widgets/glass_panel.dart';
 import '../models/roll.dart';
 import '../models/roll_status.dart';
+import '../providers/auth_provider.dart';
 import '../providers/roll_provider.dart';
 import '../widgets/status_selector.dart';
 import '../widgets/image_uploader_widget.dart';
@@ -19,24 +21,24 @@ class RollDetailView extends ConsumerWidget {
 
     return rollAsync.when(
       loading: () => Scaffold(
-        backgroundColor: const Color(0xFFF5F5F5),
-        appBar: AppBar(backgroundColor: Colors.white, foregroundColor: Colors.black87),
-        body: const Center(child: CircularProgressIndicator()),
+        backgroundColor: const Color(0xFF0D0D0D),
+        appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: Colors.white),
+        body: const Center(child: CircularProgressIndicator(color: Colors.white)),
       ),
       error: (err, _) => Scaffold(
-        backgroundColor: const Color(0xFFF5F5F5),
-        appBar: AppBar(backgroundColor: Colors.white, foregroundColor: Colors.black87),
+        backgroundColor: const Color(0xFF0D0D0D),
+        appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: Colors.white),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(err.toString(), textAlign: TextAlign.center),
+                Text(err.toString(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => ref.refresh(rollDetailProvider(rollId)),
-                  child: const Text('Retry'),
+                  child: const Text('Retry', style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
@@ -66,14 +68,14 @@ class _RollDetailBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFF0D0D0D),
       appBar: AppBar(
         title: Text(
           '${roll.brand} ${roll.name}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -84,7 +86,7 @@ class _RollDetailBody extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit_outlined),
+            icon: const Icon(Icons.edit_outlined, color: Colors.white),
             onPressed: () {
               showHalideModalBottomSheet(
                 context: context,
@@ -99,28 +101,28 @@ class _RollDetailBody extends ConsumerWidget {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              color: Colors.white,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: ImageUploaderWidget(
-                  rollId: rollId,
-                  onUploadComplete: onRefresh,
-                ),
+            GlassPanel(
+              padding: const EdgeInsets.all(20),
+              child: ImageUploaderWidget(
+                rollId: rollId,
+                onUploadComplete: onRefresh,
+                darkMode: true,
               ),
             ),
             if (roll.imageUrls.isNotEmpty) ...[
               const SizedBox(height: 24),
-              const Text(
-                'Uploaded Images',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                'UPLOADED IMAGES',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                  color: Colors.white.withOpacity(0.5),
+                ),
               ),
               const SizedBox(height: 12),
               GridView.builder(
@@ -194,7 +196,7 @@ class _StatusProgressBar extends StatelessWidget {
                   height: 4,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(2),
-                    color: active ? Colors.black87 : Colors.grey.shade300,
+                    color: active ? Colors.white.withOpacity(0.8) : Colors.white.withOpacity(0.2),
                   ),
                 ),
               ),

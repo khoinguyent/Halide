@@ -33,7 +33,7 @@ Create a service that monitors a "Source" folder on a connected drive and transf
 ## Backend – BE_DEV_2 (User Profile & Metadata)
 
 ### [BE_4.3] User Profile & Avatar API
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [BE_2.1]
 - **Assignee**: BE_DEV_2
 
@@ -48,7 +48,7 @@ Implement full profile management including avatar uploads and metadata updates 
 ## Frontend – FE_DEV_1 (Advanced Rolls & Gallery)
 
 ### [FE_4.1] "Add New Roll" Modal Enhancement
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_3.2]
 - **Assignee**: FE_DEV_1
 
@@ -62,7 +62,7 @@ Update the "Add Roll" modal to include a Roll Title/Nickname, a searchable camer
 - Bug Fix: Implement BLoC listener to refresh "THE ARCHIVE" immediately after successful creation (no manual refresh needed).
 
 ### [FE_4.2] Scanned Gallery & Image Viewer
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_2.2], [BE_2.2]
 - **Assignee**: FE_DEV_1
 
@@ -75,7 +75,7 @@ Implement the full gallery view for "SCANNED" rolls and a high-fidelity individu
 - Displays frame-level metadata (if available) as an overlay in the viewer.
 
 ### [FE_4.3] Roll Status Management & Device Upload
-- **Status**: TODO
+- **Status**: DONE
 - **Depends On**: [FE_3.1], [BE_2.6]
 - **Assignee**: FE_DEV_1
 

@@ -1,9 +1,17 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from ..db import models
 from uuid import uuid4
 import datetime
 import random
 from typing import List
+
+# Default gear image URLs by (brand, model) when master camera has none
+_GEAR_IMAGE_URLS = {
+    ("Leica", "M6"): ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32"],
+    ("Hasselblad", "500C/M"): ["https://images.unsplash.com/photo-1585155770148-7d436f2e2c0a"],
+    ("Canon", "AE-1"): ["https://images.unsplash.com/photo-1606983340126-99ab4feaa64a"],
+    ("Pentax", "67"): ["https://images.unsplash.com/photo-1492691527719-9d1e07e534b4"],
+}
 
 class SeedService:
     @staticmethod
@@ -44,6 +52,9 @@ class SeedService:
             elif existing.image_urls is None or existing.image_urls == []:
                 existing.image_urls = cam.get("image_urls")
 
+        # 2b. Backfill user_cameras image_urls / primary_image_index from linked camera
+        SeedService._backfill_user_camera_gear_urls(db)
+
         # 3. Seed Master Lenses
         lenses = [
             {"brand": "Leica", "model": "Summicron 35mm f/2", "focal_length_mm": 35, "max_aperture": 2.0},
@@ -64,6 +75,23 @@ class SeedService:
         db.commit()
 
     @staticmethod
+    def _backfill_user_camera_gear_urls(db: Session):
+        """Set image_urls and primary_image_index on user_cameras that have none."""
+        rows = db.query(models.UserCamera).options(joinedload(models.UserCamera.camera)).all()
+        updated = 0
+        for uc in rows:
+            if uc.image_urls and len(uc.image_urls) > 0:
+                continue
+            urls = None
+            if uc.camera:
+                urls = uc.camera.image_urls or _GEAR_IMAGE_URLS.get((uc.camera.brand, uc.camera.model))
+            uc.image_urls = urls or ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32"]
+            uc.primary_image_index = 0
+            updated += 1
+        if updated:
+            db.commit()
+
+    @staticmethod
     def populate_dev_data(db: Session, user_id: str):
         # Ensure user exists
         user = db.query(models.User).filter(models.User.id == user_id).first()
@@ -81,12 +109,15 @@ class SeedService:
                 models.UserCamera.camera_id == m_cam.id
             ).first()
             if not exists:
+                urls = m_cam.image_urls or _GEAR_IMAGE_URLS.get((m_cam.brand, m_cam.model)) or ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32"]
                 uc = models.UserCamera(
                     user_id=user_id,
                     camera_id=m_cam.id,
                     rating_functional=random.randint(7, 10),
                     rating_view=random.randint(7, 10),
-                    rating_looking=random.randint(7, 10)
+                    rating_looking=random.randint(7, 10),
+                    image_urls=urls,
+                    primary_image_index=0,
                 )
                 db.add(uc)
                 user_cameras.append(uc)
@@ -174,12 +205,16 @@ class SeedService:
         master_cameras = db.query(models.Camera).all()
         user_cameras = list(db.query(models.UserCamera).filter(models.UserCamera.user_id == user_id).all())
         if not user_cameras and master_cameras:
+            m_cam = master_cameras[0]
+            urls = m_cam.image_urls or _GEAR_IMAGE_URLS.get((m_cam.brand, m_cam.model)) or ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32"]
             uc = models.UserCamera(
                 user_id=user_id,
-                camera_id=master_cameras[0].id,
+                camera_id=m_cam.id,
                 rating_functional=8,
                 rating_view=8,
                 rating_looking=8,
+                image_urls=urls,
+                primary_image_index=0,
             )
             db.add(uc)
             db.commit()

@@ -5,6 +5,37 @@ from app.db import models
 from uuid import uuid4
 import datetime
 
+# Default gear image URLs by (brand, model) for user_cameras when master camera has none
+GEAR_IMAGE_URLS = {
+    ("Leica", "M6"): ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32", "https://images.unsplash.com/photo-1606983340126-99ab4feaa64a"],
+    ("Canon", "AE-1"): ["https://images.unsplash.com/photo-1606983340126-99ab4feaa64a", "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4"],
+    ("Pentax", "67"): ["https://images.unsplash.com/photo-1492691527719-9d1e07e534b4", "https://images.unsplash.com/photo-1516035069371-29a1b244cc32"],
+    ("Hasselblad", "500C/M"): ["https://images.unsplash.com/photo-1585155770148-7d436f2e2c0a", "https://images.unsplash.com/photo-1606983340126-99ab4feaa64a"],
+}
+
+def _backfill_user_camera_gear_urls(db: Session):
+    """Set image_urls and primary_image_index on user_cameras that have none, using linked camera or defaults."""
+    from sqlalchemy.orm import joinedload
+    rows = db.query(models.UserCamera).options(joinedload(models.UserCamera.camera)).all()
+    updated = 0
+    for uc in rows:
+        if uc.image_urls is not None and len(uc.image_urls) > 0:
+            continue
+        urls = None
+        if uc.camera:
+            urls = uc.camera.image_urls
+            if not urls:
+                key = (uc.camera.brand, uc.camera.model)
+                urls = GEAR_IMAGE_URLS.get(key)
+        if not urls:
+            urls = ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32"]
+        uc.image_urls = urls
+        uc.primary_image_index = 0
+        updated += 1
+    if updated:
+        db.commit()
+        print(f"Backfilled image_urls for {updated} user_cameras")
+
 def seed_master_data():
     models.Base.metadata.create_all(bind=engine)
     db = SessionLocal()
@@ -115,29 +146,46 @@ def seed_master_data():
                 user_cam = models.UserCamera(
                     user_id=test_user_id,
                     camera_id=leica_m6.id,
+                    gear_nickname="Main Shooter",
                     rating_functional=9,
                     rating_view=8,
-                    rating_looking=10
+                    rating_looking=10,
+                    image_urls=leica_m6.image_urls or ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32"],
+                    primary_image_index=0,
                 )
                 db.add(user_cam)
                 print(f"Linking Leica M6 to Test User")
                 db.commit()
                 db.refresh(user_cam)
-
-            # Add some test rolls
-            portra = db.query(models.FilmStock).filter(models.FilmStock.name == "Portra 400").first()
-            if portra:
-                for i in range(5):
-                    roll = models.Roll(
-                        user_id=test_user_id,
-                        film_stock_id=portra.id,
-                        user_camera_id=user_cam.id,
-                        shot_at_iso=400,
-                        status=models.RollStatusEnum.shooting
-                    )
-                    db.add(roll)
-                print(f"Added 5 Portra 400 rolls to Test User")
+            elif user_cam.image_urls is None or user_cam.image_urls == []:
+                user_cam.image_urls = leica_m6.image_urls or ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32"]
+                user_cam.primary_image_index = 0
                 db.commit()
+                print(f"Backfilled image_urls for Test User Leica M6")
+
+        # Backfill image_urls and primary_image_index for all user_cameras that lack them
+        _backfill_user_camera_gear_urls(db)
+
+        # Add some test rolls (requires leica_m6 / user_cam from above)
+        if leica_m6:
+            user_cam = db.query(models.UserCamera).filter(
+                models.UserCamera.user_id == test_user_id,
+                models.UserCamera.camera_id == leica_m6.id
+            ).first()
+            if user_cam:
+                portra = db.query(models.FilmStock).filter(models.FilmStock.name == "Portra 400").first()
+                if portra:
+                    for i in range(5):
+                        roll = models.Roll(
+                            user_id=test_user_id,
+                            film_stock_id=portra.id,
+                            user_camera_id=user_cam.id,
+                            shot_at_iso=400,
+                            status=models.RollStatusEnum.shooting
+                        )
+                        db.add(roll)
+                    print(f"Added 5 Portra 400 rolls to Test User")
+                    db.commit()
 
     finally:
         db.close()

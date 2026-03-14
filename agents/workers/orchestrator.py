@@ -60,9 +60,9 @@ class HalideOrchestrator:
                 with open(sprint_file, "r", encoding="utf-8") as f:
                     content = f.read()
                 
-                # Update status for the specific role's main task if found
-                # Pattern: ### [role_id...] ... - **Status**: TODO
-                pattern = rf"(### \[({role_id}.*?)\].*?-\s*\*\*Status\*\*:\s*)TODO"
+                # Update status for the specific role's tasks if found by Assignee
+                # Pattern: Look for - **Status**: TODO followed by - **Assignee**: role_id
+                pattern = rf"(- \*\*Status\*\*:\s*)TODO(?=.*?- \*\*Assignee\*\*: {role_id})"
                 new_content = re.sub(pattern, r"\1DONE", content, flags=re.DOTALL | re.IGNORECASE)
                 
                 if new_content != content:

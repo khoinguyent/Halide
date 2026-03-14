@@ -1,27 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../models/roll.dart';
 import '../models/roll_status.dart';
 import '../core/widgets/glass_panel.dart';
+import '../core/widgets/halide_dialog.dart';
+import '../providers/auth_provider.dart';
+import '../providers/dashboard_provider.dart';
+import '../providers/roll_provider.dart';
+import 'status_selector.dart';
 
-class RollCard extends StatelessWidget {
+class RollCard extends ConsumerWidget {
   final Roll roll;
 
   const RollCard({Key? key, required this.roll}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return GlassPanel(
       padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Row: Status Badge and Timestamp
+          // Top Row: Status Badge (tappable quick action) and Timestamp
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _StatusBadge(status: roll.status),
+                GestureDetector(
+                  onTap: () => _showQuickStatusSheet(context, ref, roll),
+                  child: _StatusBadge(status: roll.status),
+                ),
                 if (roll.createdAt != null)
                   Text(
                     _formatDate(roll.createdAt!),
@@ -81,6 +91,7 @@ class RollCard extends StatelessWidget {
         return _LabContent(maxFrames: roll.maxFrames);
       case RollStatus.scanned:
         return _ScannedContent(
+          rollId: roll.id,
           imageUrls: roll.imageUrls,
           actualFrames: roll.imageUrls.length,
           totalFrames: roll.maxFrames,
@@ -92,6 +103,37 @@ class RollCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  static Future<void> _showQuickStatusSheet(BuildContext context, WidgetRef ref, Roll roll) async {
+    final rollService = ref.read(rollServiceProvider);
+    final user = ref.read(userProvider);
+    if (user == null) return;
+    final token = await user.getIdToken();
+    if (token == null) return;
+
+    if (!context.mounted) return;
+    showHalideModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatusSelector(
+        currentStatus: roll.status,
+        onStatusSelected: (RollStatus newStatus) async {
+          try {
+            await rollService.updateRollStatus(token, roll.id, newStatus.name);
+            ref.refresh(dashboardRollsProvider);
+            if (context.mounted) Navigator.pop(context);
+          } catch (_) {
+            if (context.mounted) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to update status')),
+              );
+            }
+          }
+        },
+      ),
+    );
   }
 }
 
@@ -168,12 +210,14 @@ class _LabContent extends StatelessWidget {
 
 /// Scanned: show actual/total frames (e.g. 38/36 or 20/36).
 class _ScannedContent extends StatelessWidget {
+  final String rollId;
   final List<String> imageUrls;
   final int actualFrames;
   final int totalFrames;
 
   const _ScannedContent({
     Key? key,
+    required this.rollId,
     required this.imageUrls,
     required this.actualFrames,
     required this.totalFrames,
@@ -265,7 +309,7 @@ class _ScannedContent extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: TextButton(
-            onPressed: () {},
+            onPressed: () => context.push('/roll/$rollId'),
             style: TextButton.styleFrom(
               padding: EdgeInsets.zero,
               minimumSize: Size.zero,

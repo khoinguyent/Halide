@@ -5,7 +5,9 @@ import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 import '../providers/gear_provider.dart';
 import '../models/camera.dart';
+import '../models/gear_status.dart';
 import '../models/lens.dart';
+import '../widgets/gear_status_selector.dart';
 
 class LockerView extends ConsumerWidget {
   const LockerView({Key? key}) : super(key: key);
@@ -21,6 +23,13 @@ class LockerView extends ConsumerWidget {
             expandedHeight: 120,
             backgroundColor: Colors.transparent,
             elevation: 0,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add_rounded, color: Colors.white),
+                tooltip: 'Add gear',
+                onPressed: () => context.push('/locker/add-gear'),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
               title: const Text(
@@ -44,7 +53,10 @@ class LockerView extends ConsumerWidget {
                     final camera = cameras[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 20),
-                      child: _GearCard(camera: camera),
+                      child: _GearCard(
+                        camera: camera,
+                        onStatusTap: (c) => _showGearStatusSheet(context, ref, c),
+                      ),
                     );
                   },
                   childCount: cameras.length,
@@ -67,14 +79,30 @@ class LockerView extends ConsumerWidget {
       ),
     );
   }
+
+  static void _showGearStatusSheet(BuildContext context, WidgetRef ref, Camera camera) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => GearStatusSelector(
+        currentStatus: camera.status,
+        onStatusSelected: (s) {
+          ref.read(userGearProvider.notifier).updateCameraStatus(camera.id, s);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
 }
 
 class _GearCard extends StatelessWidget {
   final Camera camera;
+  final void Function(Camera camera)? onStatusTap;
 
   const _GearCard({
     Key? key,
     required this.camera,
+    this.onStatusTap,
   }) : super(key: key);
 
   @override
@@ -147,6 +175,11 @@ class _GearCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onStatusTap != null)
+                  GestureDetector(
+                    onTap: () => onStatusTap!(camera),
+                    child: _GearStatusChip(status: camera.status),
+                  ),
               ],
             ),
           ),
@@ -201,6 +234,55 @@ class _LensItem extends StatelessWidget {
             '${lens.brand} ${lens.model}',
             style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GearStatusChip extends StatelessWidget {
+  final GearStatus status;
+
+  const _GearStatusChip({Key? key, required this.status}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    switch (status) {
+      case GearStatus.active:
+        color = Colors.green;
+        break;
+      case GearStatus.repair:
+        color = Colors.orange;
+        break;
+      case GearStatus.sold:
+        color = Colors.grey;
+        break;
+      case GearStatus.archived:
+        color = Colors.blueGrey;
+        break;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.5), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            status.label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(Icons.arrow_drop_down, color: color, size: 18),
         ],
       ),
     );

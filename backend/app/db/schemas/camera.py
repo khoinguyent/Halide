@@ -47,9 +47,17 @@ class UserCameraBase(BaseModel):
     rating_functional: Optional[int] = None
     rating_view: Optional[int] = None
     rating_looking: Optional[int] = None
+    image_urls: Optional[List[str]] = None
+    primary_image_index: int = 0
 
 class UserCameraCreate(UserCameraBase):
     pass
+
+class UserCameraUpdate(BaseModel):
+    """Partial update for user camera (e.g. gear images)."""
+    gear_nickname: Optional[str] = None
+    image_urls: Optional[List[str]] = None
+    primary_image_index: Optional[int] = None
 
 class UserCameraOut(UserCameraBase):
     id: UUID
