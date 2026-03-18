@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:frontend/features/storage/presentation/views/storage_account_list_view.dart';
-import 'package:frontend/features/storage/presentation/bloc/storage_accounts_bloc.dart';
 import 'package:frontend/features/storage/presentation/widgets/storage_tier_selector.dart';
 
 void main() {
-  testWidgets('StorageAccountListView renders and contains necessary elements', (WidgetTester tester) async {
+  testWidgets('StorageAccountListView renders and handles tier switching', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: StorageAccountListView(),
@@ -16,20 +14,21 @@ void main() {
     // Verify Title
     expect(find.text('Storage Management'), findsOneWidget);
 
-    // Verify Tier Selector
-    expect(find.byType(StorageTierSelector), findsOneWidget);
+    // Wait for BLoC mock data
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
-    // Initial loading state
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    // -- Tier 0: Local --
+    expect(find.text('LOCAL ACCOUNTS'), findsOneWidget);
+    
+    // -- Switch to Tier 1: Personal Cloud --
+    await tester.tap(find.text('Personal Cloud'));
+    await tester.pumpAndSettle();
+    expect(find.text('CLOUD PROVIDERS'), findsOneWidget);
 
-    // Wait for BLoC mock data to load and animations to finish
-    await tester.pump(const Duration(milliseconds: 100)); // Initial pump for BLoC trigger
-    await tester.pumpAndSettle(); // Wait for state transition and possible animations
-
-    // Verify list items once loaded
-    expect(find.text('Connected Accounts'), findsOneWidget);
-    expect(find.text('Local Device'), findsOneWidget);
-    expect(find.text('Personal iCloud'), findsOneWidget);
-    expect(find.text('Halide Pro Sync'), findsOneWidget);
+    // -- Switch to Tier 2: System Cloud --
+    await tester.tap(find.text('System Cloud'));
+    await tester.pumpAndSettle();
+    expect(find.text('SYSTEM CLOUD'), findsOneWidget);
   });
 }

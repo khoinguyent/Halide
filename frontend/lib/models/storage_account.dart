@@ -9,6 +9,7 @@ class StorageAccount {
   final String name;
   final StorageAccountType type;
   final String email;
+  final String providerName;
   final bool isPrimary;
 
   const StorageAccount({
@@ -16,6 +17,7 @@ class StorageAccount {
     required this.name,
     required this.type,
     required this.email,
+    required this.providerName,
     this.isPrimary = false,
   });
 
@@ -24,6 +26,7 @@ class StorageAccount {
     String? name,
     StorageAccountType? type,
     String? email,
+    String? providerName,
     bool? isPrimary,
   }) {
     return StorageAccount(
@@ -31,6 +34,7 @@ class StorageAccount {
       name: name ?? this.name,
       type: type ?? this.type,
       email: email ?? this.email,
+      providerName: providerName ?? this.providerName,
       isPrimary: isPrimary ?? this.isPrimary,
     );
   }

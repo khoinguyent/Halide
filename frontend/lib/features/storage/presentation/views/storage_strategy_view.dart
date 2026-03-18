@@ -62,89 +62,90 @@ class _StorageStrategyViewState extends State<StorageStrategyView> {
   }
 
   Widget _buildContentForTier(BuildContext context) {
-    switch (_selectedTierIndex) {
-      case 0:
-        return _buildLocalDeviceContent(context);
-      case 1:
-        return const CloudProvidersSection();
-      case 2:
-        return _buildSystemCloudContent(context);
-      default:
+    return BlocBuilder<StorageAccountsBloc, StorageAccountsState>(
+      builder: (context, state) {
+        if (state is StorageAccountsLoading) {
+          return const Padding(
+            padding: EdgeInsets.all(64),
+            child: Center(child: CircularProgressIndicator(color: Color(0xFFF97316))),
+          );
+        }
+        if (state is StorageAccountsError) {
+          return Center(child: Text(state.message, style: const TextStyle(color: Colors.redAccent)));
+        }
+        if (state is StorageAccountsLoaded) {
+          switch (_selectedTierIndex) {
+            case 0:
+              return _buildAccountList(
+                context, 
+                state.accounts.where((a) => a.type == StorageAccountType.local).toList(),
+                title: 'LOCAL STORAGE',
+              );
+            case 1:
+              return CloudProvidersSection(accounts: state.accounts);
+            case 2:
+              return _buildAccountList(
+                context, 
+                state.accounts.where((a) => a.type == StorageAccountType.system).toList(),
+                title: 'SYSTEM CLOUD',
+                emptyDescription: 'Upgrade above to get Pro storage. Each account includes 5–10 GB by default.',
+              );
+            default:
+              return const SizedBox.shrink();
+          }
+        }
         return const SizedBox.shrink();
-    }
-  }
-
-  Widget _buildLocalDeviceContent(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Connected Accounts',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1,
-          ),
-        ),
-        const SizedBox(height: 12),
-        BlocBuilder<StorageAccountsBloc, StorageAccountsState>(
-          builder: (context, state) {
-            if (state is StorageAccountsLoading) {
-              return const Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator(color: Colors.white54)),
-              );
-            }
-            if (state is StorageAccountsError) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(state.message, style: const TextStyle(color: Colors.redAccent)),
-              );
-            }
-            if (state is StorageAccountsLoaded) {
-              final localOnly = state.accounts
-                  .where((a) => a.type == StorageAccountType.local)
-                  .toList();
-              return Column(
-                children: localOnly
-                    .map((a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _StorageAccountCard(account: a),
-                        ))
-                    .toList(),
-              );
-            }
-            return const SizedBox.shrink();
-          },
-        ),
-      ],
+      },
     );
   }
 
-  Widget _buildSystemCloudContent(BuildContext context) {
+  Widget _buildAccountList(
+    BuildContext context, 
+    List<StorageAccount> accounts, 
+    {required String title, String? emptyDescription}
+  ) {
+    if (accounts.isEmpty && emptyDescription != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(title: title),
+          const SizedBox(height: 12),
+          Text(
+            emptyDescription,
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13, height: 1.5),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'System Cloud',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Upgrade above to get Pro storage. Each account includes 5–10 GB by default; you can add more storage at checkout. After upgrading, your account will appear here.',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 13,
-            height: 1.4,
-          ),
-        ),
+        _SectionHeader(title: title),
+        const SizedBox(height: 16),
+        ...accounts.map((a) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _StorageAccountCard(account: a),
+        )).toList(),
       ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({Key? key, required this.title}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: Colors.white70,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.5,
+      ),
     );
   }
 }
