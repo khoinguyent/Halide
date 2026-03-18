@@ -1,5 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:frontend/features/storage/presentation/bloc/storage_accounts_bloc.dart';
+import 'package:frontend/models/storage_account.dart';
 import 'package:frontend/services/storage_connection_service.dart';
 
 class CloudProviderInfo {
@@ -17,7 +20,8 @@ class CloudProviderInfo {
 }
 
 class CloudProvidersSection extends StatelessWidget {
-  const CloudProvidersSection({Key? key}) : super(key: key);
+  final List<StorageAccount> accounts;
+  const CloudProvidersSection({Key? key, required this.accounts}) : super(key: key);
 
   static const List<CloudProviderInfo> _providers = [
     CloudProviderInfo(id: 'icloud', name: 'iCloud', icon: Icons.cloud_outlined),
@@ -33,19 +37,12 @@ class CloudProvidersSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Cloud providers',
+          'CLOUD PROVIDERS',
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Add your own cloud or network storage. Tap a provider to connect.',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 14,
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.5,
           ),
         ),
         const SizedBox(height: 16),
@@ -53,10 +50,16 @@ class CloudProvidersSection extends StatelessWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: _providers.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, __) => const SizedBox(height: 16),
           itemBuilder: (context, index) {
             final provider = _providers[index];
-            return _CloudProviderTile(provider: provider);
+            final providerAccounts = accounts
+                .where((a) => a.providerName == provider.name)
+                .toList();
+            return _CloudProviderGroup(
+              provider: provider,
+              connectedAccounts: providerAccounts,
+            );
           },
         ),
       ],
@@ -64,140 +67,210 @@ class CloudProvidersSection extends StatelessWidget {
   }
 }
 
-class _CloudProviderTile extends StatefulWidget {
-  final CloudProviderInfo provider;
+enum ConnectionState { idle, connecting, success }
 
-  const _CloudProviderTile({Key? key, required this.provider}) : super(key: key);
+class _CloudProviderGroup extends StatefulWidget {
+  final CloudProviderInfo provider;
+  final List<StorageAccount> connectedAccounts;
+
+  const _CloudProviderGroup({
+    Key? key,
+    required this.provider,
+    required this.connectedAccounts,
+  }) : super(key: key);
 
   @override
-  State<_CloudProviderTile> createState() => _CloudProviderTileState();
+  State<_CloudProviderGroup> createState() => _CloudProviderGroupState();
 }
 
-class _CloudProviderTileState extends State<_CloudProviderTile> {
-  bool _isConnecting = false;
+class _CloudProviderGroupState extends State<_CloudProviderGroup> {
+  ConnectionState _viewState = ConnectionState.idle;
 
-  Future<void> _handleTap(BuildContext context) async {
-    if (_isConnecting) return;
+  Future<void> _handleConnect() async {
+    if (_viewState != ConnectionState.idle) return;
+
+    setState(() => _viewState = ConnectionState.connecting);
+    
+    // Simulate connection delay
+    await Future.delayed(const Duration(milliseconds: 1500));
+
     if (widget.provider.id == 'gdrive') {
-      setState(() => _isConnecting = true);
-      // Defer sign-in to next frame so tap completes and native UI is stable
-      await Future.delayed(const Duration(milliseconds: 100));
       try {
         await StorageConnectionService().connectGoogleDrive();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Google Drive connected'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+        if (mounted) {
+          setState(() => _viewState = ConnectionState.success);
+          await Future.delayed(const Duration(milliseconds: 1000));
+          if (mounted) setState(() => _viewState = ConnectionState.idle);
         }
       } catch (e) {
-        if (context.mounted) {
-          final message = e is StorageConnectionException
-              ? e.message
-              : 'Failed to connect: ${e.toString().length > 80 ? '${e.toString().substring(0, 80)}...' : e}';
+        if (mounted) {
+          setState(() => _viewState = ConnectionState.idle);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.red.shade700,
-            ),
+            SnackBar(content: Text('Failed to connect: $e'), backgroundColor: Colors.redAccent),
           );
         }
-      } finally {
-        if (mounted) setState(() => _isConnecting = false);
       }
-      return;
-    }
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${widget.provider.name} coming soon'), behavior: SnackBarBehavior.floating),
-      );
+    } else {
+      // Mock success for other providers for demonstration
+      if (mounted) {
+        setState(() => _viewState = ConnectionState.success);
+        await Future.delayed(const Duration(milliseconds: 1000));
+        if (mounted) {
+          setState(() => _viewState = ConnectionState.idle);
+          // In a real app, the BLoC would trigger a reload and we'd see the new account
+          context.read<StorageAccountsBloc>().add(LoadStorageAccounts());
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = widget.provider;
+    final hasAccounts = widget.connectedAccounts.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildProviderHeader(),
+        if (hasAccounts) ...[
+          const SizedBox(height: 12),
+          ...widget.connectedAccounts.map((account) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0, left: 12),
+            child: _GroupedAccountCard(account: account),
+          )),
+        ],
+        const SizedBox(height: 8),
+        _buildActionButton(),
+      ],
+    );
+  }
+
+  Widget _buildProviderHeader() {
+    return Row(
+      children: [
+        Icon(widget.provider.icon, color: const Color(0xFFF97316).withOpacity(0.7), size: 18),
+        const SizedBox(width: 8),
+        Text(
+          widget.provider.name.toUpperCase(),
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton() {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: _isConnecting ? null : () => _handleTap(context),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            onTap: _viewState == ConnectionState.idle ? _handleConnect : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(20),
+                color: _viewState == ConnectionState.success 
+                    ? Colors.green.withOpacity(0.1) 
+                    : Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.1),
-                  width: 1,
+                  color: _viewState == ConnectionState.success 
+                      ? Colors.green.withOpacity(0.3) 
+                      : Colors.white.withOpacity(0.05),
                 ),
               ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF60A5FA).withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(provider.icon, color: const Color(0xFF60A5FA), size: 22),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      provider.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  if (_isConnecting)
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: const Color(0xFFF97316),
-                      ),
+                  if (_viewState == ConnectionState.connecting)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF97316)),
                     )
-                  else if (provider.isConnected)
-                    Text(
-                      'Connected',
-                      style: TextStyle(
-                        color: Colors.green.shade300,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    )
+                  else if (_viewState == ConnectionState.success)
+                    const Icon(Icons.check_circle_outline, color: Colors.green, size: 18)
                   else
-                    Text(
-                      'Add',
-                      style: TextStyle(
-                        color: const Color(0xFFF97316),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Icon(Icons.add_circle_outline, color: Colors.white.withOpacity(0.4), size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    _viewState == ConnectionState.connecting 
+                        ? 'CONNECTING...' 
+                        : _viewState == ConnectionState.success 
+                            ? 'CONNECTED' 
+                            : 'ADD ACCOUNT',
+                    style: TextStyle(
+                      color: _viewState == ConnectionState.success 
+                          ? Colors.green 
+                          : Colors.white.withOpacity(0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
                     ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.chevron_right,
-                    color: Colors.white.withOpacity(0.4),
-                    size: 22,
                   ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _GroupedAccountCard extends StatelessWidget {
+  final StorageAccount account;
+  const _GroupedAccountCard({Key? key, required this.account}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isPrimary = account.isPrimary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isPrimary ? const Color(0xFFF97316).withOpacity(0.3) : Colors.white.withOpacity(0.05),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  account.name,
+                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                Text(
+                  account.email,
+                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              isPrimary ? Icons.star_rounded : Icons.star_border_rounded,
+              color: isPrimary ? const Color(0xFFF97316) : Colors.white.withOpacity(0.3),
+              size: 20,
+            ),
+            onPressed: () {
+              context.read<StorageAccountsBloc>().add(TogglePrimaryAccount(account.id));
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
       ),
     );
   }

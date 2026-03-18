@@ -59,9 +59,12 @@ class _StorageAccountListViewState extends State<StorageAccountListView> {
                     onSelected: (index) => setState(() => _selectedTierIndex = index),
                   ),
                   const SizedBox(height: 32),
-                  Expanded(
-                    child: _buildContentForTier(context),
-                  ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: _buildContentForTier(context),
+            ),
+          ),
                 ],
               ),
             ),
@@ -72,93 +75,95 @@ class _StorageAccountListViewState extends State<StorageAccountListView> {
   }
 
   Widget _buildContentForTier(BuildContext context) {
-    switch (_selectedTierIndex) {
-      case 0:
-        return _buildLocalDeviceContent(context);
-      case 1:
-        return SingleChildScrollView(child: const CloudProvidersSection());
-      case 2:
-        return _buildSystemCloudContent(context);
-      default:
+    return BlocBuilder<StorageAccountsBloc, StorageAccountsState>(
+      builder: (context, state) {
+        if (state is StorageAccountsLoading) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFFF97316)));
+        }
+        if (state is StorageAccountsError) {
+          return Center(
+            child: Text(state.message, style: const TextStyle(color: Colors.redAccent)),
+          );
+        }
+        if (state is StorageAccountsLoaded) {
+          switch (_selectedTierIndex) {
+            case 0:
+              return _buildAccountList(
+                context, 
+                state.accounts.where((a) => a.type == StorageAccountType.local).toList(),
+                title: 'LOCAL ACCOUNTS',
+              );
+            case 1:
+              return CloudProvidersSection(accounts: state.accounts);
+            case 2:
+              return _buildAccountList(
+                context, 
+                state.accounts.where((a) => a.type == StorageAccountType.system).toList(),
+                title: 'SYSTEM CLOUD',
+                emptyDescription: 'Upgrade above to get Pro storage. After upgrading, your account will appear here.',
+              );
+            default:
+              return const SizedBox.shrink();
+          }
+        }
         return const SizedBox.shrink();
-    }
+      },
+    );
   }
 
-  Widget _buildLocalDeviceContent(BuildContext context) {
+  Widget _buildAccountList(
+    BuildContext context, 
+    List<StorageAccount> accounts, 
+    {required String title, String? emptyDescription}
+  ) {
+    if (accounts.isEmpty && emptyDescription != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(title: title),
+          const SizedBox(height: 12),
+          Text(
+            emptyDescription,
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13, height: 1.5),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Connected Accounts',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        _SectionHeader(title: title),
         const SizedBox(height: 16),
-        Expanded(
-          child: BlocBuilder<StorageAccountsBloc, StorageAccountsState>(
-            builder: (context, state) {
-              if (state is StorageAccountsLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (state is StorageAccountsError) {
-                return Center(
-                  child: Text(state.message, style: const TextStyle(color: Colors.red)),
-                );
-              }
-              if (state is StorageAccountsLoaded) {
-                final localOnly = state.accounts
-                    .where((a) => a.type == StorageAccountType.local)
-                    .toList();
-                if (localOnly.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No local device account',
-                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16),
-                    ),
-                  );
-                }
-                return ListView.separated(
-                  itemCount: localOnly.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    return _StorageAccountCard(account: localOnly[index]);
-                  },
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
+        ListView.separated(
+          key: const Key('account_list_view'),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: accounts.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            return _StorageAccountCard(account: accounts[index]);
+          },
         ),
       ],
     );
   }
+}
 
-  Widget _buildSystemCloudContent(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'System Cloud',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Upgrade above to get Pro storage. After upgrading, your account will appear here.',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 24),
-        const SizedBox.shrink(),
-      ],
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({Key? key, required this.title}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: Colors.white70,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.5,
+      ),
     );
   }
 }

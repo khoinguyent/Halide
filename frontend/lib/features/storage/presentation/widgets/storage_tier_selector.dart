@@ -47,27 +47,26 @@ class _StorageTierSelectorState extends State<StorageTierSelector> {
     final selectedIndex = widget.onSelected != null ? widget.selectedIndex : _selectedIndex;
     return Column(
       children: [
-        Container(
-          height: 100,
-          child: Row(
-            children: List.generate(_tiers.length, (index) {
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    if (widget.onSelected != null) {
-                      widget.onSelected!(index);
-                    } else {
-                      setState(() => _selectedIndex = index);
-                    }
-                  },
-                  child: _TierItem(
-                    data: _tiers[index],
-                    isSelected: selectedIndex == index,
-                  ),
-                ),
-              );
-            }),
-          ),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _tiers.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            return GestureDetector(
+              onTap: () {
+                if (widget.onSelected != null) {
+                  widget.onSelected!(index);
+                } else {
+                  setState(() => _selectedIndex = index);
+                }
+              },
+              child: _TierItem(
+                data: _tiers[index],
+                isSelected: selectedIndex == index,
+              ),
+            );
+          },
         ),
         if (_tiers[selectedIndex].isPro) ...[
           const SizedBox(height: 24),
@@ -106,54 +105,90 @@ class _TierItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? Colors.white : Colors.white.withOpacity(0.4);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isSelected ? const Color(0xFFF97316).withOpacity(0.5) : Colors.white.withOpacity(0.05),
-          width: 2,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(data.icon, color: color, size: 26),
-          const SizedBox(height: 6),
-          Text(
-            data.label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? const Color(0xFFF97316).withOpacity(0.08) 
+                : Colors.white.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected 
+                  ? const Color(0xFFF97316).withOpacity(0.5) 
+                  : Colors.white.withOpacity(0.05),
+              width: 1.5,
             ),
           ),
-          if (data.subtitle != null) ...[
-            const SizedBox(height: 2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: data.isPro ? const Color(0xFFF97316).withOpacity(0.25) : Colors.white.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                data.subtitle!,
-                style: TextStyle(
-                  color: data.isPro ? const Color(0xFFF97316) : color,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: (isSelected ? const Color(0xFFF97316) : Colors.white).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  data.icon, 
+                  color: isSelected ? const Color(0xFFF97316) : Colors.white70, 
+                  size: 24
                 ),
               ),
-            ),
-          ],
-        ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.label,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white70,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      data.description,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.4),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (data.subtitle != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: data.isPro 
+                        ? const Color(0xFFF97316).withOpacity(0.15) 
+                        : Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: data.isPro 
+                          ? const Color(0xFFF97316).withOpacity(0.3) 
+                          : Colors.white.withOpacity(0.1),
+                    ),
+                  ),
+                  child: Text(
+                    data.subtitle!,
+                    style: TextStyle(
+                      color: data.isPro ? const Color(0xFFF97316) : Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

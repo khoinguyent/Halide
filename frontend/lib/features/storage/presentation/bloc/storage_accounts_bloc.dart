@@ -42,6 +42,7 @@ class StorageAccountsBloc extends Bloc<StorageAccountsEvent, StorageAccountsStat
             name: 'Local Device',
             type: StorageAccountType.local,
             email: 'local@device.com',
+            providerName: 'Device',
             isPrimary: true,
           ),
           const StorageAccount(
@@ -49,6 +50,23 @@ class StorageAccountsBloc extends Bloc<StorageAccountsEvent, StorageAccountsStat
             name: 'Personal iCloud',
             type: StorageAccountType.personal,
             email: 'user@icloud.com',
+            providerName: 'iCloud',
+            isPrimary: false,
+          ),
+          const StorageAccount(
+            id: '2b',
+            name: 'Shared Family iCloud',
+            type: StorageAccountType.personal,
+            email: 'family@icloud.com',
+            providerName: 'iCloud',
+            isPrimary: false,
+          ),
+          const StorageAccount(
+            id: '4',
+            name: 'Work Drive',
+            type: StorageAccountType.personal,
+            email: 'work@gmail.com',
+            providerName: 'Google Drive',
             isPrimary: false,
           ),
           const StorageAccount(
@@ -56,6 +74,7 @@ class StorageAccountsBloc extends Bloc<StorageAccountsEvent, StorageAccountsStat
             name: 'Halide Pro Sync',
             type: StorageAccountType.system,
             email: 'pro@halide.com',
+            providerName: 'Halide',
             isPrimary: false,
           ),
         ];
