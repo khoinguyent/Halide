@@ -1,13 +1,10 @@
-# 🎞️ Halide Project Status: sprint_05
-**Last Sync:** 2026-03-14 22:35:10
+# 🎞️ Halide Project Status: sprint_06
+**Last Sync:** 2026-03-18 11:40:16
 
 | Task ID | Status | Owner | Spec Alignment |
 | :--- | :--- | :--- | :--- |
-| BE_5.1 | ✅ DONE | BE | Verified |
-| BE_5.2 | ✅ DONE | BE | Verified |
-| BE_5.3 | ✅ DONE | BE | Verified |
-| FE_5.1 | ✅ DONE | FE | Verified |
-| FE_5.2 | ✅ DONE | FE | Verified |
-| FE_5.3 | ✅ DONE | FE | Verified |
-| FE_5.4 | ✅ DONE | FE | Verified |
-| FE_5.5 | ✅ DONE | FE | Verified |
+| FE_6.1 | 💤 TODO | FE | Verified |
+| FE_6.2 | 💤 TODO | FE | Verified |
+| FE_6.3 | 💤 TODO | FE | Verified |
+| FE_6.4 | 💤 TODO | FE | Verified |
+| BE_6.1 | 💤 TODO | BE | Verified |

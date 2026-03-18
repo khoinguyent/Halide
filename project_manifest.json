@@ -1,13 +1,14 @@
 {
     "project_name": "Halide",
-    "current_sprint": "sprint_05",
+    "current_sprint": "sprint_06",
     "sprints": [
         "sprint_00",
         "sprint_01",
         "sprint_02",
         "sprint_03",
         "sprint_04",
-        "sprint_05"
+        "sprint_05",
+        "sprint_06"
     ],
     "status": {
         "sprint_00": "DONE",
@@ -15,7 +16,8 @@
         "sprint_02": "DONE",
         "sprint_03": "DONE",
         "sprint_04": "DONE",
-        "sprint_05": "DONE"
+        "sprint_05": "DONE",
+        "sprint_06": "TODO"
     },
     "git_config": {
         "main_branch": "develop",
@@ -47,6 +49,11 @@
         "sprint_05": {
             "branch_name": "sprint_05_profile_customization",
             "start_date": "2026-03-14",
+            "target_merge": "develop"
+        },
+        "sprint_06": {
+            "branch_name": "sprint_06_advanced_tools",
+            "start_date": "2026-03-18",
             "target_merge": "develop"
         }
     },
