@@ -11,7 +11,50 @@ from ...db.schemas.image import ImageOut
 from ...core.dependencies import get_current_user
 from ...services.storage_service import storage_service
 
+from ...db.schemas.storage import StorageProviderMetadata
+
 router = APIRouter()
+
+@router.get("/storage/providers", response_model=List[StorageProviderMetadata])
+async def get_storage_providers():
+    """Returns metadata for supported storage providers."""
+    return [
+        StorageProviderMetadata(
+            id="icloud",
+            name="iCloud",
+            icon="icloud-icon",
+            auth_type="none",
+            description="Apple iCloud Storage (Native Integration)"
+        ),
+        StorageProviderMetadata(
+            id="gdrive",
+            name="Google Drive",
+            icon="google-drive-icon",
+            auth_type="oauth",
+            description="Google Drive Cloud Storage"
+        ),
+        StorageProviderMetadata(
+            id="onedrive",
+            name="OneDrive",
+            icon="onedrive-icon",
+            auth_type="oauth",
+            description="Microsoft OneDrive Cloud Storage"
+        ),
+        StorageProviderMetadata(
+            id="nas",
+            name="NAS",
+            icon="nas-icon",
+            auth_type="credentials",
+            description="Network Attached Storage (Generic)"
+        ),
+        StorageProviderMetadata(
+            id="smb",
+            name="SMB",
+            icon="smb-icon",
+            auth_type="credentials",
+            description="Server Message Block (Windows Share)"
+        ),
+    ]
 
 @router.post("/rolls/{roll_id}/images", response_model=List[ImageOut])
 async def upload_roll_images(

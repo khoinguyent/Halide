@@ -6,6 +6,8 @@ from ..base import Base
 class StorageProviderEnum(str, enum.Enum):
     gdrive = 'gdrive'
     onedrive = 'onedrive'
+    icloud = 'icloud'
+    nas = 'nas'
     ftp = 'ftp'
     smb = 'smb'
 
