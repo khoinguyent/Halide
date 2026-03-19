@@ -5,7 +5,7 @@ Sprint 6 introduces the high-fidelity Storage Strategy UI, the interactive cloud
 ## Frontend – FE_DEV_1 (Storage UX V2)
 
 ### [FE_6.1] 3-Tier UI & State-Driven Connection Flow
-- **Status**: TODO  
+- **Status**: DONE  
 - **Assignee**: FE_DEV_1
 
 **Summary**  
@@ -20,7 +20,7 @@ Implement the three-tier card selector and the multi-state integration workflow 
 - Smooth animated transitions between states; app bar / navigation chrome is hidden during `connecting` and `success` to keep focus on the flow.
 
 ### [FE_6.2] Primary Archive Logic & Provider Grouping
-- **Status**: TODO  
+- **Status**: DONE  
 - **Assignee**: FE_DEV_1
 
 **Summary**  
@@ -35,7 +35,7 @@ Implement the logic and UI for managing multiple instances of the same provider 
 ## Frontend – FE_DEV_2 (Light Metering)
 
 ### [FE_6.3] Real-time Sensor Data & EV Calculation
-- **Status**: TODO  
+- **Status**: DONE  
 - **Assignee**: FE_DEV_2
 
 **Summary**  
@@ -47,7 +47,7 @@ Use the device camera/sensor to measure ambient light levels and derive Exposure
 - Public API surface that the Light Meter UI can subscribe to for continuous, debounced updates.
 
 ### [FE_6.4] Light Meter UI Overlay
-- **Status**: TODO  
+- **Status**: DONE  
 - **Assignee**: FE_DEV_2
 
 **Summary**  
@@ -65,7 +65,7 @@ Create a professional spot-metering interface with interactive sliders layered o
 ## Backend – BE_DEV_1 (Support)
 
 ### [BE_6.1] Provider Metadata API
-- **Status**: TODO  
+- **Status**: DONE  
 - **Assignee**: BE_DEV_1
 
 **Summary**  

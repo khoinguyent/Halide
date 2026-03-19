@@ -10,6 +10,8 @@ class RollBase(BaseModel):
     shot_at_iso: Optional[int] = None
     expired_year: Optional[int] = None
     max_frames: Optional[int] = 36
+    title: Optional[str] = None
+    description: Optional[str] = None
 
 class RollCreate(RollBase):
     pass
@@ -26,6 +28,11 @@ class RollStatusUpdate(BaseModel):
     status: RollStatusEnum
 
 
+class RollMetaUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
 # Dashboard/list view: frontend-friendly shape with joined film, camera, lens, image_urls
 class RollOutDashboard(BaseModel):
     id: str
@@ -35,6 +42,8 @@ class RollOutDashboard(BaseModel):
     status: str
     image_urls: List[str] = []
     nickname: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
     camera_name: Optional[str] = None
     lens_name: Optional[str] = None
     frame_count: int = 0

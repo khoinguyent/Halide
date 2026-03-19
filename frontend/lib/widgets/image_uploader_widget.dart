@@ -8,12 +8,14 @@ class ImageUploaderWidget extends ConsumerStatefulWidget {
   final String rollId;
   final VoidCallback? onUploadComplete;
   final bool darkMode;
+  final bool readOnly;
 
   const ImageUploaderWidget({
     super.key,
     required this.rollId,
     this.onUploadComplete,
     this.darkMode = false,
+    this.readOnly = false,
   });
 
   @override
@@ -28,6 +30,7 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
   int _uploadedCount = 0;
 
   Future<void> _pickImages() async {
+    if (widget.readOnly) return;
     final List<XFile> images = await _picker.pickMultiImage();
     if (images.isNotEmpty) {
       setState(() {
@@ -37,12 +40,14 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
   }
 
   void _removeImage(int index) {
+    if (widget.readOnly) return;
     setState(() {
       _selectedImages.removeAt(index);
     });
   }
 
   Future<void> _uploadImages() async {
+    if (widget.readOnly) return;
     if (_selectedImages.isEmpty) return;
 
     setState(() {
@@ -93,6 +98,16 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
     final fgMuted = widget.darkMode ? Colors.white.withOpacity(0.6) : Colors.grey.shade600;
     final borderColor = widget.darkMode ? Colors.white.withOpacity(0.2) : Colors.grey.shade300;
     final bgColor = widget.darkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
+
+    if (widget.readOnly) {
+      return Text(
+        'Images are archived and can no longer be modified.',
+        style: TextStyle(
+          color: fgMuted,
+          fontSize: 13,
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

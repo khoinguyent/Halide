@@ -6,6 +6,7 @@ class HalideScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
   final Widget? bottomNavigationBar;
   final String? title;
+  final Color? backgroundColor;
 
   const HalideScaffold({
     Key? key,
@@ -14,6 +15,7 @@ class HalideScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.bottomNavigationBar,
     this.title,
+    this.backgroundColor,
   }) : super(key: key);
 
   @override
@@ -24,37 +26,7 @@ class HalideScaffold extends StatelessWidget {
       appBar: appBar,
       body: Stack(
         children: [
-          // Background Gradient/Image layer
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF0D0D0D),
-                  Color(0xFF1A1A1A),
-                ],
-              ),
-            ),
-          ),
-          // Radial highlight to give depth
-          Positioned(
-            top: -200,
-            left: -100,
-            child: Container(
-              width: 600,
-              height: 600,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.05),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
+          Container(color: backgroundColor ?? const Color(0xFF0D0D0D)),
           SafeArea(
             child: child,
           ),

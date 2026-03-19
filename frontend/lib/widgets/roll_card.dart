@@ -51,7 +51,9 @@ class RollCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  roll.name.toUpperCase(),
+                  (roll.title?.trim().isNotEmpty ?? false)
+                      ? roll.title!.trim().toUpperCase()
+                      : roll.name.toUpperCase(),
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
@@ -61,7 +63,20 @@ class RollCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${roll.nickname ?? "Untitled Roll"} • ${roll.cameraName ?? "Unknown Camera"}${roll.lensName != null ? " + " + roll.lensName! : ""}',
+                  '${roll.name.toUpperCase()} - ${roll.cameraName ?? "Unknown Camera"}${roll.lensName != null && roll.lensName!.trim().isNotEmpty ? " + ${roll.lensName!.trim()}" : ""}',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Colors.white.withOpacity(0.72),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  (roll.description?.trim().isNotEmpty ?? false)
+                      ? roll.description!.trim()
+                      : '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.7),
@@ -122,14 +137,16 @@ class RollCard extends ConsumerWidget {
           try {
             await rollService.updateRollStatus(token, roll.id, newStatus.name);
             ref.refresh(dashboardRollsProvider);
-            if (context.mounted) Navigator.pop(context);
+            // Ensure the detail screen doesn't keep a stale cached roll status.
+            ref.invalidate(rollDetailProvider(roll.id));
+            return true;
           } catch (_) {
             if (context.mounted) {
-              Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Failed to update status')),
               );
             }
+            return false;
           }
         },
       ),
@@ -225,97 +242,84 @@ class _ScannedContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final urls = imageUrls.isEmpty ? <String>[] : imageUrls;
+    // Treat blank/empty URLs as "no preview images yet".
+    // Also ignore non-displayable values (e.g. storage keys like users/.../x.jpg).
+    final urls = imageUrls
+        .where((u) => u.trim().isNotEmpty)
+        .where((u) => u.startsWith('http') || u.startsWith('/'))
+        .toList(growable: false);
+    final effectiveActualFrames = urls.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Text(
-            '$actualFrames/$totalFrames Frames',
+            '$effectiveActualFrames/$totalFrames Frames',
             style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 100,
-          child: urls.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                    child: Text(
-                      'No preview images',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 13,
-                      ),
-                    ),
+        if (urls.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: urls.length,
+              itemBuilder: (context, index) {
+                return Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  width: 140,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white.withOpacity(0.08),
                   ),
-                )
-              : ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: urls.length,
-                  itemBuilder: (context, index) {
-                    return Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      width: 140,
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        color: Colors.white.withOpacity(0.08),
-                      ),
-                      child: Image.network(
-                        urls[index],
-                        fit: BoxFit.cover,
-                        width: 140,
-                        height: 100,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: Colors.white.withOpacity(0.05),
-                            child: Center(
-                              child: SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white38,
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                            (loadingProgress.expectedTotalBytes ?? 1)
-                                      : null,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.white.withOpacity(0.05),
-                            child: Icon(
-                              Icons.broken_image_outlined,
+                  child: Image.network(
+                    urls[index],
+                    fit: BoxFit.cover,
+                    width: 140,
+                    height: 100,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: Colors.white.withOpacity(0.05),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
                               color: Colors.white38,
-                              size: 32,
                             ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-        ),
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      // If the specific URL is broken, render nothing.
+                      // ignore: avoid_print
+                      debugPrint('[RollCard] image preview failed url=${urls[index]} err=$error');
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: TextButton(
-            onPressed: () => context.push('/roll/$rollId'),
+            onPressed: urls.isEmpty ? null : () => context.push('/roll/$rollId'),
             style: TextButton.styleFrom(
               padding: EdgeInsets.zero,
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: const Text(
+            child: Text(
               'OPEN GALLERY →',
               style: TextStyle(
                 color: Colors.blueAccent,

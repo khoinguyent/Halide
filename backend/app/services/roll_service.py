@@ -5,7 +5,8 @@ from ..db.models.roll import Roll, RollStatusEnum
 from ..db.models.film_stock import FilmStock
 from ..db.models.camera import UserCamera, Camera, UserLens, Lens
 from ..db.models.image import Image
-from ..db.schemas.roll import RollCreate, RollOutDashboard
+from ..db.schemas.roll import RollCreate, RollOutDashboard, RollMetaUpdate
+from ..core.config import settings
 
 # Simple hex colors per brand for dashboard cards
 _FILM_COLOR = {
@@ -39,8 +40,46 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
             lens = db.query(Lens).filter(Lens.id == ul.lens_id).first()
             if lens:
                 lens_name = f"{lens.brand} {lens.model}"
-    images = db.query(Image.image_url).filter(Image.roll_id == r.id).order_by(Image.frame_number).all()
-    image_urls = [row[0] for row in images]
+    images = (
+        db.query(Image.image_url)
+        .filter(Image.roll_id == r.id)
+        .order_by(Image.frame_number)
+        .all()
+    )
+    keys = [row[0] for row in images]
+
+    # Image.image_url is stored as a storage key (not a full URL). Convert it
+    # to an HTTP URL so the Flutter gallery can render via Image.network.
+    base_url = (settings.S3_ENDPOINT or "").rstrip("/")
+    bucket = (settings.S3_BUCKET_NAME or "").strip()
+
+    # Prefer public, no-auth URL (R2 dev) when configured.
+    if getattr(settings, "R2_PUBLIC_BASE_URL", None):
+        # R2 public base usually does NOT include the bucket name.
+        # Our object keys are stored under `users/...`, so we must include the
+        # bucket segment between the public base and the object key.
+        public_base = settings.R2_PUBLIC_BASE_URL.rstrip("/")
+        if bucket and not public_base.endswith("/" + bucket):
+            url_base = f"{public_base}/{bucket}"
+        else:
+            url_base = public_base
+    else:
+        # If the endpoint already includes the bucket path (common for some R2 configs),
+        # don't append bucket again.
+        if bucket and base_url.endswith("/" + bucket):
+            url_base = base_url.rstrip("/")
+        else:
+            url_base = (f"{base_url}/{bucket}").rstrip("/") if bucket else base_url.rstrip("/")
+
+    # `k` is stored as a key like: users/<uid>/rolls/<roll_id>/<image_id>.jpg (no leading slash).
+    # Avoid naive `replace("//","/")` because it breaks the `https://` scheme.
+    # Only render images stored via our storage uploader:
+    # keys look like `users/<uid>/rolls/<roll_id>/<image_id>.jpg`.
+    image_urls = [
+        f"{url_base}/{k}".rstrip("/")
+        for k in keys
+        if isinstance(k, str) and k.startswith("users/")
+    ]
     total_frames = (r.max_frames if r.max_frames is not None else 36)
     actual_frames = len(image_urls)
     return RollOutDashboard(
@@ -50,7 +89,10 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         color=color,
         status=r.status.value,
         image_urls=image_urls,
-        nickname=None,
+        title=r.title,
+        description=r.description,
+        # Keep existing frontend contract: use title as the "nickname" shown on cards.
+        nickname=r.title,
         camera_name=camera_name,
         lens_name=lens_name,
         frame_count=actual_frames,
@@ -122,3 +164,19 @@ def update_roll_status(db: Session, roll_id: str, new_status: RollStatusEnum, us
     db.commit()
     db.refresh(db_roll)
     return db_roll
+
+
+def update_roll_meta(db: Session, roll_id: str, meta: RollMetaUpdate, user_id: str):
+    db_roll = get_roll(db, roll_id, user_id)
+    if not db_roll:
+        raise HTTPException(status_code=404, detail="Roll not found")
+
+    # Patch semantics: missing fields are treated as no-op at the DB layer by setting directly.
+    # Frontend always sends title/description (possibly null) for editing.
+    db_roll.title = meta.title
+    db_roll.description = meta.description
+
+    db.add(db_roll)
+    db.commit()
+    db.refresh(db_roll)
+    return _build_roll_dashboard(db_roll, db)

@@ -1,6 +1,7 @@
 import boto3
 from botocore.client import Config
 from ..core.config import settings
+import io
 
 def _is_s3_configured() -> bool:
     """True if S3 endpoint looks like a real URL (not a placeholder)."""
@@ -32,14 +33,46 @@ class StorageService:
         """
         if self._s3 is None:
             raise RuntimeError("S3/R2 is not configured. Set S3_ENDPOINT and credentials in .env for uploads.")
-        key = f"users/{user_id}/rolls/{roll_id}/{image_id}.jpg"
+
+        base_key = f"users/{user_id}/rolls/{roll_id}/{image_id}"
+        full_key = f"{base_key}.jpg"
+        thumb_key = f"{base_key}_thumb.jpg"
+
+        # Upload original / full-size bytes
         self._s3.put_object(
             Bucket=self.bucket_name,
-            Key=key,
+            Key=full_key,
             Body=file_content,
-            ContentType=content_type
+            ContentType=content_type,
         )
-        return key
+
+        # Best-effort thumbnail generation; failures shouldn't break uploads.
+        # Note: Pillow may not be installed in some environments.
+        try:
+            from PIL import Image as PILImage  # type: ignore
+
+            img = PILImage.open(io.BytesIO(file_content))
+            img = img.convert("RGB")
+            img.thumbnail((800, 800))  # good for grid / list thumbnails
+
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=80)
+            buf.seek(0)
+
+            self._s3.put_object(
+                Bucket=self.bucket_name,
+                Key=thumb_key,
+                Body=buf.getvalue(),
+                ContentType="image/jpeg",
+            )
+        except ModuleNotFoundError:
+            # Skip thumbnails if Pillow isn't available.
+            pass
+        except Exception:
+            # In a real app we'd log this; for now we silently fall back to full-size only.
+            pass
+
+        return full_key
 
     def upload_avatar(self, user_id: str, file_content: bytes, content_type: str = "image/jpeg"):
         """

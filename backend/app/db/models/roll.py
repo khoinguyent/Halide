@@ -21,4 +21,6 @@ class Roll(Base):
     expired_year = Column(Integer)
     max_frames = Column(Integer, server_default=text('36'))  # total frames (user input when creating roll)
     status = Column(Enum(RollStatusEnum), server_default='shooting')
+    title = Column(String(255), nullable=True)
+    description = Column(String(), nullable=True)
     created_at = Column(DateTime, server_default=text('NOW()'))

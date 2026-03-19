@@ -23,6 +23,11 @@ class Settings(BaseSettings):
 
     # Cloud Storage (R2/S3)
     S3_ENDPOINT: str
+    # If set, image URLs will be generated using this public (no-auth) R2 dev URL.
+    # Example: https://pub-xxxxxxxxxxxx.r2.dev
+    # When present, we will NOT append the bucket name again; we will just
+    # append the stored object key.
+    R2_PUBLIC_BASE_URL: Optional[str] = None
     S3_ACCESS_KEY: str
     S3_SECRET_KEY: str
     S3_BUCKET_NAME: str

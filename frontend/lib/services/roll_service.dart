@@ -52,6 +52,29 @@ class RollService {
     }
   }
 
+  Future<void> updateRollMeta(
+    String token,
+    String rollId, {
+    required String title,
+    required String description,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('${AppConfig.apiUrl}/rolls/$rollId/meta'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'title': title.isEmpty ? null : title,
+        'description': description.isEmpty ? null : description,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update roll meta: ${response.body}');
+    }
+  }
+
   Future<Map<String, dynamic>> createRoll(String token, Map<String, dynamic> rollData) async {
     final response = await http.post(
       Uri.parse('${AppConfig.apiUrl}/rolls'),

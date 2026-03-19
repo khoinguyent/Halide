@@ -17,12 +17,15 @@ class StorageStrategyView extends StatefulWidget {
 
 class _StorageStrategyViewState extends State<StorageStrategyView> {
   int _selectedTierIndex = 0;
+  static const _zinc950 = Color(0xFF09090B);
+  static const _orange500 = Color(0xFFF97316);
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => StorageAccountsBloc()..add(LoadStorageAccounts()),
       child: HalideScaffold(
+        backgroundColor: _zinc950,
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -33,7 +36,7 @@ class _StorageStrategyViewState extends State<StorageStrategyView> {
           title: const Text(
             'STORAGE STRATEGY',
             style: TextStyle(
-              letterSpacing: 4,
+              letterSpacing: 2.0,
               fontWeight: FontWeight.w600,
               fontSize: 16,
               color: Colors.white,
@@ -44,7 +47,7 @@ class _StorageStrategyViewState extends State<StorageStrategyView> {
           iconTheme: const IconThemeData(color: Colors.white),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -52,7 +55,7 @@ class _StorageStrategyViewState extends State<StorageStrategyView> {
                 selectedIndex: _selectedTierIndex,
                 onSelected: (index) => setState(() => _selectedTierIndex = index),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 22),
               _buildContentForTier(context),
             ],
           ),
@@ -67,7 +70,7 @@ class _StorageStrategyViewState extends State<StorageStrategyView> {
         if (state is StorageAccountsLoading) {
           return const Padding(
             padding: EdgeInsets.all(64),
-            child: Center(child: CircularProgressIndicator(color: Color(0xFFF97316))),
+            child: Center(child: CircularProgressIndicator(color: _orange500)),
           );
         }
         if (state is StorageAccountsError) {
@@ -162,15 +165,26 @@ class _StorageAccountCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.06),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isPrimary ? const Color(0xFFF97316) : Colors.white.withOpacity(0.1),
+              color: isPrimary ? const Color(0xFFF97316) : Colors.white.withOpacity(0.10),
               width: isPrimary ? 2 : 1,
             ),
+            boxShadow: isPrimary
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFF97316).withOpacity(0.30),
+                      spreadRadius: 2,
+                      blurRadius: 15,
+                      offset: const Offset(0, 0),
+                    ),
+                  ]
+                : const [],
           ),
           child: Row(
             children: [
@@ -198,16 +212,15 @@ class _StorageAccountCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF97316).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFF97316).withOpacity(0.5)),
+                              color: const Color(0xFFF97316),
+                              borderRadius: BorderRadius.circular(999),
                             ),
                             child: const Text(
                               'PRIMARY',
                               style: TextStyle(
-                                color: Color(0xFFF97316),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
                                 letterSpacing: 0.8,
                               ),
                             ),
@@ -219,7 +232,7 @@ class _StorageAccountCard extends StatelessWidget {
                     Text(
                       account.email,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withOpacity(isPrimary ? 0.70 : 0.50),
                         fontSize: 13,
                       ),
                       overflow: TextOverflow.ellipsis,

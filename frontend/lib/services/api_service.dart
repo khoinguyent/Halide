@@ -6,8 +6,10 @@ import '../config/app_config.dart';
 class ApiService {
   final Dio _dio = Dio(BaseOptions(
     baseUrl: AppConfig.baseUrl,
-    connectTimeout: const Duration(seconds: 5),
-    receiveTimeout: const Duration(seconds: 3),
+    // Drive sync can require downloading many images and uploading them to R2/S3.
+    // Increase timeouts so the request isn't aborted mid-way.
+    connectTimeout: const Duration(seconds: 20),
+    receiveTimeout: const Duration(seconds: 180),
   ));
 
   ApiService() {
@@ -35,5 +37,9 @@ class ApiService {
 
   Future<Response> patch(String path, {dynamic data}) async {
     return _dio.patch(path, data: data);
+  }
+
+  Future<Response> delete(String path, {dynamic data}) async {
+    return _dio.delete(path, data: data);
   }
 }

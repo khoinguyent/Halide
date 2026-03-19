@@ -3,7 +3,7 @@ import '../models/roll_status.dart';
 
 class StatusSelector extends StatelessWidget {
   final RollStatus currentStatus;
-  final Function(RollStatus) onStatusSelected;
+  final Future<bool> Function(RollStatus) onStatusSelected;
 
   const StatusSelector({
     super.key,
@@ -13,6 +13,12 @@ class StatusSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final steps = RollStatus.values;
+    final currentIndex = steps.indexOf(currentStatus);
+    final allowedStatuses = (currentIndex >= 0)
+        ? steps.where((s) => steps.indexOf(s) >= currentIndex).toList()
+        : steps;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: const BoxDecoration(
@@ -32,14 +38,15 @@ class StatusSelector extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          ...RollStatus.values.map((status) {
+          ...allowedStatuses.map((status) {
             final isSelected = status == currentStatus;
             return ListTile(
               title: Text(status.label),
               trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
-              onTap: () {
-                onStatusSelected(status);
-                Navigator.pop(context);
+              onTap: () async {
+                final success = await onStatusSelected(status);
+                if (!context.mounted) return;
+                if (success) Navigator.pop(context);
               },
             );
           }),

@@ -10,6 +10,14 @@ class UploadService {
     required File imageFile,
   }) async {
     try {
+      const maxBytes = 15 * 1024 * 1024; // 15 MB
+      final length = await imageFile.length();
+      if (length > maxBytes) {
+        // Too large; let caller surface a friendly message.
+        print('Skipped ${imageFile.path}: file larger than 15MB (${length} bytes).');
+        return false;
+      }
+
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('${AppConfig.apiUrl}/upload_roll_image/$rollId'),
@@ -17,7 +25,6 @@ class UploadService {
 
       // Add image file
       final stream = http.ByteStream(imageFile.openRead());
-      final length = await imageFile.length();
       
       final multipartFile = http.MultipartFile(
         'file',

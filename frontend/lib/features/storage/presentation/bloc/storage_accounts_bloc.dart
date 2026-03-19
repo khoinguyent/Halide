@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/models/storage_account.dart';
+import 'package:frontend/services/api_service.dart';
 
 // Events
 abstract class StorageAccountsEvent {}
@@ -10,6 +11,11 @@ class LoadStorageAccounts extends StorageAccountsEvent {}
 class TogglePrimaryAccount extends StorageAccountsEvent {
   final String accountId;
   TogglePrimaryAccount(this.accountId);
+}
+
+class RemoveStorageAccounts extends StorageAccountsEvent {
+  final List<String> accountIds;
+  RemoveStorageAccounts(this.accountIds);
 }
 
 // States
@@ -31,52 +37,55 @@ class StorageAccountsError extends StorageAccountsState {
 
 // BLoC
 class StorageAccountsBloc extends Bloc<StorageAccountsEvent, StorageAccountsState> {
-  StorageAccountsBloc() : super(StorageAccountsInitial()) {
+  final ApiService _api;
+
+  StorageAccountsBloc({ApiService? api}) : _api = api ?? ApiService(), super(StorageAccountsInitial()) {
     on<LoadStorageAccounts>((event, emit) async {
       emit(StorageAccountsLoading());
       try {
-        // Mocking some data for now
-        final accounts = [
+        final connectionsResp = await _api.get('/api/v1/connections');
+        final raw = connectionsResp.data;
+
+        final connectedAccounts = <StorageAccount>[];
+        if (raw is List) {
+          for (final item in raw) {
+            if (item is! Map) continue;
+            final m = Map<String, dynamic>.from(item as Map);
+            final provider = (m['provider'] as String?) ?? '';
+            final providerName = _providerDisplayName(provider);
+            if (providerName == null) continue;
+
+            final id = (m['id'] as String?) ?? '';
+            final identifier = (m['identifier'] as String?) ?? '';
+            final displayLabel = (m['display_label'] as String?)?.trim();
+            final isPrimary = (m['is_primary'] as bool?) ?? false;
+
+            connectedAccounts.add(
+              StorageAccount(
+                id: id.isEmpty ? '${provider}_$identifier' : id,
+                name: (displayLabel != null && displayLabel.isNotEmpty)
+                    ? displayLabel
+                    : providerName,
+                type: StorageAccountType.personal,
+                email: identifier,
+                providerName: providerName,
+                isPrimary: isPrimary,
+              ),
+            );
+          }
+        }
+
+        // Local device entry is not stored in backend storage_credentials; keep a stable local row.
+        final accounts = <StorageAccount>[
           const StorageAccount(
-            id: '1',
+            id: 'local_device',
             name: 'Local Device',
             type: StorageAccountType.local,
             email: 'local@device.com',
             providerName: 'Device',
             isPrimary: true,
           ),
-          const StorageAccount(
-            id: '2',
-            name: 'Personal iCloud',
-            type: StorageAccountType.personal,
-            email: 'user@icloud.com',
-            providerName: 'iCloud',
-            isPrimary: false,
-          ),
-          const StorageAccount(
-            id: '2b',
-            name: 'Shared Family iCloud',
-            type: StorageAccountType.personal,
-            email: 'family@icloud.com',
-            providerName: 'iCloud',
-            isPrimary: false,
-          ),
-          const StorageAccount(
-            id: '4',
-            name: 'Work Drive',
-            type: StorageAccountType.personal,
-            email: 'work@gmail.com',
-            providerName: 'Google Drive',
-            isPrimary: false,
-          ),
-          const StorageAccount(
-            id: '3',
-            name: 'Halide Pro Sync',
-            type: StorageAccountType.system,
-            email: 'pro@halide.com',
-            providerName: 'Halide',
-            isPrimary: false,
-          ),
+          ...connectedAccounts,
         ];
         emit(StorageAccountsLoaded(accounts));
       } catch (e) {
@@ -102,5 +111,35 @@ class StorageAccountsBloc extends Bloc<StorageAccountsEvent, StorageAccountsStat
         emit(StorageAccountsLoaded(updatedAccounts));
       }
     });
+
+    on<RemoveStorageAccounts>((event, emit) async {
+      try {
+        for (final id in event.accountIds) {
+          if (id == 'local_device') continue;
+          await _api.delete('/api/v1/connections/$id');
+        }
+        add(LoadStorageAccounts());
+      } catch (e) {
+        emit(StorageAccountsError(e.toString()));
+      }
+    });
+  }
+
+  static String? _providerDisplayName(String provider) {
+    switch (provider) {
+      case 'icloud':
+        return 'iCloud';
+      case 'gdrive':
+        return 'Google Drive';
+      case 'onedrive':
+        return 'OneDrive';
+      case 'nas':
+        return 'NAS';
+      case 'smb':
+        // Matches CloudProvidersSection provider list label.
+        return 'SMB / Network';
+      default:
+        return null;
+    }
   }
 }

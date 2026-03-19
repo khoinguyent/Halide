@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/roll_card.dart';
 import '../providers/dashboard_provider.dart';
@@ -19,6 +20,25 @@ class HomeView extends ConsumerStatefulWidget {
 
 class _HomeViewState extends ConsumerState<HomeView> {
   RollStatus? _statusFilter;
+
+  void _showAddRollDialog() {
+    final bloc = ref.read(rollsBlocProvider);
+    showHalideDialog(
+      context: context,
+      builder: (dialogContext) => BlocProvider.value(
+        value: bloc,
+        child: AddRollForm(
+          repository: ref.read(rollsRepositoryProvider),
+          onRollAdded: () {
+            // Force reload the list, and clear any active status filter so the
+            // newly created roll is visible.
+            setState(() => _statusFilter = null);
+            ref.invalidate(dashboardRollsProvider);
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,18 +63,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
           IconButton(
             icon: const Icon(Icons.add_rounded),
             tooltip: 'Add roll',
-            onPressed: () {
-              showHalideDialog(
-                context: context,
-                builder: (context) => AddRollForm(
-                  repository: ref.read(rollsRepositoryProvider),
-                  onRollAdded: () {
-                    Navigator.of(context).pop();
-                    ref.refresh(dashboardRollsProvider);
-                  },
-                ),
-              );
-            },
+            onPressed: _showAddRollDialog,
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
@@ -127,7 +136,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
   }
 
   Widget _buildEmptyOrNoMatch(bool noRollsAtAll) {
-    if (noRollsAtAll) return const _EmptyState();
+    if (noRollsAtAll) return _EmptyState(onAddFirstRoll: _showAddRollDialog);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -195,7 +204,9 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({Key? key}) : super(key: key);
+  final VoidCallback onAddFirstRoll;
+
+  const _EmptyState({Key? key, required this.onAddFirstRoll}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +231,7 @@ class _EmptyState extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () {},
+                onPressed: onAddFirstRoll,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white.withOpacity(0.1),
                   foregroundColor: Colors.white,
