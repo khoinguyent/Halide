@@ -128,7 +128,7 @@ def seed_master_data():
                 id=test_user_id,
                 email="test@example.com",
                 display_name="Test User",
-                avatar_url="https://example.com/avatar.jpg"
+                avatar_url="https://picsum.photos/seed/halide_avatar/200/200",
             )
             db.add(test_user)
             print(f"Adding Test User: {test_user_id}")

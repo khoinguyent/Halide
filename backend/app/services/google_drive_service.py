@@ -2,13 +2,14 @@
 Google Drive API integration for personal cloud storage.
 Uses stored OAuth tokens (from mobile serverAuthCode exchange) to list/upload files.
 """
-import json
 import logging
-from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Optional, List, Dict, Any, Tuple
 import re
 
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from googleapiclient.errors import HttpError
@@ -18,11 +19,92 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
-DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+DRIVE_SCOPES = [
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive.metadata.readonly",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "openid",
+]
+
+# Naive UTC — google-auth compares expiry with naive UTC (see google.auth._helpers.utcnow).
+_LEGACY_FORCE_REFRESH_EXPIRY = datetime(1970, 1, 1, 0, 0, 0)
 
 
 def _is_configured() -> bool:
     return bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
+
+
+def is_gdrive_oauth_configured() -> bool:
+    """True when backend .env has Web OAuth client id + secret (required for token refresh)."""
+    return _is_configured()
+
+
+def _effective_refresh_token(tokens_dict: Dict[str, Any]) -> Optional[str]:
+    rt = tokens_dict.get("refresh_token")
+    if rt is None:
+        return None
+    rt = str(rt).strip()
+    return rt if rt else None
+
+
+def has_stored_refresh_token(tokens_dict: Dict[str, Any]) -> bool:
+    """True if the stored OAuth payload includes a non-empty refresh token."""
+    return _effective_refresh_token(tokens_dict) is not None
+
+
+def _credentials_from_stored_tokens(tokens_dict: Dict[str, Any]) -> Credentials:
+    rt = _effective_refresh_token(tokens_dict)
+    return Credentials(
+        token=tokens_dict.get("access_token"),
+        refresh_token=rt,
+        token_uri=tokens_dict.get("token_uri") or "https://oauth2.googleapis.com/token",
+        client_id=tokens_dict.get("client_id") or settings.GOOGLE_CLIENT_ID,
+        client_secret=tokens_dict.get("client_secret") or settings.GOOGLE_CLIENT_SECRET,
+        scopes=tokens_dict.get("scopes") or DRIVE_SCOPES,
+        expiry=_expiry_for_stored_tokens(tokens_dict),
+    )
+
+
+def _parse_expiry_iso_to_naive_utc(raw: str) -> Optional[datetime]:
+    """Parse stored ISO expiry into naive UTC for google.oauth2.credentials.Credentials."""
+    s = raw.strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def _expiry_for_stored_tokens(tokens_dict: Dict[str, Any]) -> Optional[datetime]:
+    """
+    google-auth treats expiry=None as "never expires", so we never refresh and send
+    stale access tokens. We always persist expiry on connect; legacy rows without it
+    use a sentinel so refresh runs once, then we persist real expiry.
+    """
+    raw = tokens_dict.get("expiry")
+    if isinstance(raw, str) and raw.strip():
+        parsed = _parse_expiry_iso_to_naive_utc(raw)
+        if parsed is not None:
+            return parsed
+    if _effective_refresh_token(tokens_dict):
+        return _LEGACY_FORCE_REFRESH_EXPIRY
+    return None
+
+
+def _merge_creds_into_tokens_dict(creds: Credentials, tokens_dict: Dict[str, Any]) -> None:
+    """After refresh, mirror new tokens back into the dict we persist."""
+    if creds.token:
+        tokens_dict["access_token"] = creds.token
+    if creds.refresh_token:
+        tokens_dict["refresh_token"] = creds.refresh_token
+    if creds.expiry:
+        e = creds.expiry
+        if e.tzinfo is not None:
+            e = e.astimezone(timezone.utc).replace(tzinfo=None)
+        tokens_dict["expiry"] = e.isoformat()
 
 
 def exchange_server_auth_code(server_auth_code: str) -> Dict[str, Any]:
@@ -44,32 +126,55 @@ def exchange_server_auth_code(server_auth_code: str) -> Dict[str, Any]:
             scopes=DRIVE_SCOPES,
         )
         flow.redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
-        tokens = flow.fetch_token(code=server_auth_code)
+        flow.fetch_token(code=server_auth_code)
+        credentials = flow.credentials
+        
+        # DEBUG PRINT (ensure visibility in terminal)
+        print(f"DEBUG: [GDrive] Credentials after exchange: has_refresh={credentials.refresh_token is not None}")
+        print(f"DEBUG: [GDrive] Scopes: {credentials.scopes}")
+        
         return {
-            "access_token": tokens.get("access_token"),
-            "refresh_token": tokens.get("refresh_token"),
-            "token_uri": tokens.get("token_uri"),
-            "client_id": settings.GOOGLE_CLIENT_ID,
-            "client_secret": settings.GOOGLE_CLIENT_SECRET,
-            "scopes": DRIVE_SCOPES,
+            "access_token": credentials.token,
+            "refresh_token": credentials.refresh_token,
+            "token_uri": credentials.token_uri,
+            "client_id": credentials.client_id,
+            "client_secret": credentials.client_secret,
+            "scopes": credentials.scopes,
+            "expiry": credentials.expiry.isoformat() if credentials.expiry else None,
         }
     except Exception as e:
         logger.exception("Google Drive token exchange failed: %s", e)
         raise
 
 
-def tokens_to_credentials(tokens_dict: Dict[str, Any]) -> Credentials:
-    """Build Credentials from stored token dict; refresh if expired."""
-    creds = Credentials(
-        token=tokens_dict.get("access_token"),
-        refresh_token=tokens_dict.get("refresh_token"),
-        token_uri=tokens_dict.get("token_uri") or "https://oauth2.googleapis.com/token",
-        client_id=tokens_dict.get("client_id") or settings.GOOGLE_CLIENT_ID,
-        client_secret=tokens_dict.get("client_secret") or settings.GOOGLE_CLIENT_SECRET,
-        scopes=tokens_dict.get("scopes") or DRIVE_SCOPES,
-    )
-    if not creds.valid and creds.expired and creds.refresh_token:
+def refresh_google_credentials(
+    tokens_dict: Dict[str, Any],
+    *,
+    force: bool = False,
+) -> Tuple[Credentials, bool]:
+    """
+    Build Credentials from stored JSON and refresh when the access token is invalid or stale.
+    Mutates tokens_dict when a refresh succeeds so callers can persist the updated payload.
+
+    If ``force`` is True and a refresh_token exists, expiry is set to a sentinel so we always
+    attempt ``refresh()`` — use when the library still considers the access token valid but
+    Google rejects it (e.g. after a forced revoke).
+
+    Returns (credentials, did_refresh).
+    """
+    if force and _effective_refresh_token(tokens_dict):
+        tokens_dict["expiry"] = _LEGACY_FORCE_REFRESH_EXPIRY.isoformat()
+    creds = _credentials_from_stored_tokens(tokens_dict)
+    if creds.refresh_token and not creds.valid:
         creds.refresh(Request())
+        _merge_creds_into_tokens_dict(creds, tokens_dict)
+        return creds, True
+    return creds, False
+
+
+def tokens_to_credentials(tokens_dict: Dict[str, Any], *, force: bool = False) -> Credentials:
+    """Build Credentials from stored token dict; refresh if invalid/stale. Mutates dict on refresh."""
+    creds, _ = refresh_google_credentials(tokens_dict, force=force)
     return creds
 
 
@@ -217,6 +322,17 @@ def download_file_bytes(
     Download a single Drive file's bytes plus its mimeType.
     Used for premium sync where we ingest lab scans into our own storage.
     """
+    # Ensure credentials are valid before creating service.
+    # If invalid and no refresh token, discovery will fail internally with a RefreshError that's hard to catch.
+    if not credentials.valid:
+        if credentials.refresh_token:
+            try:
+                credentials.refresh(Request())
+            except Exception as e:
+                raise RefreshError(f"Failed to refresh credentials: {e}")
+        else:
+            raise RefreshError("Credentials are expired and no refresh token is available.")
+
     service = build("drive", "v3", credentials=credentials)
 
     # Fetch minimal metadata for mimeType.

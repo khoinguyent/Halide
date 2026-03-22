@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'api_service.dart';
@@ -15,30 +16,56 @@ class StorageConnectionService {
   }
 
   /// Starts Google Sign-In with Drive scope and sends credentials to the backend.
-  Future<void> connectGoogleDrive() async {
+  Future<void> connectGoogleDrive({
+    bool isArchive = false,
+    bool isScanSync = true,
+  }) async {
     try {
+      final clientId = _googleDriveServerClientId;
+      debugPrint('[GDrive] Using serverClientId: $clientId');
+      
+      if (clientId == null || clientId.isEmpty) {
+        throw StorageConnectionException(
+          'Missing GOOGLE_DRIVE_SERVER_CLIENT_ID environment variable. '
+          'Please check your --dart-define flag.'
+        );
+      }
+
       final googleSignIn = GoogleSignIn(
+        clientId: (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS)
+            ? '413280765346-2pq8udmspnct62nvojgpuafku9pq8som.apps.googleusercontent.com'
+            : null,
         scopes: const [
           'email',
-            'https://www.googleapis.com/auth/drive.readonly',
+          'https://www.googleapis.com/auth/drive.readonly',
+          'https://www.googleapis.com/auth/drive.metadata.readonly',
         ],
-        serverClientId: _googleDriveServerClientId,
-        // Ensure serverAuthCode is returned so backend can store refresh_token.
+        serverClientId: clientId,
         forceCodeForRefreshToken: true,
       );
+
+      // Sign out and disconnect to ensure we get a fresh account selection/consent.
+      try {
+        await googleSignIn.signOut();
+        await googleSignIn.disconnect();
+      } catch (_) {}
 
       final account = await googleSignIn.signIn();
       if (account == null) {
         throw StorageConnectionException('Sign-in cancelled');
       }
 
+      final auth = await account.authentication;
+      final serverCode = account.serverAuthCode;
+      debugPrint('[GDrive] account.serverAuthCode: $serverCode');
+      
       String authData;
-      final code = account.serverAuthCode;
-      if (code != null && code.isNotEmpty) {
-        authData = jsonEncode({'server_auth_code': code});
+      if (serverCode != null && serverCode.isNotEmpty) {
+        debugPrint('[GDrive] Proceeding with server_auth_code path');
+        authData = jsonEncode({'server_auth_code': serverCode});
       } else {
-        final auth = await account.authentication;
         final token = auth.accessToken;
+        debugPrint('[GDrive] No server_auth_code found. Falling back to access_token.');
         if (token == null || token.isEmpty) {
           throw StorageConnectionException('Could not get Google access token');
         }
@@ -51,7 +78,8 @@ class StorageConnectionService {
         'auth_data': authData,
         'display_label': 'Google Drive (${account.email})',
         'is_primary': true,
-        'is_archive': true,
+        'is_archive': isArchive,
+        'is_scan_sync': isScanSync,
       });
     } on PlatformException catch (e) {
       throw StorageConnectionException(

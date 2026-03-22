@@ -136,3 +136,78 @@ Future<T?> showHalideModalBottomSheet<T>({
     },
   );
 }
+class HalideSimpleDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final String buttonText;
+  final VoidCallback? onButtonPressed;
+
+  const HalideSimpleDialog({
+    Key? key,
+    required this.title,
+    required this.message,
+    this.buttonText = 'OK',
+    this.onButtonPressed,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: MediaQuery.of(context).size.width * 0.85,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1C29),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 30,
+            spreadRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 14,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 28),
+          ElevatedButton(
+            onPressed: onButtonPressed ?? () => Navigator.of(context).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white.withOpacity(0.95),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              elevation: 0,
+            ),
+            child: Text(
+              buttonText,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

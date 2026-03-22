@@ -290,8 +290,12 @@ class _CloudProviderGroupState extends State<_CloudProviderGroup> {
       } catch (e) {
         if (mounted) {
           setState(() => _viewState = ConnectionState.idle);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to connect: $e'), backgroundColor: Colors.redAccent),
+          showHalideDialog(
+            context: context,
+            builder: (context) => HalideSimpleDialog(
+              title: 'Connection Failed',
+              message: e.toString(),
+            ),
           );
         }
       }
@@ -315,8 +319,12 @@ class _CloudProviderGroupState extends State<_CloudProviderGroup> {
       } catch (e) {
         if (mounted) {
           setState(() => _viewState = ConnectionState.idle);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to connect: $e'), backgroundColor: Colors.redAccent),
+          showHalideDialog(
+            context: context,
+            builder: (context) => HalideSimpleDialog(
+              title: 'Connection Failed',
+              message: e.toString(),
+            ),
           );
         }
       }
@@ -327,22 +335,36 @@ class _CloudProviderGroupState extends State<_CloudProviderGroup> {
   @override
   Widget build(BuildContext context) {
     final hasAccounts = widget.connectedAccounts.isNotEmpty;
-    final connectedIds = widget.connectedAccounts.map((a) => a.id).where((id) => id.isNotEmpty).toList();
-    final connectedSubtitle = hasAccounts
-        ? 'Connected${widget.connectedAccounts.first.email.isNotEmpty ? ' • ${widget.connectedAccounts.first.email}' : ''}'
-        : null;
-    return _ProviderTile(
-      icon: widget.provider.icon,
-      label: widget.provider.name,
-      actionLabel: _viewState == ConnectionState.connecting
-          ? '...'
-          : (hasAccounts ? 'Remove' : 'Add'),
-      onTap: _viewState == ConnectionState.idle
-          ? (hasAccounts
-              ? () => context.read<StorageAccountsBloc>().add(RemoveStorageAccounts(connectedIds))
-              : _handleConnect)
-          : null,
-      subtitle: connectedSubtitle,
+    final isGDrive = widget.provider.id == 'gdrive';
+    // Only allow one GDrive account. If connected, hide the 'Add' action.
+    final hideAddAction = isGDrive && hasAccounts;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ProviderTile(
+          icon: widget.provider.icon,
+          label: widget.provider.name,
+          actionLabel: hideAddAction ? null : (_viewState == ConnectionState.connecting ? '...' : 'Add'),
+          onTap: (hideAddAction || _viewState != ConnectionState.idle) ? null : _handleConnect,
+          subtitle: hasAccounts ? '${widget.connectedAccounts.length} Connected' : null,
+          showChevron: !hideAddAction,
+        ),
+        if (hasAccounts) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Column(
+              children: widget.connectedAccounts
+                  .map((a) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _GroupedAccountCard(account: a),
+                      ))
+                  .toList(),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -350,9 +372,10 @@ class _CloudProviderGroupState extends State<_CloudProviderGroup> {
 class _ProviderTile extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String actionLabel;
+  final String? actionLabel;
   final VoidCallback? onTap;
   final String? subtitle;
+  final bool showChevron;
 
   const _ProviderTile({
     required this.icon,
@@ -360,6 +383,7 @@ class _ProviderTile extends StatelessWidget {
     required this.actionLabel,
     required this.onTap,
     required this.subtitle,
+    this.showChevron = true,
   });
 
   static const _orange500 = Color(0xFFF97316);
@@ -422,16 +446,19 @@ class _ProviderTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text(
-                  actionLabel,
-                  style: const TextStyle(
-                    color: _orange500,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
+                if (actionLabel != null)
+                  Text(
+                    actionLabel!,
+                    style: const TextStyle(
+                      color: _orange500,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.35)),
+                if (showChevron) ...[
+                  const SizedBox(width: 10),
+                  Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.35)),
+                ],
               ],
             ),
           ),
@@ -448,90 +475,161 @@ class _GroupedAccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPrimary = account.isPrimary;
+    final isGDrive = account.providerName == 'Google Drive';
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 240),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isPrimary ? const Color(0xFFF97316) : Colors.white.withOpacity(0.10),
-          width: isPrimary ? 2.0 : 1.0,
+          width: isPrimary ? 1.5 : 1.0,
         ),
-        boxShadow: isPrimary
-            ? [
-                BoxShadow(
-                  color: const Color(0xFFF97316).withOpacity(0.30),
-                  spreadRadius: 2,
-                  blurRadius: 15,
-                  offset: const Offset(0, 0),
-                ),
-              ]
-            : const [],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        account.name,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(isPrimary ? 1.0 : 0.75),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isPrimary) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF97316),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Text(
-                          'PRIMARY',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            account.name,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(isPrimary ? 1.0 : 0.85),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (isPrimary) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF97316),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'PRI',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      account.email,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.40),
+                        fontSize: 12,
                       ),
-                    ],
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  account.email,
-                  style: TextStyle(color: Colors.white.withOpacity(isPrimary ? 0.70 : 0.40), fontSize: 12),
-                  overflow: TextOverflow.ellipsis,
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.redAccent.withOpacity(0.7),
+                  size: 20,
                 ),
-              ],
-            ),
+                onPressed: () {
+                  context.read<StorageAccountsBloc>().add(RemoveStorageAccounts([account.id]));
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
           ),
-          IconButton(
-            icon: Icon(
-              isPrimary ? Icons.star_rounded : Icons.star_border_rounded,
-              color: isPrimary ? const Color(0xFFF97316) : Colors.white.withOpacity(0.30),
-              size: 20,
-            ),
-            onPressed: () {
-              context.read<StorageAccountsBloc>().add(TogglePrimaryAccount(account.id));
+          const SizedBox(height: 12),
+          const Divider(color: Colors.white10, height: 1),
+          const SizedBox(height: 12),
+          // Feature Toggles
+          _FeatureToggleRow(
+            label: 'Archive Storage',
+            description: 'Backup gear and rolls to this account.',
+            value: account.isArchive,
+            onChanged: (val) {
+              context.read<StorageAccountsBloc>().add(
+                    UpdateStorageAccountFlags(accountId: account.id, isArchive: val),
+                  );
             },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
+          if (isGDrive) ...[
+            const SizedBox(height: 8),
+            _FeatureToggleRow(
+              label: 'Lab Scan Sync',
+              description: 'Auto-sync film scans via Drive URLs.',
+              value: account.isScanSync,
+              onChanged: (val) {
+                context.read<StorageAccountsBloc>().add(
+                      UpdateStorageAccountFlags(accountId: account.id, isScanSync: val),
+                    );
+              },
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _FeatureToggleRow extends StatelessWidget {
+  final String label;
+  final String description;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _FeatureToggleRow({
+    required this.label,
+    required this.description,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              Text(
+                description,
+                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        Transform.scale(
+          scale: 0.8,
+          child: Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: const Color(0xFFF97316),
+            activeTrackColor: const Color(0xFFF97316).withOpacity(0.2),
+          ),
+        ),
+      ],
     );
   }
 }

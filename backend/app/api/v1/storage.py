@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
-from typing import List
+from typing import List, Optional
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 import uuid
 from pydantic import BaseModel
@@ -9,11 +10,12 @@ import zipfile
 import hashlib
 import os
 import re
+import json
 
 import requests
 
 from ...db.models.user import User
-from ...db.models.roll import Roll
+from ...db.models.roll import Roll, RollStatusEnum
 from ...db.models.image import Image
 from ...db.session import get_db
 from ...db.schemas.image import ImageOut
@@ -23,13 +25,15 @@ from ...services.storage_service import storage_service
 from ...db.schemas.storage import StorageProviderMetadata
 from ...db.models.storage_credential import StorageCredential, StorageProviderEnum
 from ...db.schemas.storage_credential import StorageCredentialOut
-from ...core.encryption import decrypt_credential
+from ...core.encryption import decrypt_credential, encrypt_credential
 from ...core.config import settings
 from ...services.google_drive_service import (
     extract_drive_folder_id,
     list_folder_leaf_files,
-    tokens_to_credentials,
+    refresh_google_credentials,
     download_file_bytes,
+    is_gdrive_oauth_configured,
+    has_stored_refresh_token,
 )
 from google.auth.exceptions import RefreshError
 from googleapiclient.errors import HttpError
@@ -99,6 +103,19 @@ async def upload_roll_images(
             detail="Not authorized to upload to this roll"
         )
     
+    # Check total storage limit
+    total_new_size = 0
+    for file in files:
+        # We don't know the size yet without reading, 
+        # but we can check the current usage first
+        pass
+
+    if current_user.storage_used_bytes >= current_user.storage_limit_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Storage limit reached. Please upgrade your plan."
+        )
+    
     max_bytes = 15 * 1024 * 1024  # 15 MB per file
     uploaded_images = []
     for file in files:
@@ -116,15 +133,32 @@ async def upload_roll_images(
             chunks.append(chunk)
             chunk = await file.read(1024 * 1024)
         file_content = b"".join(chunks)
+        
+        # Check if this file exceeds the remaining storage
+        if current_user.storage_used_bytes + len(file_content) > current_user.storage_limit_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Uploading {file.filename} would exceed your storage limit. Please upgrade your plan."
+            )
+        
         image_id = str(uuid.uuid4())
         
-        # Upload to Storage
-        key = storage_service.upload_roll_image(
+        # Determine Strategy
+        primary_cred = db.query(StorageCredential).filter(
+            StorageCredential.user_id == current_user.id,
+            StorageCredential.is_primary == True
+        ).first()
+        strategy = "PERSONAL_CLOUD" if primary_cred else "SYSTEM_CLOUD"
+
+        # Upload to Storage via TransferService
+        from ...services.transfer_service import transfer_service
+        key = transfer_service.route_transfer(
+            db=db,
             user_id=current_user.id,
             roll_id=roll_id,
             image_id=image_id,
             file_content=file_content,
-            content_type=file.content_type
+            strategy=strategy
         )
         
         # Save to DB
@@ -137,14 +171,95 @@ async def upload_roll_images(
         )
         db.add(db_image)
         uploaded_images.append(db_image)
+        
+        # Update storage usage
+        current_user.storage_used_bytes += len(file_content)
+        db.add(current_user)
     
     db.commit()
     return uploaded_images
 
-import json
 from ...db.models.storage_credential import StorageCredential, StorageProviderEnum
 from ...db.schemas.storage_credential import StorageCredentialCreate, StorageCredentialOut
-from ...core.encryption import encrypt_credential
+
+def _persist_gdrive_tokens(db: Session, cred: StorageCredential, tokens: dict, refreshed: bool) -> None:
+    """Persist updated OAuth fields after a successful refresh."""
+    if not refreshed:
+        return
+    cred.encrypted_auth_data = encrypt_credential(json.dumps(tokens))
+    db.add(cred)
+    db.commit()
+
+
+def _raise_gdrive_refresh_http_exception(tokens: dict, exc: RefreshError) -> None:
+    """Map google.auth RefreshError to an HTTP response; always raises (never returns)."""
+    logger.warning("GDrive RefreshError: %s", exc)
+    if not is_gdrive_oauth_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Google Drive OAuth is not configured on this server. "
+                "Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend/.env (Web client from Google Cloud Console), "
+                "restart uvicorn, then disconnect and reconnect Google Drive in the app."
+            ),
+        ) from exc
+    msg = str(exc).lower()
+    if "necessary fields" in msg or "must specify" in msg:
+        if not has_stored_refresh_token(tokens):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "This Google Drive connection has no refresh token. "
+                    "Disconnect and reconnect Google Drive in the app (use Google sign-in with Drive access so the server receives a refresh token)."
+                ),
+            ) from exc
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Google Drive cannot refresh tokens: OAuth client id or secret is missing. "
+                "Ensure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set in backend/.env (same Web OAuth client as the app’s GOOGLE_DRIVE_SERVER_CLIENT_ID), "
+                "restart the server, then reconnect Google Drive."
+            ),
+        ) from exc
+    raise HTTPException(
+        status_code=400,
+        detail="Google Drive access has expired. Please disconnect and reconnect Google Drive in storage settings.",
+    ) from exc
+
+
+def _list_leaf_files_with_drive_retry(
+    db: Session,
+    cred: StorageCredential,
+    tokens: dict,
+    folder_id: str,
+):
+    """
+    Refresh OAuth tokens, list Drive folder contents, and on RefreshError retry once with
+    a forced token refresh (handles 'valid' cached access tokens that Google rejects).
+
+    Returns (leaf_files, credentials) for callers that need the same credentials for downloads.
+    """
+    try:
+        credentials, refreshed = refresh_google_credentials(tokens)
+        _persist_gdrive_tokens(db, cred, tokens, refreshed)
+    except RefreshError as e:
+        logger.warning("GDrive token refresh failed, retrying with force: %s", e)
+        if not has_stored_refresh_token(tokens):
+            _raise_gdrive_refresh_http_exception(tokens, e)
+        credentials, refreshed = refresh_google_credentials(tokens, force=True)
+        _persist_gdrive_tokens(db, cred, tokens, refreshed)
+    try:
+        files = list_folder_leaf_files(credentials, folder_id)
+        return files, credentials
+    except RefreshError as e:
+        logger.warning("GDrive list_folder_leaf_files failed, retrying with forced refresh: %s", e)
+        if not has_stored_refresh_token(tokens):
+            _raise_gdrive_refresh_http_exception(tokens, e)
+        credentials, refreshed = refresh_google_credentials(tokens, force=True)
+        _persist_gdrive_tokens(db, cred, tokens, refreshed)
+        files = list_folder_leaf_files(credentials, folder_id)
+        return files, credentials
+
 
 @router.post("/connect", response_model=StorageCredentialOut)
 def connect_storage(
@@ -154,25 +269,51 @@ def connect_storage(
 ):
     auth_data_to_store = data.auth_data
     if data.provider == StorageProviderEnum.gdrive:
+        if not is_gdrive_oauth_configured():
+            raise HTTPException(
+                status_code=503,
+                detail="Google Drive OAuth is not configured on this server. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend/.env.",
+            )
         try:
             from ...services.google_drive_service import exchange_server_auth_code, DRIVE_SCOPES
             payload = json.loads(data.auth_data)
-
             # Preferred: mobile sends a one-time server_auth_code; exchange it for
             # a full token dict that includes refresh_token, token_uri, client_id, etc.
             if payload.get("server_auth_code"):
+                logger.info(f"[GDrive] Received server_auth_code for user {current_user.id}")
                 tokens = exchange_server_auth_code(payload["server_auth_code"])
             else:
                 # Fallback: mobile sends a token response directly. Normalise it so
                 # that all required fields are present for silent refresh.
+                logger.warning(f"[GDrive] No server_auth_code; using direct access_token for user {current_user.id}")
                 tokens = {
                     "access_token": payload.get("access_token"),
                     "refresh_token": payload.get("refresh_token"),
                     "token_uri": payload.get("token_uri") or "https://oauth2.googleapis.com/token",
-                    "client_id": payload.get("client_id") or settings.GOOGLE_CLIENT_ID,
-                    "client_secret": payload.get("client_secret") or settings.GOOGLE_CLIENT_SECRET,
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
                     "scopes": payload.get("scopes") or DRIVE_SCOPES,
                 }
+                exp_in = payload.get("expires_in")
+                if exp_in is not None:
+                    exp_naive = (
+                        datetime.now(timezone.utc) + timedelta(seconds=int(exp_in))
+                    ).replace(tzinfo=None)
+                    tokens["expiry"] = exp_naive.isoformat()
+                elif isinstance(payload.get("expiry"), str) and payload.get("expiry"):
+                    tokens["expiry"] = payload["expiry"]
+
+            # Validate that we have a refresh_token for Google Drive.
+            # Background sync will fail after 1hr without it.
+            if not tokens.get("refresh_token"):
+                logger.error(
+                    f"[GDrive] Missing refresh_token for user {current_user.id}. "
+                    f"Keys present in tokens: {list(tokens.keys())}"
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail="Missing GDrive refresh token. Please revoke 'Halide' from your Google Security settings and try again.",
+                )
 
             auth_data_to_store = json.dumps(tokens)
             print(
@@ -196,6 +337,7 @@ def connect_storage(
         username=data.username,
         encrypted_auth_data=encrypted_data,
         is_archive=data.is_archive,
+        is_scan_sync=data.is_scan_sync,
         display_label=data.display_label,
         is_primary=data.is_primary,
     )
@@ -230,6 +372,52 @@ def delete_connection(
     return None
 
 
+class StorageCredentialUpdate(BaseModel):
+    is_archive: Optional[bool] = None
+    is_scan_sync: Optional[bool] = None
+    is_primary: Optional[bool] = None
+    display_label: Optional[str] = None
+
+
+@router.patch("/connections/{connection_id}", response_model=StorageCredentialOut)
+def patch_connection(
+    connection_id: str,
+    data: StorageCredentialUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    cred = (
+        db.query(StorageCredential)
+        .filter(StorageCredential.id == connection_id, StorageCredential.user_id == current_user.id)
+        .first()
+    )
+    if not cred:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found")
+
+    if data.is_archive is not None:
+        cred.is_archive = data.is_archive
+    if data.is_scan_sync is not None:
+        cred.is_scan_sync = data.is_scan_sync
+    
+    if data.is_primary is True:
+        # Unset others for this user to avoid unique constraint violation
+        db.query(StorageCredential).filter(
+            StorageCredential.user_id == current_user.id,
+            StorageCredential.id != cred.id
+        ).update({"is_primary": False})
+        cred.is_primary = True
+    elif data.is_primary is False:
+        cred.is_primary = False
+        
+    if data.display_label is not None:
+        cred.display_label = data.display_label
+
+    db.add(cred)
+    db.commit()
+    db.refresh(cred)
+    return cred
+
+
 class GDriveListLeafFilesRequest(BaseModel):
     folder_url_or_id: str
 
@@ -240,10 +428,13 @@ def list_gdrive_leaf_files(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Given a shared lab folder URL (or a raw folder id), return all leaf files
-    inside it, recursively traversing sub-folders.
-    """
+    # Premium sync: requires Plus or Pro tier.
+    if current_user.subscription_tier not in ["plus", "pro"]:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Google Drive sync is a premium feature. Please upgrade to the Plus or Pro plan."
+        )
+
     # Pick the primary gdrive connection if available, else first connection.
     cred = (
         db.query(StorageCredential)
@@ -257,6 +448,12 @@ def list_gdrive_leaf_files(
     if not cred:
         raise HTTPException(status_code=400, detail="Google Drive is not connected for this user")
 
+    if not is_gdrive_oauth_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Google Drive OAuth is not configured on this server (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in backend/.env).",
+        )
+
     tokens_json = decrypt_credential(cred.encrypted_auth_data)
     if not tokens_json:
         raise HTTPException(status_code=400, detail="Failed to decrypt Google Drive credentials")
@@ -268,30 +465,28 @@ def list_gdrive_leaf_files(
 
     # Debug: confirm we have the expected scopes / credential shape.
     # Use print so it always shows in uvicorn logs during development.
-    print(
-        f"[GDrive] list_leaf_files: scopes={tokens.get('scopes')} has_refresh={bool(tokens.get('refresh_token'))}"
+    logger.debug(
+        "[GDrive] list_leaf_files: scopes=%s has_refresh=%s",
+        tokens.get("scopes"),
+        bool(tokens.get("refresh_token")),
     )
-
-    credentials = tokens_to_credentials(tokens)
 
     try:
         folder_id = extract_drive_folder_id(payload.folder_url_or_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    print(f"[GDrive] list_leaf_files: folder_id={folder_id}")
+    logger.debug("[GDrive] list_leaf_files: folder_id=%s", folder_id)
 
     try:
-        files = list_folder_leaf_files(credentials, folder_id)
-    except RefreshError:
-        # Drive connection was created with an access_token-only payload and can no
-        # longer be refreshed. Surface a clear 400 so the client can ask the user
-        # to reconnect Google Drive.
-        raise HTTPException(
-            status_code=400,
-            detail="Google Drive access has expired. Please disconnect and reconnect Google Drive in storage settings.",
-        )
+        files, _ = _list_leaf_files_with_drive_retry(db, cred, tokens, folder_id)
+    except RefreshError as e:
+        _raise_gdrive_refresh_http_exception(tokens, e)
 
-    print(f"[GDrive] list_leaf_files: returned={len(files)} first={(files[:3]) if files else None}")
+    logger.debug(
+        "[GDrive] list_leaf_files: returned=%s first=%s",
+        len(files),
+        (files[:3]) if files else None,
+    )
     return files
 
 
@@ -334,6 +529,12 @@ def sync_gdrive_leaf_files(
     if not cred:
         raise HTTPException(status_code=400, detail="Google Drive is not connected for this user")
 
+    if not is_gdrive_oauth_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Google Drive OAuth is not configured on this server (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in backend/.env).",
+        )
+
     tokens_json = decrypt_credential(cred.encrypted_auth_data)
     if not tokens_json:
         raise HTTPException(status_code=400, detail="Failed to decrypt Google Drive credentials")
@@ -343,20 +544,15 @@ def sync_gdrive_leaf_files(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid Google Drive credentials payload")
 
-    credentials = tokens_to_credentials(tokens)
-
     try:
         folder_id = extract_drive_folder_id(payload.folder_url_or_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     try:
-        files = list_folder_leaf_files(credentials, folder_id)
-    except RefreshError:
-        raise HTTPException(
-            status_code=400,
-            detail="Google Drive access has expired. Please disconnect and reconnect Google Drive in storage settings.",
-        )
+        files, credentials = _list_leaf_files_with_drive_retry(db, cred, tokens, folder_id)
+    except RefreshError as e:
+        _raise_gdrive_refresh_http_exception(tokens, e)
 
     synced_count = 0
     skipped_existing = 0
@@ -420,6 +616,9 @@ def sync_gdrive_leaf_files(
         db.add(db_image)
         synced_count += 1
 
+    # Mark roll as scanned once sync completes successfully.
+    roll.status = RollStatusEnum.scanned
+    db.add(roll)
     db.commit()
 
     return {
@@ -534,6 +733,13 @@ def sync_gdrive_zip_images(
     if not roll:
         raise HTTPException(status_code=404, detail="Roll not found")
 
+    # Plus tier or higher required for GDrive sync features
+    if current_user.subscription_tier not in ["plus", "pro"]:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Google Drive sync requires Plus or Pro subscription",
+        )
+
     zip_id = extract_drive_folder_id(payload.zip_url_or_id)
 
     # Optional: use connected OAuth credentials when available (more reliable than public download).
@@ -554,15 +760,18 @@ def sync_gdrive_zip_images(
         if not tokens_json:
             raise HTTPException(status_code=400, detail="Failed to decrypt Google Drive credentials")
         tokens = json.loads(tokens_json)
-        credentials = tokens_to_credentials(tokens)
         try:
+            credentials, refreshed = refresh_google_credentials(tokens)
+            _persist_gdrive_tokens(db, cred, tokens, refreshed)
             zip_bytes, _mime = download_file_bytes(credentials, zip_id)
             used_auth = True
-        except RefreshError:
+        except RefreshError as e:
+            if not is_gdrive_oauth_configured():
+                _raise_gdrive_refresh_http_exception(tokens, e)
             # Token cannot be refreshed (e.g., access-token-only payload or missing
             # client_id/client_secret). Fall back to public ZIP download if allowed.
-            logger.exception(
-                "GDrive ZIP download auth failed (refresh not possible) for zip_id=%s; falling back to public download",
+            logger.warning(
+                "GDrive ZIP download auth failed (expired/no refresh token) for zip_id=%s; falling back to public download",
                 zip_id,
             )
             used_auth = False
@@ -570,10 +779,11 @@ def sync_gdrive_zip_images(
                 zip_bytes = _download_drive_zip_public(zip_id)
             except HTTPException:
                 raise
-            except Exception:
+            except Exception as e:
+                logger.error(f"Public fallback failed for zip_id={zip_id}: {e}")
                 raise HTTPException(
                     status_code=400,
-                    detail="Google Drive OAuth credentials are not refreshable and ZIP download failed.",
+                    detail="Google Drive credentials expired (cannot refresh) and public download failed. Please try reconnecting Google Drive or ensure the file is publicly accessible.",
                 )
         except HttpError as e:
             logger.exception("Failed to download Drive ZIP file %s: %s", zip_id, e)
@@ -609,23 +819,6 @@ def sync_gdrive_zip_images(
             total_candidates = len(image_entries)
 
             for idx, info in enumerate(image_entries):
-                # Make the R2 object key deterministic so re-syncing doesn't duplicate.
-                crc_part = str(getattr(info, "CRC", ""))
-                stable_material = f"{zip_id}:{info.filename}:{crc_part}".encode("utf-8")
-                image_id = hashlib.sha1(stable_material).hexdigest()
-
-                base_key = f"users/{current_user.id}/rolls/{roll.id}/{image_id}"
-                full_key = f"{base_key}.jpg"
-
-                existing = (
-                    db.query(Image)
-                    .filter(Image.roll_id == roll.id, Image.image_url == full_key)
-                    .first()
-                )
-                if existing:
-                    skipped_existing += 1
-                    continue
-
                 try:
                     with zf.open(info) as member_fp:
                         file_content = member_fp.read()
@@ -650,6 +843,23 @@ def sync_gdrive_zip_images(
                         # If Pillow isn't installed, skip non-JPEG entries to avoid corrupting *.jpg objects.
                         continue
 
+                # Deterministic key: hash the final bytes we will store.
+                # This avoids duplicate ingestion when Drive ZIP downloads differ
+                # in metadata (e.g. ZipEntry CRC) between sync runs.
+                image_id = hashlib.sha1(file_content).hexdigest()
+
+                base_key = f"users/{current_user.id}/rolls/{roll.id}/{image_id}"
+                full_key = f"{base_key}.jpg"
+
+                existing = (
+                    db.query(Image)
+                    .filter(Image.roll_id == roll.id, Image.image_url == full_key)
+                    .first()
+                )
+                if existing:
+                    skipped_existing += 1
+                    continue
+
                 storage_service.upload_roll_image(
                     user_id=str(current_user.id),
                     roll_id=str(roll.id),
@@ -666,6 +876,9 @@ def sync_gdrive_zip_images(
                 db.add(db_image)
                 synced_count += 1
 
+            # Mark roll as scanned once sync completes successfully.
+            roll.status = RollStatusEnum.scanned
+            db.add(roll)
             db.commit()
 
             return {
@@ -709,18 +922,27 @@ def sync_images_from_url(
 
     For raw IDs (no /folders/ or /file/d/), the route is ambiguous -> 400.
     """
+    # Premium sync: requires Plus or Pro tier.
+    if current_user.subscription_tier not in ["plus", "pro"]:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Google Drive sync is a premium feature. Please upgrade to the Plus or Pro plan."
+        )
+
     raw = (payload.gdrive_url_or_id or "").strip()
     if not raw:
         raise HTTPException(status_code=400, detail="gdrive_url_or_id is required")
 
-    if "/folders/" in raw:
+    raw_lower = raw.lower()
+    if "/folders/" in raw_lower:
         return sync_gdrive_leaf_files(
             payload=GDriveSyncRequest(roll_id=payload.roll_id, folder_url_or_id=raw),
             current_user=current_user,
             db=db,
         )
 
-    if "/file/d/" in raw:
+    # Route to ZIP sync if it looks like a file link, direct download, or has .zip extension
+    if "/file/d/" in raw_lower or "export=download" in raw_lower or raw_lower.endswith(".zip"):
         return sync_gdrive_zip_images(
             payload=GDriveZipSyncRequest(roll_id=payload.roll_id, zip_url_or_id=raw),
             current_user=current_user,
