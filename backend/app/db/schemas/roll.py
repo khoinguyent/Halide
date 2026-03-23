@@ -6,7 +6,7 @@ from ..models.roll import RollStatusEnum
 
 class RollBase(BaseModel):
     film_stock_id: UUID
-    user_camera_id: UUID
+    user_camera_id: Optional[UUID] = None
     shot_at_iso: Optional[int] = None
     expired_year: Optional[int] = None
     max_frames: Optional[int] = 36
@@ -33,6 +33,11 @@ class RollMetaUpdate(BaseModel):
     description: Optional[str] = None
 
 
+class RollDriveUrlUpdate(BaseModel):
+    # Store a Google Drive shared URL (folder or ZIP) to sync scans later.
+    drive_url: Optional[str] = None
+
+
 # Dashboard/list view: frontend-friendly shape with joined film, camera, lens, image_urls
 class RollOutDashboard(BaseModel):
     id: str
@@ -41,6 +46,7 @@ class RollOutDashboard(BaseModel):
     color: str  # hex e.g. #FFCC33
     status: str
     image_urls: List[str] = []
+    drive_url: Optional[str] = None
     nickname: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None

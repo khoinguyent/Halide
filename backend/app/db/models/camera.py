@@ -63,3 +63,4 @@ class UserLens(Base):
 
     # Relationships
     parent_camera = relationship("UserCamera", back_populates="lenses")
+    lens = relationship("Lens", foreign_keys=[lens_id])

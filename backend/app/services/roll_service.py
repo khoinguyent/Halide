@@ -5,7 +5,7 @@ from ..db.models.roll import Roll, RollStatusEnum
 from ..db.models.film_stock import FilmStock
 from ..db.models.camera import UserCamera, Camera, UserLens, Lens
 from ..db.models.image import Image
-from ..db.schemas.roll import RollCreate, RollOutDashboard, RollMetaUpdate
+from ..db.schemas.roll import RollCreate, RollOutDashboard, RollMetaUpdate, RollDriveUrlUpdate
 from ..core.config import settings
 
 # Simple hex colors per brand for dashboard cards
@@ -75,11 +75,15 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
     # Avoid naive `replace("//","/")` because it breaks the `https://` scheme.
     # Only render images stored via our storage uploader:
     # keys look like `users/<uid>/rolls/<roll_id>/<image_id>.jpg`.
-    image_urls = [
-        f"{url_base}/{k}".rstrip("/")
-        for k in keys
-        if isinstance(k, str) and k.startswith("users/")
-    ]
+    image_urls = []
+    for k in keys:
+        if not isinstance(k, str):
+            continue
+        if k.startswith("users/"):
+            image_urls.append(f"{url_base}/{k}".rstrip("/"))
+        elif k.startswith("/"):
+            # Local path reference for free tier
+            image_urls.append(k)
     total_frames = (r.max_frames if r.max_frames is not None else 36)
     actual_frames = len(image_urls)
     return RollOutDashboard(
@@ -89,6 +93,7 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         color=color,
         status=r.status.value,
         image_urls=image_urls,
+        drive_url=getattr(r, "drive_url", None),
         title=r.title,
         description=r.description,
         # Keep existing frontend contract: use title as the "nickname" shown on cards.
@@ -180,3 +185,40 @@ def update_roll_meta(db: Session, roll_id: str, meta: RollMetaUpdate, user_id: s
     db.commit()
     db.refresh(db_roll)
     return _build_roll_dashboard(db_roll, db)
+
+
+def update_roll_drive_url(db: Session, roll_id: str, drive_url_update: RollDriveUrlUpdate, user_id: str):
+    db_roll = get_roll(db, roll_id, user_id)
+    if not db_roll:
+        raise HTTPException(status_code=404, detail="Roll not found")
+
+    raw = (drive_url_update.drive_url or "").strip()
+    db_roll.drive_url = raw if raw else None
+
+    db.add(db_roll)
+    db.commit()
+    db.refresh(db_roll)
+    return _build_roll_dashboard(db_roll, db)
+
+
+def add_local_images(db: Session, roll_id: str, local_paths: list[str], user_id: str):
+    db_roll = get_roll(db, roll_id, user_id)
+    if not db_roll:
+        raise HTTPException(status_code=404, detail="Roll not found")
+
+    # Get current max frame number
+    max_frame = db.query(func.max(Image.frame_number)).filter(Image.roll_id == str(roll_id)).scalar()
+    start_frame = (max_frame + 1) if max_frame is not None else 0
+
+    new_images = []
+    for i, path in enumerate(local_paths):
+        db_image = Image(
+            roll_id=str(roll_id),
+            image_url=path,
+            frame_number=start_frame + i
+        )
+        db.add(db_image)
+        new_images.append(db_image)
+
+    db.commit()
+    return new_images

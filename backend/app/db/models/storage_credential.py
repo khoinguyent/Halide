@@ -10,6 +10,7 @@ class StorageProviderEnum(str, enum.Enum):
     nas = 'nas'
     ftp = 'ftp'
     smb = 'smb'
+    system = 'system'
 
 class StorageCredential(Base):
     __tablename__ = "storage_credentials"
@@ -32,6 +33,9 @@ class StorageCredential(Base):
     
     # Flag to designate this storage as the archive destination
     is_archive = Column(Boolean, default=False, server_default=text('FALSE'))
+    
+    # Flag to designate this storage as a source for lab scans sync
+    is_scan_sync = Column(Boolean, default=False, server_default=text('FALSE'))
     
     created_at = Column(DateTime, server_default=text('NOW()'))
     updated_at = Column(DateTime, server_default=text('NOW()'), onupdate=text('NOW()'))

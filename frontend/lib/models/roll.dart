@@ -15,6 +15,7 @@ class Roll {
   final int? expiredYear;
   final RollStatus status;
   final List<String> imageUrls;
+  final String? driveUrl;
   final String? nickname;
   final String? cameraName;
   final String? lensName;
@@ -36,6 +37,7 @@ class Roll {
     this.expiredYear,
     this.status = RollStatus.shooting,
     this.imageUrls = const [],
+    this.driveUrl,
     this.nickname,
     this.cameraName,
     this.lensName,
@@ -47,6 +49,7 @@ class Roll {
   Roll copyWith({
     RollStatus? status,
     List<String>? imageUrls,
+    String? driveUrl,
     String? nickname,
     String? cameraName,
     String? lensName,
@@ -67,6 +70,7 @@ class Roll {
       color: color,
       status: status ?? this.status,
       imageUrls: imageUrls ?? this.imageUrls,
+      driveUrl: driveUrl ?? this.driveUrl,
       nickname: nickname ?? this.nickname,
       cameraName: cameraName ?? this.cameraName,
       lensName: lensName ?? this.lensName,
@@ -95,6 +99,7 @@ class Roll {
       expiredYear: json['expired_year'],
       status: statusFromString(json['status'] ?? 'shooting'),
       imageUrls: List<String>.from(json['image_urls'] ?? []),
+      driveUrl: (json['drive_url'] ?? json['driveUrl'])?.toString(),
       nickname: json['nickname'],
       cameraName: json['camera_name'],
       lensName: json['lens_name'],

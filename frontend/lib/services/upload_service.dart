@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../config/app_config.dart';
 
 class UploadService {
@@ -10,6 +11,13 @@ class UploadService {
     required File imageFile,
   }) async {
     try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      final token = await firebaseUser?.getIdToken();
+      if (token == null || token.isEmpty) {
+        print('[UploadService] Missing Firebase ID token; cannot upload.');
+        return false;
+      }
+
       const maxBytes = 15 * 1024 * 1024; // 15 MB
       final length = await imageFile.length();
       if (length > maxBytes) {
@@ -20,14 +28,16 @@ class UploadService {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${AppConfig.apiUrl}/upload_roll_image/$rollId'),
+        // Backend endpoint expects multipart form field name `files`.
+        Uri.parse('${AppConfig.apiUrl}/rolls/$rollId/images'),
       );
+      request.headers['Authorization'] = 'Bearer $token';
 
       // Add image file
       final stream = http.ByteStream(imageFile.openRead());
       
       final multipartFile = http.MultipartFile(
-        'file',
+        'files',
         stream,
         length,
         filename: imageFile.path.split('/').last,

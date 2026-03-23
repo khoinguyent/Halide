@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
 import '../core/widgets/glass_panel.dart';
 import '../models/roll.dart';
 import '../models/roll_status.dart';
 import '../models/film_stock.dart';
 import '../models/camera.dart';
+import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/roll_provider.dart';
 import '../providers/rolls_provider.dart';
@@ -17,6 +19,10 @@ import '../widgets/status_selector.dart';
 import '../widgets/image_uploader_widget.dart';
 import '../widgets/full_screen_viewer.dart';
 import '../services/api_service.dart';
+import '../services/upload_service.dart';
+import '../core/widgets/image_placeholder.dart';
+import '../services/local_sync_service.dart';
+import '../widgets/synced_image.dart';
 
 class RollDetailView extends ConsumerStatefulWidget {
   final String rollId;
@@ -69,11 +75,19 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
           ),
         ),
       ),
-      data: (roll) => _RollDetailBody(
-        rollId: widget.rollId,
-        roll: roll,
-        onRefresh: () => ref.refresh(rollDetailProvider(widget.rollId)),
-      ),
+      data: (roll) {
+        // Plus/Pro users: ensure local sync in the background
+        final plan = ref.read(userPlanProvider);
+        if (plan != UserPlan.free && roll.imageUrls.isNotEmpty) {
+           LocalSyncService().syncRoll(widget.rollId, roll.imageUrls);
+        }
+        
+        return _RollDetailBody(
+          rollId: widget.rollId,
+          roll: roll,
+          onRefresh: () => ref.refresh(rollDetailProvider(widget.rollId)),
+        );
+      },
     );
   }
 }
@@ -142,6 +156,61 @@ class _RollDetailBody extends ConsumerWidget {
       return _buildGalleryGrid(context, roll);
     }
 
+    Future<void> _handleImagesAddition() async {
+      final picker = ImagePicker();
+      final List<XFile> picked = await picker.pickMultiImage();
+      if (picked.isEmpty) return;
+
+      final plan = ref.read(userPlanProvider);
+      final user = ref.read(userProvider);
+      if (user == null) return;
+      final token = await user.getIdToken();
+      if (token == null) return;
+
+      if (plan == UserPlan.free) {
+        // Free tier: add local paths directly
+        final rollService = ref.read(rollServiceProvider);
+        final paths = picked.map((x) => x.path).toList();
+        try {
+          await rollService.addLocalImagesToRoll(token, rollId, paths);
+          ref.invalidate(rollDetailProvider(rollId));
+          onRefresh();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Added local image references (Free Tier).')),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to add references: $e')),
+            );
+          }
+        }
+      } else {
+        // Paid tier: upload to cloud
+        final uploader = UploadService();
+        int successCount = 0;
+        for (final xFile in picked) {
+          final file = File(xFile.path);
+          final ok = await uploader.uploadRollImage(
+            rollId: rollId,
+            imageFile: file,
+          );
+          if (ok) successCount++;
+        }
+        if (successCount > 0) {
+          ref.invalidate(rollDetailProvider(rollId));
+          onRefresh();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Uploaded $successCount image(s).')),
+            );
+          }
+        }
+      }
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -149,14 +218,13 @@ class _RollDetailBody extends ConsumerWidget {
         children: [
           SizedBox(
             height: 260,
-            child: _buildGalleryGrid(context, roll),
-          ),
-          const SizedBox(height: 24),
-          GlassPanel(
-            padding: const EdgeInsets.all(20),
-            child: _LabImportOptions(
-              rollId: rollId,
-              onUploadComplete: onRefresh,
+            child: _buildGalleryGrid(
+              context,
+              roll,
+              emptyStateTopLeft: true,
+              onEmptyStateTap: () {
+                _handleImagesAddition();
+              },
             ),
           ),
         ],
@@ -196,7 +264,13 @@ class _RollDetailBody extends ConsumerWidget {
     );
   }
 
-  Widget _buildGalleryGrid(BuildContext context, Roll roll, {bool shrinkWrap = false}) {
+  Widget _buildGalleryGrid(
+    BuildContext context,
+    Roll roll, {
+    bool shrinkWrap = false,
+    bool emptyStateTopLeft = false,
+    VoidCallback? onEmptyStateTap,
+  }) {
     final images = roll.imageUrls
         .where((u) => u.trim().isNotEmpty)
         // Only render displayable URLs. Backend may return storage keys (e.g. users/.../x.jpg)
@@ -204,28 +278,53 @@ class _RollDetailBody extends ConsumerWidget {
         .where((u) => u.startsWith('http') || u.startsWith('/'))
         .toList(growable: false);
     if (images.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.photo_library_outlined, size: 48, color: Colors.white.withOpacity(0.25)),
-              const SizedBox(height: 14),
-              const Text(
-                'No images yet',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-                textAlign: TextAlign.center,
+      const crossAxisCount = 3;
+      const gridPadding = 12.0;
+      const crossAxisSpacing = 10.0;
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.maxWidth.isFinite ? constraints.maxWidth : 0.0;
+          final cellWidth = (availableWidth - (gridPadding * 2) - ((crossAxisCount - 1) * crossAxisSpacing)) /
+              crossAxisCount;
+          final size = (cellWidth > 0 ? cellWidth : 120.0);
+
+          final square = SizedBox(
+            width: size,
+            height: size,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.18), width: 2),
+                color: Colors.white.withOpacity(0.04),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'When scans are uploaded or synced from the lab, they’ll show up here.',
-                style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13, height: 1.35),
-                textAlign: TextAlign.center,
+              child: const Center(
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 28,
+                  color: Colors.white70,
+                ),
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+
+          final built = onEmptyStateTap == null
+              ? square
+              : GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onEmptyStateTap,
+                  child: square,
+                );
+
+          return emptyStateTopLeft
+              ? Padding(
+                  padding: const EdgeInsets.all(gridPadding),
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: built,
+                  ),
+                )
+              : Center(child: built);
+        },
       );
     }
 
@@ -252,6 +351,7 @@ class _RollDetailBody extends ConsumerWidget {
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => FullScreenViewer(
+                  rollId: roll.id,
                   imageUrls: images,
                   initialIndex: index,
                   iso: roll.shotAtIso,
@@ -263,22 +363,15 @@ class _RollDetailBody extends ConsumerWidget {
             );
           },
           child: Hero(
-            tag: path,
+            // `imageUrls` can contain duplicates. Include the index to keep Hero tags unique.
+            tag: '$index-$path',
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: isNetwork
-                  ? Image.network(
-                      thumbUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        // Fallback: if thumbnail missing, load original image.
-                            // Log the failing URL so we can see whether it's a 403/404.
-                            // ignore: avoid_print
-                            debugPrint('[Gallery] thumb load failed url=$thumbUrl err=$error');
-                        return Image.network(path, fit: BoxFit.cover);
-                      },
-                    )
-                  : (isLocal ? Image.file(File(path), fit: BoxFit.cover) : Container(color: Colors.white10)),
+              child: SyncedImage(
+                rollId: roll.id,
+                imageUrl: path,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
         );
@@ -595,6 +688,9 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
   final TextEditingController _driveUrlController = TextEditingController();
   final ApiService _api = ApiService();
 
+  int _manualUploadResetToken = 0;
+  bool _manualUploadDone = false;
+
   bool _isFetching = false;
   String? _error;
   List<Map<String, dynamic>> _leafFiles = const [];
@@ -742,6 +838,17 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
     }
   }
 
+  void _onManualUploadComplete() {
+    // Ensure the manual uploader goes back to an empty state so the next
+    // upload starts from a clean slate.
+    setState(() {
+      _manualUploadResetToken++;
+      _manualUploadDone = true;
+      _mode = _LabImportMode.manual;
+    });
+    widget.onUploadComplete();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -766,18 +873,21 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
               selected: _mode == _LabImportMode.manual,
               onSelected: (_) => setState(() => _mode = _LabImportMode.manual),
             ),
-            ChoiceChip(
-              label: const Text('Drive URL (Pro)'),
-              selected: _mode == _LabImportMode.drive,
-              onSelected: (_) => setState(() => _mode = _LabImportMode.drive),
-            ),
+            if (!_manualUploadDone) ...[
+              ChoiceChip(
+                label: const Text('Drive URL (Plus)'),
+                selected: _mode == _LabImportMode.drive,
+                onSelected: (_) => setState(() => _mode = _LabImportMode.drive),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 18),
         if (_mode == _LabImportMode.manual)
           ImageUploaderWidget(
+            key: ValueKey('manual-uploader-$_manualUploadResetToken'),
             rollId: widget.rollId,
-            onUploadComplete: widget.onUploadComplete,
+            onUploadComplete: _onManualUploadComplete,
             darkMode: true,
             readOnly: false,
           )

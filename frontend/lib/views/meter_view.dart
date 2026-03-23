@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
+import 'package:go_router/go_router.dart';
 import '../features/meter/providers/meter_provider.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
+import '../models/user_profile.dart';
+import '../providers/auth_provider.dart';
 
 class MeterView extends ConsumerStatefulWidget {
   const MeterView({Key? key}) : super(key: key);
@@ -402,6 +405,8 @@ class _MeterViewState extends ConsumerState<MeterView> {
   @override
   Widget build(BuildContext context) {
     final meterState = ref.watch(meterProvider);
+    final plan = ref.watch(userPlanProvider);
+    final isFree = plan == UserPlan.free;
 
     return HalideScaffold(
       appBar: AppBar(
@@ -419,7 +424,7 @@ class _MeterViewState extends ConsumerState<MeterView> {
       ),
       child: Stack(
         children: [
-          // Camera Viewfinder
+          // Camera Viewfinder (Background)
           if (_isCameraInitialized)
             Positioned.fill(
               child: AspectRatio(
@@ -430,79 +435,125 @@ class _MeterViewState extends ConsumerState<MeterView> {
           else
             const Center(child: CircularProgressIndicator()),
 
-          // Spot Metering Target
-          Center(
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: meterState.isLocked ? Colors.orangeAccent : Colors.white54,
-                  width: 1,
+          if (isFree)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.8),
+                child: Center(
+                  child: GlassPanel(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.lock_person_rounded, size: 64, color: Colors.orangeAccent),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'PRO FEATURE',
+                          style: TextStyle(
+                            color: Colors.orangeAccent,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Precision Light Metering is reserved for Plus and Pro members.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white, fontSize: 16),
+                        ),
+                        const SizedBox(height: 32),
+                        ElevatedButton(
+                          onPressed: () => context.push('/paywall'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orangeAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                            shape: const StadiumBorder(),
+                          ),
+                          child: const Text('UPGRADE NOW', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                shape: BoxShape.circle,
               ),
-              child: Center(
-                child: Container(
-                  width: 4,
-                  height: 4,
-                  decoration: const BoxDecoration(
-                    color: Colors.white54,
-                    shape: BoxShape.circle,
+            )
+          else ...[
+            // Spot Metering Target
+            Center(
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: meterState.isLocked ? Colors.orangeAccent : Colors.white54,
+                    width: 1,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 4,
+                    height: 4,
+                    decoration: const BoxDecoration(
+                      color: Colors.white54,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
-          // Bottom Overlay
-          Positioned(
-            bottom: 40,
-            left: 20,
-            right: 20,
-            child: GlassPanel(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _infoColumn('LUX', meterState.lux.toStringAsFixed(0)),
-                        _infoColumn('EV', meterState.ev.toStringAsFixed(1), onTap: _showEvPicker),
-                        _infoColumn('ISO', meterState.iso.toStringAsFixed(0), onTap: _showIsoPicker),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _valueColumn('f/', meterState.aperture.toStringAsFixed(1), onTap: _showAperturePicker),
-                        _valueColumn('SS', _formatShutterSpeed(meterState.shutterSpeed), onTap: _showShutterPicker),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _handleLockToggle,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: meterState.isLocked ? Colors.orangeAccent : Colors.white10,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
+            // Bottom Overlay
+            Positioned(
+              bottom: 40,
+              left: 20,
+              right: 20,
+              child: GlassPanel(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _infoColumn('LUX', meterState.lux.toStringAsFixed(0)),
+                          _infoColumn('EV', meterState.ev.toStringAsFixed(1), onTap: _showEvPicker),
+                          _infoColumn('ISO', meterState.iso.toStringAsFixed(0), onTap: _showIsoPicker),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _valueColumn('f/', meterState.aperture.toStringAsFixed(1), onTap: _showAperturePicker),
+                          _valueColumn('SS', _formatShutterSpeed(meterState.shutterSpeed), onTap: _showShutterPicker),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _handleLockToggle,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: meterState.isLocked ? Colors.orangeAccent : Colors.white10,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: Text(
+                          meterState.isLocked ? 'UNLOCK' : 'LOCK EXPOSURE',
+                          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
                         ),
                       ),
-                      child: Text(
-                        meterState.isLocked ? 'UNLOCK' : 'LOCK EXPOSURE',
-                        style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

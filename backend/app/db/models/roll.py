@@ -23,4 +23,6 @@ class Roll(Base):
     status = Column(Enum(RollStatusEnum), server_default='shooting')
     title = Column(String(255), nullable=True)
     description = Column(String(), nullable=True)
+    # Google Drive shared Drive folder URL (or file ZIP URL/id) used for syncing scans.
+    drive_url = Column(String(), nullable=True)
     created_at = Column(DateTime, server_default=text('NOW()'))

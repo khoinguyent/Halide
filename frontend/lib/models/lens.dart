@@ -41,16 +41,17 @@ class Lens {
   }
 
   factory Lens.fromJson(Map<String, dynamic> json) {
+    final master = json['lens'] as Map<String, dynamic>?;
     return Lens(
-      id: json['id'] ?? '',
-      nickname: json['nickname'] ?? '',
-      brand: json['brand'] ?? '',
-      model: json['model'] ?? '',
+      id: json['id']?.toString() ?? '',
+      nickname: json['gear_nickname'] ?? json['nickname'] ?? '',
+      brand: json['brand'] ?? master?['brand'] ?? '',
+      model: json['model'] ?? master?['model'] ?? '',
       serialNumber: json['serial_number'],
-      focalLength: json['focal_length'],
-      maxAperture: json['max_aperture'],
+      focalLength: json['focal_length'] ?? master?['focal_length'],
+      maxAperture: json['max_aperture'] ?? master?['max_aperture'],
       status: gearStatusFromString(json['status'] ?? 'active'),
-      imageUrls: List<String>.from(json['image_urls'] ?? []),
+      imageUrls: List<String>.from(json['image_urls'] ?? master?['image_urls'] ?? []),
     );
   }
 

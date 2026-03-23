@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from ...core import security
 from ...core.dependencies import get_current_user
 from ...db.models.user import User
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/register", response_model=UserOut)
@@ -37,4 +39,5 @@ def read_user_me(current_user: User = Depends(get_current_user)):
     Returns the current authenticated user profile.
     Creation is handled in get_current_user dependency.
     """
+    logger.info("FETCH /me: user_id=%s, subscription_tier=%s", current_user.id, current_user.subscription_tier)
     return current_user

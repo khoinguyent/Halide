@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+from pydantic import BaseModel
 from ...db.session import get_db
-from ...db.schemas.roll import RollCreate, RollOut, RollOutDashboard, RollStatusUpdate, RollMetaUpdate
+from ...db.schemas.roll import RollCreate, RollOut, RollOutDashboard, RollStatusUpdate, RollMetaUpdate, RollDriveUrlUpdate
+from ...db.schemas.image import ImageOut
 from ...db.models.user import User
 from uuid import UUID
 from ...core.dependencies import get_current_user
@@ -57,4 +59,38 @@ def update_roll_meta(
     current_user: User = Depends(get_current_user),
 ):
     return roll_service.update_roll_meta(db=db, roll_id=str(id), meta=meta_update, user_id=current_user.id)
+
+
+@router.patch("/rolls/{id}/drive-url", response_model=RollOutDashboard)
+def update_roll_drive_url(
+    id: UUID,
+    drive_url_update: RollDriveUrlUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return roll_service.update_roll_drive_url(
+        db=db,
+        roll_id=str(id),
+        drive_url_update=drive_url_update,
+        user_id=current_user.id,
+    )
+
+
+class LocalImagesRequest(BaseModel):
+    local_paths: List[str]
+
+
+@router.post("/rolls/{id}/local-images", response_model=List[ImageOut])
+def add_local_images(
+    id: UUID,
+    request: LocalImagesRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return roll_service.add_local_images(
+        db=db,
+        roll_id=str(id),
+        local_paths=request.local_paths,
+        user_id=current_user.id
+    )
 

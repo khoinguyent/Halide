@@ -5,9 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/widgets/glass_panel.dart';
 import '../models/camera.dart';
+import '../models/lens.dart';
 import '../models/gear_status.dart';
+import '../models/user_profile.dart';
 import '../providers/gear_provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/upload_service.dart';
+import '../core/utils/notifications.dart';
 
 class CameraDetailView extends ConsumerWidget {
   final String cameraId;
@@ -17,6 +21,7 @@ class CameraDetailView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final camera = ref.watch(cameraProvider(cameraId));
+    final plan = ref.watch(userPlanProvider);
 
     if (camera == null) {
       return Scaffold(
@@ -163,19 +168,25 @@ class CameraDetailView extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-            // GEAR IMAGES section: all uploaded images + edit action
+            // PHOTOS section: all uploaded images + edit action
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  'GEAR IMAGES',
-                  style: TextStyle(
-                    fontSize: 10,
-                    letterSpacing: 1.5,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
+                Row(
+                  children: [
+                    Icon(Icons.photo_library_outlined, size: 14, color: Colors.white.withOpacity(0.3)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'GALLERY',
+                      style: TextStyle(
+                        fontSize: 10,
+                        letterSpacing: 1.5,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white.withOpacity(0.3),
+                      ),
+                    ),
+                  ],
                 ),
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -195,9 +206,10 @@ class CameraDetailView extends ConsumerWidget {
                         ref,
                         cameraId: cameraId,
                         currentUrls: camera.imageUrls,
+                        plan: plan,
                       ),
-                      icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white70),
-                      label: const Text('Edit', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)),
+                      icon: const Icon(Icons.camera_alt_outlined, size: 18, color: Colors.white70),
+                      label: const Text('PHOTOS', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500, fontSize: 11, letterSpacing: 1)),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         minimumSize: Size.zero,
@@ -210,29 +222,21 @@ class CameraDetailView extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             GlassPanel(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: camera.imageUrls.isEmpty
                   ? Center(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        padding: const EdgeInsets.symmetric(vertical: 20),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.photo_library_outlined, size: 40, color: Colors.white.withOpacity(0.3)),
+                            Icon(Icons.photo_library_outlined, size: 32, color: Colors.white.withOpacity(0.3)),
                             const SizedBox(height: 8),
                             Text(
                               'No gear images yet',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: Colors.white.withOpacity(0.5),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Tap Edit to add up to 3 photos',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white.withOpacity(0.35),
                               ),
                             ),
                           ],
@@ -241,6 +245,7 @@ class CameraDetailView extends ConsumerWidget {
                     )
                   : GridView.builder(
                       shrinkWrap: true,
+                      padding: EdgeInsets.zero,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: camera.imageUrls.length,
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -261,52 +266,72 @@ class CameraDetailView extends ConsumerWidget {
                       },
                     ),
             ),
-            // LINKED LENSES full-width section
+            // OPTICS section
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  'LINKED LENSES',
-                  style: TextStyle(
-                    fontSize: 10,
-                    letterSpacing: 1.5,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
+                Row(
+                  children: [
+                    Icon(Icons.filter_tilt_shift, size: 14, color: Colors.white.withOpacity(0.3)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'OPTICS',
+                      style: TextStyle(
+                        fontSize: 10,
+                        letterSpacing: 1.5,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white.withOpacity(0.3),
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '+ LINK LENS',
-                  style: TextStyle(
-                    fontSize: 10,
-                    letterSpacing: 1.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withOpacity(0.5),
+                GestureDetector(
+                  onTap: () {
+                    if (plan == UserPlan.free && camera.lenses.length >= 1) {
+                      showHalideSnackBar('Free tier is limited to 1 lens. Upgrade to add more.');
+                      return;
+                    }
+                    _showLinkLensSheet(context, ref, cameraId);
+                  },
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_circle_outline, size: 16, color: Colors.white.withOpacity(0.5)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'MOUNT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          letterSpacing: 1.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withOpacity(0.5),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             GlassPanel(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(12),
               child: camera.lenses.isEmpty
                   ? Row(
                       children: [
                         Icon(
                           Icons.lens_outlined,
-                          size: 28,
+                          size: 24,
                           color: Colors.white.withOpacity(0.3),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'No lenses currently linked to this body',
+                            'No optics mounted',
                             style: TextStyle(
                               fontStyle: FontStyle.italic,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 13,
+                              color: Colors.white.withOpacity(0.5),
                             ),
                           ),
                         ),
@@ -316,7 +341,7 @@ class CameraDetailView extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: camera.lenses.map((lens) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
                           children: [
                             Icon(Icons.lens_outlined, color: Colors.white.withOpacity(0.4), size: 20),
@@ -344,6 +369,12 @@ class CameraDetailView extends ConsumerWidget {
                                 ],
                               ),
                             ),
+                            IconButton(
+                              icon: Icon(Icons.link_off, color: Colors.white.withOpacity(0.3), size: 18),
+                              onPressed: () {
+                                ref.read(userGearProvider.notifier).linkLens(lens.id, null);
+                              },
+                            ),
                           ],
                         ),
                       )).toList(),
@@ -360,6 +391,7 @@ class CameraDetailView extends ConsumerWidget {
     WidgetRef ref, {
     required String cameraId,
     required List<String> currentUrls,
+    required UserPlan plan,
   }) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     const navBarHeight = 88.0;
@@ -373,10 +405,219 @@ class CameraDetailView extends ConsumerWidget {
         child: _GearImagesEditSheet(
           cameraId: cameraId,
           initialUrls: List<String>.from(currentUrls),
+          plan: plan,
           onSave: (List<String> urls) {
             ref.read(userGearProvider.notifier).setCameraImages(cameraId, urls);
             Navigator.of(ctx).pop();
           },
+        ),
+      ),
+    );
+  }
+
+  void _showLinkLensSheet(BuildContext context, WidgetRef ref, String cameraId) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1C1C1C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return _LinkLensSheet(cameraId: cameraId);
+      },
+    );
+  }
+
+  static void _showCreateLensSheet(BuildContext context, WidgetRef ref, String cameraId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _CreateLensSheet(cameraId: cameraId),
+    );
+  }
+}
+
+// ─── Link Lens Sheet ──────────────────────────────────────────────────────────
+
+class _LinkLensSheet extends ConsumerWidget {
+  final String cameraId;
+
+  const _LinkLensSheet({required this.cameraId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lensesAsync = ref.watch(allUserLensesProvider);
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Select Lens to Mount', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          lensesAsync.when(
+            data: (lenses) {
+              final unlinked = lenses.where((l) => true).toList(); 
+              return Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (unlinked.isEmpty)
+                      const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('No lenses available', style: TextStyle(color: Colors.white54))))
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: unlinked.length,
+                        itemBuilder: (ctx, index) {
+                          final lens = unlinked[index];
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('${lens.brand} ${lens.model}', style: const TextStyle(color: Colors.white)),
+                            subtitle: Text(lens.nickname, style: TextStyle(color: Colors.white.withOpacity(0.6))),
+                            trailing: Icon(Icons.add_link, color: Colors.white.withOpacity(0.5)),
+                            onTap: () {
+                              ref.read(userGearProvider.notifier).linkLens(lens.id, cameraId);
+                              Navigator.pop(ctx);
+                            },
+                          );
+                        },
+                      ),
+                    const Divider(color: Colors.white10),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.add_circle_outline, color: Colors.blueAccent),
+                      title: const Text('CREATE NEW LENS', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 13)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        CameraDetailView._showCreateLensSheet(context, ref, cameraId);
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, __) => Text('Error: $e', style: const TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Create Lens Sheet ────────────────────────────────────────────────────────
+
+class _CreateLensSheet extends ConsumerStatefulWidget {
+  final String cameraId;
+  const _CreateLensSheet({required this.cameraId});
+
+  @override
+  ConsumerState<_CreateLensSheet> createState() => _CreateLensSheetState();
+}
+
+class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
+  final _nicknameController = TextEditingController();
+  final _brandController = TextEditingController();
+  final _modelController = TextEditingController();
+  final _serialController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    _brandController.dispose();
+    _modelController.dispose();
+    _serialController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final nickname = _nicknameController.text.trim();
+    final brand = _brandController.text.trim();
+    final model = _modelController.text.trim();
+    
+    if (brand.isEmpty || model.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Brand and Model are required')));
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await ref.read(userGearProvider.notifier).addAndLinkLens({
+        'gear_nickname': nickname.isEmpty ? '$brand $model' : nickname,
+        'brand': brand,
+        'model': model,
+        'serial_number': _serialController.text.trim(),
+      }, widget.cameraId);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to create lens: $e')));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1C1C1C),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 12, 24, 24 + bottomPadding),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 24),
+          const Text('New Lens Details', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('Create and mount a new lens to this body.', style: TextStyle(color: Colors.white54, fontSize: 13)),
+          const SizedBox(height: 24),
+          _field('Brand (e.g. Leica)', _brandController),
+          _field('Model (e.g. 35mm f/2 Summicron)', _modelController),
+          _field('Serial Number (Optional)', _serialController),
+          _field('Nickname (e.g. My Favorite)', _nicknameController),
+          const SizedBox(height: 32),
+          FilledButton(
+            onPressed: _isSaving ? null : _submit,
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isSaving 
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+              : const Text('CREATE & MOUNT', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController controller) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextField(
+        controller: controller,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.05),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
     );
@@ -388,11 +629,13 @@ class CameraDetailView extends ConsumerWidget {
 class _GearImagesEditSheet extends StatefulWidget {
   final String cameraId;
   final List<String> initialUrls;
+  final UserPlan plan;
   final void Function(List<String> urls) onSave;
 
   const _GearImagesEditSheet({
     required this.cameraId,
     required this.initialUrls,
+    required this.plan,
     required this.onSave,
   });
 
@@ -440,16 +683,28 @@ class _GearImagesEditSheetState extends State<_GearImagesEditSheet> {
       widget.onSave(_urls);
       return;
     }
+    
     setState(() => _isUploading = true);
-    final uploadService = UploadService();
+    
     final newPaths = <String>[];
-    for (final xFile in _pendingAdds) {
-      final ok = await uploadService.uploadRollImage(
-        rollId: 'gear_${widget.cameraId}',
-        imageFile: File(xFile.path),
-      );
-      if (ok) newPaths.add(xFile.path);
+    
+    if (widget.plan == UserPlan.free) {
+      // Free Tier: Keep files locally, skip upload service
+      for (final xFile in _pendingAdds) {
+        newPaths.add(xFile.path);
+      }
+    } else {
+      // Paid Upgrade: Upload to Cloud
+      final uploadService = UploadService();
+      for (final xFile in _pendingAdds) {
+        final ok = await uploadService.uploadRollImage(
+          rollId: 'gear_${widget.cameraId}',
+          imageFile: File(xFile.path),
+        );
+        if (ok) newPaths.add(xFile.path);
+      }
     }
+    
     setState(() => _isUploading = false);
     if (!mounted) return;
     widget.onSave([..._urls, ...newPaths]);
@@ -482,7 +737,12 @@ class _GearImagesEditSheetState extends State<_GearImagesEditSheet> {
           ),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              padding: EdgeInsets.fromLTRB(
+                20, 
+                0, 
+                20, 
+                24 + MediaQuery.of(context).padding.bottom + 88.0, // Push above floating nav bar (88px height)
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -573,7 +833,7 @@ class _GearImagesEditSheetState extends State<_GearImagesEditSheet> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: _isUploading
-                          ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
                           : const Text('Save'),
                     ),
                   ),
@@ -586,6 +846,7 @@ class _GearImagesEditSheetState extends State<_GearImagesEditSheet> {
     );
   }
 }
+
 
 // ─── Dashed glass panel (kept for potential reuse) ──────────────────────────────
 

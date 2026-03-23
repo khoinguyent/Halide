@@ -28,7 +28,7 @@ class RollsRepository {
 
   Future<Roll> createRoll({
     required String filmStockId,
-    required String userCameraId,
+    String? userCameraId,
     String? title,
     String? description,
     int? shotAtIso,

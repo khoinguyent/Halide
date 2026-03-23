@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/dashboard_provider.dart';
 import '../features/shell/presentation/widgets/halide_scaffold.dart';
 import '../views/home_view.dart';
 import '../views/profile_view.dart';
@@ -19,6 +20,7 @@ import '../providers/auth_provider.dart';
 import '../features/storage/presentation/views/storage_account_list_view.dart';
 import '../features/storage/presentation/views/storage_strategy_view.dart';
 import '../views/edit_profile_view.dart';
+import '../features/billing/presentation/views/paywall_view.dart';
 
 // Global keys for navigation
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -66,6 +68,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const RegisterView(),
     ),
     GoRoute(
+      path: '/paywall',
+      builder: (context, state) => const PaywallView(),
+    ),
+    GoRoute(
       path: '/roll/:id',
       builder: (context, state) {
         final id = state.pathParameters['id']!;
@@ -76,13 +82,16 @@ final appRouter = GoRouter(
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         const branchPaths = ['/', '/locker', '/meter', '/profile'];
-        return HalideScaffold(
-          currentIndex: navigationShell.currentIndex,
-          onTabSelected: (index) {
-            // Using go for top-level tabs ensures state preservation in the shell
-            context.go(branchPaths[index]);
-          },
-          child: navigationShell,
+        return _ShellArchiveRefresh(
+          navigationShell: navigationShell,
+          child: HalideScaffold(
+            currentIndex: navigationShell.currentIndex,
+            onTabSelected: (index) {
+              // Using go for top-level tabs ensures state preservation in the shell
+              context.go(branchPaths[index]);
+            },
+            child: navigationShell,
+          ),
         );
       },
       branches: [
@@ -171,3 +180,36 @@ final appRouter = GoRouter(
     ),
   ],
 );
+
+/// When switching bottom tabs to the Archive (home) branch, reload rolls so
+/// the list reflects changes made while on other tabs.
+class _ShellArchiveRefresh extends ConsumerStatefulWidget {
+  final StatefulNavigationShell navigationShell;
+  final Widget child;
+
+  const _ShellArchiveRefresh({
+    required this.navigationShell,
+    required this.child,
+  });
+
+  @override
+  ConsumerState<_ShellArchiveRefresh> createState() =>
+      _ShellArchiveRefreshState();
+}
+
+class _ShellArchiveRefreshState extends ConsumerState<_ShellArchiveRefresh> {
+  int? _previousIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final index = widget.navigationShell.currentIndex;
+    if (_previousIndex != null && index == 0 && _previousIndex != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.invalidate(dashboardRollsProvider);
+      });
+    }
+    _previousIndex = index;
+    return widget.child;
+  }
+}

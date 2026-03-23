@@ -27,18 +27,36 @@ class TransferService:
             db.close()
 
     def route_transfer(self, db: Session, user_id: str, roll_id: str, image_id: str, file_content: bytes, strategy: str):
-        """Routes transfer based on strategy with exponential backoff."""
+        """Routes transfer based on strategy with exponential backoff.
+        For PRO users, also auto-uploads to SYSTEM_CLOUD as a backup."""
         max_retries = 3
         base_delay = 1
         
+        user = db.query(User).filter(User.id == user_id).first()
+        is_pro = user and user.subscription_tier == "pro"
+        
+        results = []
         for attempt in range(max_retries):
             try:
+                # If user is PRO, we ALWAYS try to upload to SYSTEM_CLOUD first (or as well)
+                # according to req: "Synced images ... will auto upload to cloud storage"
+                system_key = None
+                if is_pro and strategy != "SYSTEM_CLOUD":
+                    try:
+                        system_key = self._handle_system_cloud(db, user_id, roll_id, image_id, file_content)
+                    except Exception as e:
+                        print(f"Auto-upload to system cloud failed for pro user: {e}")
+
+                main_key = None
                 if strategy == "SYSTEM_CLOUD":
-                    return self._handle_system_cloud(db, user_id, roll_id, image_id, file_content)
+                    main_key = self._handle_system_cloud(db, user_id, roll_id, image_id, file_content)
                 elif strategy == "PERSONAL_CLOUD":
-                    return self._handle_personal_cloud(db, user_id, roll_id, image_id, file_content)
+                    main_key = self._handle_personal_cloud(db, user_id, roll_id, image_id, file_content)
                 else: # LOCAL
-                    return self._handle_local_transfer(db, user_id, roll_id, image_id, file_content)
+                    main_key = self._handle_local_transfer(db, user_id, roll_id, image_id, file_content)
+                
+                # We return the main strategy key, but the system_cloud upload happened in background
+                return main_key or system_key
             except Exception as e:
                 if attempt == max_retries - 1:
                     raise e

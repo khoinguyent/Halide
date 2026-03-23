@@ -13,6 +13,13 @@ class TogglePrimaryAccount extends StorageAccountsEvent {
   TogglePrimaryAccount(this.accountId);
 }
 
+class UpdateStorageAccountFlags extends StorageAccountsEvent {
+  final String accountId;
+  final bool? isArchive;
+  final bool? isScanSync;
+  UpdateStorageAccountFlags({required this.accountId, this.isArchive, this.isScanSync});
+}
+
 class RemoveStorageAccounts extends StorageAccountsEvent {
   final List<String> accountIds;
   RemoveStorageAccounts(this.accountIds);
@@ -41,12 +48,25 @@ class StorageAccountsBloc extends Bloc<StorageAccountsEvent, StorageAccountsStat
 
   StorageAccountsBloc({ApiService? api}) : _api = api ?? ApiService(), super(StorageAccountsInitial()) {
     on<LoadStorageAccounts>((event, emit) async {
-      emit(StorageAccountsLoading());
+      // Local device entry is always present.
+      var localAccount = const StorageAccount(
+        id: 'local_device',
+        name: 'Local Device',
+        type: StorageAccountType.local,
+        email: '',
+        providerName: 'Device',
+        isPrimary: true,
+      );
+      
+      emit(StorageAccountsLoaded([localAccount]));
+
       try {
         final connectionsResp = await _api.get('/api/v1/connections');
         final raw = connectionsResp.data;
 
         final connectedAccounts = <StorageAccount>[];
+        bool hasCloudPrimary = false;
+
         if (raw is List) {
           for (final item in raw) {
             if (item is! Map) continue;
@@ -59,6 +79,12 @@ class StorageAccountsBloc extends Bloc<StorageAccountsEvent, StorageAccountsStat
             final identifier = (m['identifier'] as String?) ?? '';
             final displayLabel = (m['display_label'] as String?)?.trim();
             final isPrimary = (m['is_primary'] as bool?) ?? false;
+            final isArchive = (m['is_archive'] as bool?) ?? false;
+            final isScanSync = (m['is_scan_sync'] as bool?) ?? false;
+            final storageUsed = (m['storage_used'] as int?);
+            final storageLimit = (m['storage_limit'] as int?);
+
+            if (isPrimary) hasCloudPrimary = true;
 
             connectedAccounts.add(
               StorageAccount(
@@ -66,49 +92,72 @@ class StorageAccountsBloc extends Bloc<StorageAccountsEvent, StorageAccountsStat
                 name: (displayLabel != null && displayLabel.isNotEmpty)
                     ? displayLabel
                     : providerName,
-                type: StorageAccountType.personal,
+                type: provider == 'system' ? StorageAccountType.system : StorageAccountType.personal,
                 email: identifier,
                 providerName: providerName,
                 isPrimary: isPrimary,
+                isArchive: isArchive,
+                isScanSync: isScanSync,
+                storageUsed: storageUsed,
+                storageLimit: storageLimit,
               ),
             );
           }
         }
 
-        // Local device entry is not stored in backend storage_credentials; keep a stable local row.
-        final accounts = <StorageAccount>[
-          const StorageAccount(
-            id: 'local_device',
-            name: 'Local Device',
-            type: StorageAccountType.local,
-            email: 'local@device.com',
-            providerName: 'Device',
-            isPrimary: true,
-          ),
-          ...connectedAccounts,
-        ];
-        emit(StorageAccountsLoaded(accounts));
+        // If a cloud account is primary, local device should not be.
+        if (hasCloudPrimary) {
+          localAccount = localAccount.copyWith(isPrimary: false);
+        }
+
+        // Emit updated list with both local and connected accounts
+        emit(StorageAccountsLoaded([localAccount, ...connectedAccounts]));
       } catch (e) {
-        emit(StorageAccountsError(e.toString()));
+        // Even if connections fail, we keep the local account loaded.
       }
     });
 
     on<TogglePrimaryAccount>((event, emit) async {
       if (state is StorageAccountsLoaded) {
         final currentAccounts = (state as StorageAccountsLoaded).accounts;
-        
-        // Add haptic feedback for the "Set as Primary" action
         await HapticFeedback.mediumImpact();
 
-        final updatedAccounts = currentAccounts.map((account) {
-          if (account.id == event.accountId) {
-            return account.copyWith(isPrimary: true);
+        try {
+          // If the new primary is a cloud account, update backend.
+          if (event.accountId != 'local_device') {
+            await _api.patch('/api/v1/connections/${event.accountId}', data: {'is_primary': true});
           } else {
-            return account.copyWith(isPrimary: false);
+            // Unset current cloud primary if setting local as primary.
+            final cloudPrimary = currentAccounts.firstWhere(
+              (a) => a.type != StorageAccountType.local && a.isPrimary,
+              orElse: () => currentAccounts.first,
+            );
+            if (cloudPrimary.id != 'local_device') {
+              await _api.patch('/api/v1/connections/${cloudPrimary.id}', data: {'is_primary': false});
+            }
           }
-        }).toList();
 
-        emit(StorageAccountsLoaded(updatedAccounts));
+          final updatedAccounts = currentAccounts.map((account) {
+            return account.copyWith(isPrimary: account.id == event.accountId);
+          }).toList();
+
+          emit(StorageAccountsLoaded(updatedAccounts));
+        } catch (e) {
+          emit(StorageAccountsError('Failed to update primary storage: $e'));
+        }
+      }
+    });
+
+    on<UpdateStorageAccountFlags>((event, emit) async {
+      try {
+        final data = <String, dynamic>{};
+        if (event.isArchive != null) data['is_archive'] = event.isArchive;
+        if (event.isScanSync != null) data['is_scan_sync'] = event.isScanSync;
+
+        await _api.patch('/api/v1/connections/${event.accountId}', data: data);
+        add(LoadStorageAccounts());
+      } catch (e) {
+        emit(StorageAccountsError(e.toString()));
       }
     });
 
@@ -135,9 +184,13 @@ class StorageAccountsBloc extends Bloc<StorageAccountsEvent, StorageAccountsStat
         return 'OneDrive';
       case 'nas':
         return 'NAS';
+      case 'ftp':
+        return 'FTP Storage';
       case 'smb':
         // Matches CloudProvidersSection provider list label.
         return 'SMB / Network';
+      case 'system':
+        return 'System Cloud';
       default:
         return null;
     }

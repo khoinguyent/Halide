@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,8 @@ import '../models/camera.dart';
 import '../models/gear_status.dart';
 import '../models/lens.dart';
 import '../widgets/gear_status_selector.dart';
+import '../models/user_profile.dart';
+import '../providers/auth_provider.dart';
 
 class LockerView extends ConsumerWidget {
   const LockerView({Key? key}) : super(key: key);
@@ -17,65 +20,99 @@ class LockerView extends ConsumerWidget {
     final gearAsync = ref.watch(userGearProvider);
 
     return HalideScaffold(
-      child: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.add_rounded, color: Colors.white),
+      appBar: AppBar(
+        title: const Text(
+          'THE GEARS',
+          style: TextStyle(
+            letterSpacing: 2,
+            fontWeight: FontWeight.w600,
+            fontSize: 24,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white, size: 26),
+        actions: [
+          Consumer(
+            builder: (context, ref, child) {
+              final plan = ref.watch(userPlanProvider);
+              final cameras = gearAsync.value ?? [];
+              
+              if (plan == UserPlan.free && cameras.length >= 1) {
+                return const SizedBox.shrink();
+              }
+              // PRO and PLUS users can add more gear. 
+              // (User specifically asked for Pro to have unlimited)
+
+              return IconButton(
+                icon: const Icon(Icons.add_rounded),
                 tooltip: 'Add gear',
                 onPressed: () => context.push('/locker/add-gear'),
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-              title: const Text(
-                'THE GEARS',
-                style: TextStyle(
-                  letterSpacing: 4,
-                  fontWeight: FontWeight.w200,
-                  fontSize: 28,
-                  color: Colors.white,
-                ),
-              ),
-              centerTitle: false,
-            ),
+              );
+            },
           ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            sliver: gearAsync.when(
-              data: (cameras) => SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final camera = cameras[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: _GearCard(
-                        camera: camera,
-                        onStatusTap: (c) => _showGearStatusSheet(context, ref, c),
-                      ),
-                    );
-                  },
-                  childCount: cameras.length,
-                ),
-              ),
-              loading: () => const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator(color: Colors.white24)),
-              ),
-              error: (err, stack) => SliverFillRemaining(
-                child: Center(
-                  child: Text(
-                    'Error: $err',
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                ),
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            onPressed: () async {
+              await context.push('/profile');
+              if (!context.mounted) return;
+              ref.invalidate(userGearProvider);
+            },
           ),
         ],
+      ),
+      child: gearAsync.when(
+        data: (cameras) {
+          if (cameras.isEmpty) {
+            return _EmptyState(
+              onAddFirstGear: () => context.push('/locker/add-gear'),
+            );
+          }
+          return RefreshIndicator(
+            onRefresh: () async => ref.refresh(userGearProvider),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              itemCount: cameras.length,
+              itemBuilder: (context, index) {
+                final camera = cameras[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: _GearCard(
+                    camera: camera,
+                    onStatusTap: (c) => _showGearStatusSheet(context, ref, c),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+        ),
+        error: (err, stack) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                const SizedBox(height: 16),
+                Text(
+                  'Error: $err',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => ref.refresh(userGearProvider),
+                  child: const Text('RETRY', style: TextStyle(color: Colors.white70)),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -90,6 +127,50 @@ class LockerView extends ConsumerWidget {
           ref.read(userGearProvider.notifier).updateCameraStatus(camera.id, s);
           Navigator.pop(context);
         },
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final VoidCallback onAddFirstGear;
+
+  const _EmptyState({Key? key, required this.onAddFirstGear}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: GlassPanel(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.camera_alt_outlined, size: 64, color: Colors.white24),
+              const SizedBox(height: 20),
+              const Text(
+                'No gear yet',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Add your first camera or lens to start building your gear locker.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: onAddFirstGear,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('ADD FIRST GEAR'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -127,15 +208,30 @@ class _GearCard extends StatelessWidget {
                       color: Colors.white.withOpacity(0.05),
                       border: Border.all(color: Colors.white.withOpacity(0.1)),
                     ),
-                    child: camera.imageUrl != null
-                        ? Image.network(
-                            camera.imageUrl!,
+                    child: Builder(
+                      builder: (context) {
+                        final url = camera.imageUrl;
+                        if (url == null) return const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 28);
+                        
+                        final isLocal = url.startsWith('/') || url.startsWith(RegExp(r'^[A-Za-z]:'));
+                        if (isLocal) {
+                          return Image.file(
+                            File(url),
                             fit: BoxFit.cover,
                             width: 56,
                             height: 56,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 28),
-                          )
-                        : const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 28),
+                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white38, size: 28),
+                          );
+                        }
+                        return Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          width: 56,
+                          height: 56,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 28),
+                        );
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),

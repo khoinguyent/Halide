@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str
     S3_REGION: str = "auto"
 
+    # Billing (optional for local dev)
+    REVENUE_CAT_WEBHOOK_SECRET: Optional[str] = None
+    REVENUE_CAT_SECRET_KEY: Optional[str] = None
+    IS_REVENUE_CAT_SANDBOX: bool = True
+
     model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 
 settings = Settings()

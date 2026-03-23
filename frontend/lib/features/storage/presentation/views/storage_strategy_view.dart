@@ -7,23 +7,38 @@ import 'package:frontend/features/storage/presentation/bloc/storage_accounts_blo
 import 'package:frontend/models/storage_account.dart';
 import 'package:frontend/features/storage/presentation/widgets/storage_tier_selector.dart';
 import 'package:frontend/features/storage/presentation/widgets/cloud_providers_section.dart';
+import '../../../../providers/auth_provider.dart';
+import '../../../../models/user_profile.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
+import 'package:frontend/core/utils/notifications.dart';
 
-class StorageStrategyView extends StatefulWidget {
-  const StorageStrategyView({Key? key}) : super(key: key);
+class StorageStrategyView extends riverpod.ConsumerStatefulWidget {
+  final StorageAccountsBloc? bloc;
+  const StorageStrategyView({Key? key, this.bloc}) : super(key: key);
 
   @override
-  State<StorageStrategyView> createState() => _StorageStrategyViewState();
+  riverpod.ConsumerState<StorageStrategyView> createState() => _StorageStrategyViewState();
 }
 
-class _StorageStrategyViewState extends State<StorageStrategyView> {
-  int _selectedTierIndex = 0;
+class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyView> {
+  late int _selectedTierIndex;
   static const _zinc950 = Color(0xFF09090B);
   static const _orange500 = Color(0xFFF97316);
 
   @override
+  void initState() {
+    super.initState();
+    final plan = ref.read(userPlanProvider);
+    _selectedTierIndex = (plan == UserPlan.plus || plan == UserPlan.pro) ? 1 : 0;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final plan = ref.watch(userPlanProvider);
+    final isFree = plan == UserPlan.free;
+
     return BlocProvider(
-      create: (context) => StorageAccountsBloc()..add(LoadStorageAccounts()),
+      create: (context) => widget.bloc ?? (StorageAccountsBloc()..add(LoadStorageAccounts())),
       child: HalideScaffold(
         backgroundColor: _zinc950,
         appBar: AppBar(
@@ -53,7 +68,14 @@ class _StorageStrategyViewState extends State<StorageStrategyView> {
             children: [
               StorageTierSelector(
                 selectedIndex: _selectedTierIndex,
-                onSelected: (index) => setState(() => _selectedTierIndex = index),
+                isFree: isFree,
+                onSelected: (index) {
+                  if (isFree && index > 0) {
+                    showHalideSnackBar('Free tier is limited to Local Storage. Upgrade to enable Cloud syncing.');
+                    return;
+                  }
+                  setState(() => _selectedTierIndex = index);
+                },
               ),
               const SizedBox(height: 22),
               _buildContentForTier(context),
@@ -87,11 +109,27 @@ class _StorageStrategyViewState extends State<StorageStrategyView> {
             case 1:
               return CloudProvidersSection(accounts: state.accounts);
             case 2:
-              return _buildAccountList(
-                context, 
-                state.accounts.where((a) => a.type == StorageAccountType.system).toList(),
-                title: 'SYSTEM CLOUD',
-                emptyDescription: 'Upgrade above to get Pro storage. Each account includes 5–10 GB by default.',
+              final systemAccounts = state.accounts.where((a) => a.type == StorageAccountType.system).toList();
+              if (systemAccounts.isEmpty) {
+                return _buildAccountList(
+                  context, 
+                  [],
+                  title: 'SYSTEM CLOUD',
+                  emptyDescription: 'Upgrade above to get Pro storage. Each account includes 5–10 GB by default.',
+                );
+              }
+              final systemAccount = systemAccounts.first;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _StorageConsumptionCard(account: systemAccount),
+                  const SizedBox(height: 24),
+                  _buildAccountList(
+                    context, 
+                    systemAccounts,
+                    title: 'SYSTEM CLOUD CONNECTIONS',
+                  ),
+                ],
               );
             default:
               return const SizedBox.shrink();
@@ -282,6 +320,87 @@ class _StorageAccountCard extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: Icon(iconData, color: color, size: 24),
+    );
+  }
+}
+
+class _StorageConsumptionCard extends StatelessWidget {
+  final StorageAccount account;
+  const _StorageConsumptionCard({Key? key, required this.account}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final used = account.storageUsed ?? 0;
+    final limit = account.storageLimit ?? (100 * 1024 * 1024);
+    final percent = (used / limit).clamp(0.0, 1.0);
+    
+    final usedGb = (used / (1024 * 1024 * 1024)).toStringAsFixed(2);
+    final limitGb = (limit / (1024 * 1024 * 1024)).toStringAsFixed(1);
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'STORAGE USAGE',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              Text(
+                '$usedGb GB of $limitGb GB',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: percent,
+              minHeight: 12,
+              backgroundColor: Colors.white.withOpacity(0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                percent > 0.9 ? Colors.redAccent : const Color(0xFFF97316),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => context.push('/paywall'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
+              ),
+              child: const Text(
+                'ADD MORE STORAGE',
+                style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.0),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

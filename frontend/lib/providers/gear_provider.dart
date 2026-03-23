@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/gear_service.dart';
 import '../providers/auth_provider.dart';
 import '../models/camera.dart';
+import '../models/lens.dart';
 import '../models/gear_status.dart';
 
 final gearServiceProvider = Provider<GearService>((ref) => GearService());
@@ -138,9 +139,49 @@ class UserGearNotifier extends AsyncNotifier<List<Camera>> {
       await ref.read(gearServiceProvider).updateUserCamera(token, id, primaryImageIndex: primaryImageIndex);
     } catch (_) {}
   }
+  Future<void> linkLens(String lensId, String? cameraId) async {
+    try {
+      final user = ref.read(authServiceProvider).currentUser;
+      final token = user == null ? null : await user.getIdToken();
+      if (token == null) return;
+      
+      await ref.read(gearServiceProvider).updateUserLens(
+        token,
+        lensId,
+        parentCameraId: cameraId,
+      );
+      
+      // Refresh gear list to show updated lenses
+      ref.invalidateSelf();
+    } catch (_) {}
+  }
+
+  Future<void> addAndLinkLens(Map<String, dynamic> data, String cameraId) async {
+    try {
+      final user = ref.read(authServiceProvider).currentUser;
+      if (user == null) return;
+      final token = await user.getIdToken();
+      if (token == null) return;
+
+      // Ensure the lens is linked to this camera from the start
+      data['parent_camera_id'] = cameraId;
+      
+      await ref.read(gearServiceProvider).addUserLens(token, data);
+      ref.invalidateSelf();
+    } catch (_) {}
+  }
 }
 
 final userGearProvider = AsyncNotifierProvider<UserGearNotifier, List<Camera>>(UserGearNotifier.new);
+
+final allUserLensesProvider = FutureProvider<List<Lens>>((ref) async {
+  final user = ref.read(authServiceProvider).currentUser;
+  final token = user == null ? null : await user.getIdToken();
+  if (token == null) return [];
+  
+  final rawData = await ref.read(gearServiceProvider).fetchUserLenses(token);
+  return rawData.map((json) => Lens.fromJson(json as Map<String, dynamic>)).toList();
+});
 
 final cameraProvider = Provider.family<Camera?, String>((ref, id) {
   final gearAsync = ref.watch(userGearProvider);

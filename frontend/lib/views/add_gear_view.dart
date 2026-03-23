@@ -1,23 +1,27 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
+import '../providers/auth_provider.dart';
+import '../providers/gear_provider.dart';
 
-class AddGearView extends StatefulWidget {
+class AddGearView extends ConsumerStatefulWidget {
   const AddGearView({Key? key}) : super(key: key);
 
   @override
-  State<AddGearView> createState() => _AddGearViewState();
+  ConsumerState<AddGearView> createState() => _AddGearViewState();
 }
 
-class _AddGearViewState extends State<AddGearView> {
+class _AddGearViewState extends ConsumerState<AddGearView> {
   final _formKey = GlobalKey<FormState>();
   String _gearType = 'Camera';
   final _nicknameController = TextEditingController();
   final _brandController = TextEditingController();
   final _modelController = TextEditingController();
   final _serialController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -28,10 +32,57 @@ class _AddGearViewState extends State<AddGearView> {
     super.dispose();
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
-      // TODO: Implement actual submission via GearService
-      context.pop();
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final user = ref.read(userProvider);
+      if (user == null) throw Exception('USER_NOT_LOGGED_IN');
+      
+      final token = await user.getIdToken();
+      if (token == null) throw Exception('FETCH_TOKEN_FAILED');
+
+      final gearService = ref.read(gearServiceProvider);
+      final data = {
+        'gear_nickname': _nicknameController.text.trim(),
+        'brand': _brandController.text.trim(),
+        'model': _modelController.text.trim(),
+        'serial_number': _serialController.text.trim(),
+      };
+
+      if (_gearType == 'Camera') {
+        await gearService.addUserCamera(token, data);
+      } else {
+        await gearService.addUserLens(token, data);
+      }
+
+      // Refresh the gear list
+      ref.invalidate(userGearProvider);
+
+      if (mounted) {
+        context.pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${_gearType} added successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add gear: $e'),
+            backgroundColor: Colors.orangeAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -52,9 +103,9 @@ class _AddGearViewState extends State<AddGearView> {
               title: const Text(
                 'ADD GEAR',
                 style: TextStyle(
-                  letterSpacing: 4,
-                  fontWeight: FontWeight.w200,
-                  fontSize: 20,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
                   color: Colors.white,
                 ),
               ),
@@ -139,85 +190,53 @@ class _AddGearViewState extends State<AddGearView> {
   }
 
   Widget _buildTextField(TextEditingController controller, String label, String hint) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.3),
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.15)),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.02),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.white24),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          ),
-          validator: (value) {
-            if (label != 'SERIAL NUMBER' && (value == null || value.isEmpty)) {
-              return 'Required';
-            }
-            return null;
-          },
-        ),
-      ],
+    return TextFormField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white, fontSize: 16),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.15)),
+        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.3))),
+        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)),
+        errorStyle: const TextStyle(color: Colors.orangeAccent),
+        errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.orangeAccent)),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+      ),
+      validator: (value) {
+        if (label != 'SERIAL NUMBER' && (value == null || value.trim().isEmpty)) {
+          return 'Required';
+        }
+        return null;
+      },
     );
   }
 
   Widget _buildSubmitButton() {
-    return Container(
-      height: 60,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [Colors.white.withOpacity(0.9), Colors.white],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.white.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+    return ElevatedButton(
+      onPressed: _isLoading ? null : _submit,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        minimumSize: const Size(double.infinity, 56),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 0,
       ),
-      child: ElevatedButton(
-        onPressed: _submit,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        child: Text(
-          'SAVE ${_gearType.toUpperCase()}',
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w900,
-            fontSize: 14,
-            letterSpacing: 2,
-          ),
-        ),
-      ),
+      child: _isLoading
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+            )
+          : Text(
+              'SAVE ${_gearType.toUpperCase()}',
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+                letterSpacing: 2,
+              ),
+            ),
     );
   }
 }

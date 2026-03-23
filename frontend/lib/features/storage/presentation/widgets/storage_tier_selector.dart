@@ -4,10 +4,13 @@ class StorageTierSelector extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int>? onSelected;
 
+  final bool isFree;
+
   const StorageTierSelector({
     Key? key,
     this.selectedIndex = 0,
     this.onSelected,
+    this.isFree = false,
   }) : super(key: key);
 
   static const List<TierData> _tiers = [
@@ -48,6 +51,7 @@ class StorageTierSelector extends StatelessWidget {
                 child: _TierSegment(
                   data: _tiers[index],
                   isSelected: selectedIndex == index,
+                  isLocked: isFree && index > 0,
                   onTap: onSelected == null ? null : () => onSelected(index),
                 ),
               ),
@@ -76,10 +80,13 @@ class _TierSegment extends StatelessWidget {
   final bool isSelected;
   final VoidCallback? onTap;
 
+  final bool isLocked;
+
   const _TierSegment({
     Key? key,
     required this.data,
     required this.isSelected,
+    required this.isLocked,
     required this.onTap,
   }) : super(key: key);
 
@@ -119,9 +126,9 @@ class _TierSegment extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                data.icon,
+                isLocked ? Icons.lock_outline_rounded : data.icon,
                 size: 26,
-                color: isSelected ? Colors.white : Colors.white.withOpacity(inactiveOpacity),
+                color: isSelected ? Colors.white : Colors.white.withOpacity(isLocked ? 0.25 : inactiveOpacity),
               ),
               const SizedBox(height: 8),
               Text(

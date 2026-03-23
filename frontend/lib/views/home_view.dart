@@ -67,14 +67,18 @@ class _HomeViewState extends ConsumerState<HomeView> {
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () => context.push('/profile'),
+            onPressed: () async {
+              await context.push('/profile');
+              if (!mounted) return;
+              ref.invalidate(dashboardRollsProvider);
+            },
           ),
         ],
       ),
       child: rollsAsync.when(
         data: (rolls) {
           final filtered = _statusFilter == null
-              ? rolls
+              ? rolls.where((r) => r.status != RollStatus.archived).toList()
               : rolls.where((r) => r.status == _statusFilter).toList();
           if (filtered.isEmpty) {
             return _buildEmptyOrNoMatch(rolls.isEmpty);
@@ -91,7 +95,12 @@ class _HomeViewState extends ConsumerState<HomeView> {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 20.0),
                     child: GestureDetector(
-                      onTap: () => context.push('/roll/${roll.id}'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () async {
+                        await context.push('/roll/${roll.id}');
+                        if (!mounted) return;
+                        ref.invalidate(dashboardRollsProvider);
+                      },
                       child: RollCard(roll: roll),
                     ),
                   );

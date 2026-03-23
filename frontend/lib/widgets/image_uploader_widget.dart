@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/upload_service.dart';
+import '../core/widgets/image_placeholder.dart';
 
 class ImageUploaderWidget extends ConsumerStatefulWidget {
   final String rollId;
@@ -153,6 +154,13 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
                           height: 120,
                           width: 120,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const HalideImagePlaceholder(
+                              width: 120,
+                              height: 120,
+                              message: 'File missed',
+                            );
+                          },
                         ),
                       ),
                       Positioned(

@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:frontend/models/film_stock.dart';
 import 'package:frontend/models/camera.dart';
+import 'synced_image.dart';
 
 class FullScreenViewer extends StatefulWidget {
+  final String rollId;
   final List<String> imageUrls;
   final int initialIndex;
   final FilmStock? filmStock;
@@ -12,6 +15,7 @@ class FullScreenViewer extends StatefulWidget {
 
   const FullScreenViewer({
     Key? key,
+    required this.rollId,
     required this.imageUrls,
     this.initialIndex = 0,
     this.filmStock,
@@ -67,16 +71,10 @@ class _FullScreenViewerState extends State<FullScreenViewer> {
                 return InteractiveViewer(
                   minScale: 1.0,
                   maxScale: 4.0,
-                  child: Image.network(
-                    widget.imageUrls[index],
+                  child: SyncedImage(
+                    rollId: widget.rollId,
+                    imageUrl: widget.imageUrls[index],
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(child: Icon(Icons.error, color: Colors.white, size: 48));
-                    },
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return const Center(child: CircularProgressIndicator(color: Colors.white));
-                    },
                   ),
                 );
               },
@@ -141,9 +139,14 @@ class _FullScreenViewerState extends State<FullScreenViewer> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           if (widget.filmStock != null)
-                            Text(
-                              '${widget.filmStock!.brand} ${widget.filmStock!.name}',
-                              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                            Flexible(
+                              child: Text(
+                                '${widget.filmStock!.brand} ${widget.filmStock!.name}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
+                                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                              ),
                             ),
                           const Spacer(),
                           if (widget.iso != null)

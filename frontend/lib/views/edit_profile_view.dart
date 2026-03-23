@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 import '../models/user_profile.dart';
+import '../providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
 import '../services/local_avatar_storage.dart';
 

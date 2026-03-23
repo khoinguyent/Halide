@@ -8,7 +8,7 @@ class FetchRolls extends RollsEvent {}
 class RefreshRolls extends RollsEvent {}
 class AddRollEvent extends RollsEvent {
   final String filmStockId;
-  final String userCameraId;
+  final String? userCameraId;
   final String? title;
   final String? description;
   final int? shotAtIso;
@@ -17,7 +17,7 @@ class AddRollEvent extends RollsEvent {
 
   AddRollEvent({
     required this.filmStockId,
-    required this.userCameraId,
+    this.userCameraId,
     this.title,
     this.description,
     this.shotAtIso,

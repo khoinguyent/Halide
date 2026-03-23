@@ -34,6 +34,7 @@ class _AddRollFormState extends State<AddRollForm> {
   List<FilmStock> _stocks = [];
   List<Camera> _cameras = [];
   bool _isLoading = true;
+  bool _showValidationError = false;
 
   @override
   void initState() {
@@ -53,6 +54,53 @@ class _AddRollFormState extends State<AddRollForm> {
     } catch (e) {
       setState(() => _isLoading = false);
     }
+  }
+
+  /// Strip zero-width chars used only to trigger [Autocomplete] option refresh on focus.
+  static String _normalizeAutocompleteQuery(String s) {
+    return s.replaceAll('\u200b', '').trim();
+  }
+
+  /// When query is empty, show all items for better browsing.
+  Iterable<FilmStock> _filmStockOptionsForQuery(String query) {
+    final q = _normalizeAutocompleteQuery(query).toLowerCase();
+    if (q.isEmpty) {
+      return _stocks;
+    }
+    return _stocks.where(
+      (stock) =>
+          stock.name.toLowerCase().contains(q) ||
+          stock.brand.toLowerCase().contains(q),
+    );
+  }
+
+  Iterable<Camera> _cameraOptionsForQuery(String query) {
+    final q = _normalizeAutocompleteQuery(query).toLowerCase();
+    if (q.isEmpty) {
+      return _cameras;
+    }
+    return _cameras.where(
+      (camera) => camera.displayName.toLowerCase().contains(q),
+    );
+  }
+
+  /// RawAutocomplete only refreshes options when the field text changes; a brief
+  /// invisible character forces an update on tap so empty-query options appear.
+  void _kickAutocompleteOptions(TextEditingController controller) {
+    if (controller.text.isNotEmpty) return;
+    controller.value = const TextEditingValue(
+      text: '\u200b',
+      selection: TextSelection.collapsed(offset: 1),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (controller.text == '\u200b') {
+        controller.value = const TextEditingValue(
+          text: '',
+          selection: TextSelection.collapsed(offset: 0),
+        );
+      }
+    });
   }
 
   @override
@@ -146,19 +194,22 @@ class _AddRollFormState extends State<AddRollForm> {
     return Autocomplete<FilmStock>(
       displayStringForOption: (stock) => '${stock.brand} ${stock.name}',
       optionsBuilder: (textEditingValue) {
-        if (textEditingValue.text.isEmpty) return const Iterable<FilmStock>.empty();
-        return _stocks.where((stock) => 
-          stock.name.toLowerCase().contains(textEditingValue.text.toLowerCase()) ||
-          stock.brand.toLowerCase().contains(textEditingValue.text.toLowerCase())
-        );
+        return _filmStockOptionsForQuery(textEditingValue.text);
       },
-      onSelected: (stock) => setState(() => _selectedStock = stock),
+      onSelected: (stock) => setState(() {
+        _selectedStock = stock;
+        _showValidationError = false;
+      }),
       fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
         return TextField(
           controller: controller,
           focusNode: focusNode,
           style: const TextStyle(color: Colors.white),
-          decoration: _inputDecoration('SEARCH FILM STOCK'),
+          decoration: _inputDecoration(
+            'FILM STOCK (*)', 
+            errorText: (_showValidationError && _selectedStock == null) ? 'Please select a film stock' : null,
+          ),
+          onTap: () => _kickAutocompleteOptions(controller),
         );
       },
       optionsViewBuilder: (context, onSelected, options) {
@@ -168,10 +219,11 @@ class _AddRollFormState extends State<AddRollForm> {
             color: Colors.transparent,
             child: Container(
               width: MediaQuery.of(context).size.width - 96,
-              constraints: const BoxConstraints(maxHeight: 200),
+              constraints: const BoxConstraints(maxHeight: 300),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.8),
+                color: Colors.black.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
               child: ListView.builder(
                 padding: EdgeInsets.zero,
@@ -180,7 +232,8 @@ class _AddRollFormState extends State<AddRollForm> {
                 itemBuilder: (context, index) {
                   final stock = options.elementAt(index);
                   return ListTile(
-                    title: Text('${stock.brand} ${stock.name}', style: const TextStyle(color: Colors.white)),
+                    dense: true,
+                    title: Text('${stock.brand} ${stock.name}', style: const TextStyle(color: Colors.white, fontSize: 13)),
                     onTap: () => onSelected(stock),
                   );
                 },
@@ -196,10 +249,7 @@ class _AddRollFormState extends State<AddRollForm> {
     return Autocomplete<Camera>(
       displayStringForOption: (camera) => camera.displayName,
       optionsBuilder: (textEditingValue) {
-        if (textEditingValue.text.isEmpty) return const Iterable<Camera>.empty();
-        return _cameras.where((camera) => 
-          camera.displayName.toLowerCase().contains(textEditingValue.text.toLowerCase())
-        );
+        return _cameraOptionsForQuery(textEditingValue.text);
       },
       onSelected: (camera) => setState(() => _selectedCamera = camera),
       fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
@@ -207,7 +257,8 @@ class _AddRollFormState extends State<AddRollForm> {
           controller: controller,
           focusNode: focusNode,
           style: const TextStyle(color: Colors.white),
-          decoration: _inputDecoration('SEARCH CAMERA'),
+          decoration: _inputDecoration('GEAR'),
+          onTap: () => _kickAutocompleteOptions(controller),
         );
       },
       optionsViewBuilder: (context, onSelected, options) {
@@ -217,10 +268,11 @@ class _AddRollFormState extends State<AddRollForm> {
             color: Colors.transparent,
             child: Container(
               width: MediaQuery.of(context).size.width - 96,
-              constraints: const BoxConstraints(maxHeight: 200),
+              constraints: const BoxConstraints(maxHeight: 250),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.8),
+                color: Colors.black.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
               child: ListView.builder(
                 padding: EdgeInsets.zero,
@@ -229,7 +281,8 @@ class _AddRollFormState extends State<AddRollForm> {
                 itemBuilder: (context, index) {
                   final camera = options.elementAt(index);
                   return ListTile(
-                    title: Text(camera.displayName, style: const TextStyle(color: Colors.white)),
+                    dense: true,
+                    title: Text(camera.displayName, style: const TextStyle(color: Colors.white, fontSize: 13)),
                     onTap: () => onSelected(camera),
                   );
                 },
@@ -259,21 +312,27 @@ class _AddRollFormState extends State<AddRollForm> {
     );
   }
 
-  InputDecoration _inputDecoration(String label) {
+  InputDecoration _inputDecoration(String label, {String? errorText}) {
     return InputDecoration(
       labelText: label,
+      errorText: errorText,
       labelStyle: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
       enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.3))),
       focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)),
+      errorStyle: const TextStyle(color: Colors.orangeAccent),
+      errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.orangeAccent)),
     );
   }
 
   void _submit() {
-    if (_selectedStock == null || _selectedCamera == null) return;
+    if (_selectedStock == null) {
+      setState(() => _showValidationError = true);
+      return;
+    }
     
     context.read<RollsBloc>().add(AddRollEvent(
       filmStockId: _selectedStock!.id,
-      userCameraId: _selectedCamera!.id,
+      userCameraId: _selectedCamera?.id,
       title: _title,
       description: _description,
       shotAtIso: _shotAtIso,

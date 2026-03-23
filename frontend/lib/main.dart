@@ -5,12 +5,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'config/app_config.dart';
 import 'firebase_options.dart';
 import 'router/app_router.dart';
+import 'services/purchase_service.dart';
+import 'core/utils/notifications.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  // Initialize RevenueCat
+  await PurchaseService().init();
+
   debugPrint('[Halide] Backend: ${AppConfig.baseUrl} | API: ${AppConfig.apiUrl}');
   runApp(
     const ProviderScope(
@@ -42,6 +48,7 @@ class AuthGate extends StatelessWidget {
         // Still waiting for the first auth event
         if (snapshot.connectionState == ConnectionState.waiting) {
           return MaterialApp(
+            scaffoldMessengerKey: scaffoldMessengerKey,
             debugShowCheckedModeBanner: false,
             home: const Scaffold(
               body: Center(child: CircularProgressIndicator()),
@@ -50,6 +57,7 @@ class AuthGate extends StatelessWidget {
         }
         // Auth resolved — let the router take over
         return MaterialApp.router(
+          scaffoldMessengerKey: scaffoldMessengerKey,
           title: 'Halide',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(

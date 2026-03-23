@@ -347,11 +347,34 @@ def connect_storage(
     return cred
 
 @router.get("/connections", response_model=List[StorageCredentialOut])
-def list_connections(
+def get_storage_connections(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return db.query(StorageCredential).filter(StorageCredential.user_id == current_user.id).all()
+    credentials = db.query(StorageCredential).filter(StorageCredential.user_id == current_user.id).all()
+    
+    # Cast to StorageCredentialOut-compatible objects
+    results = []
+    for c in credentials:
+        results.append(StorageCredentialOut.model_validate(c))
+        
+    # Inject System Cloud for subscribers (Plus/Pro)
+    if current_user.subscription_tier in ["plus", "pro"]:
+        results.append(StorageCredentialOut(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000000"), # Virtual ID
+            provider=StorageProviderEnum.system,
+            identifier="System Cloud",
+            host=None,
+            username=None,
+            is_archive=True,
+            is_scan_sync=True,
+            display_label="System Cloud",
+            is_primary=False,
+            storage_used=current_user.storage_used_bytes,
+            storage_limit=current_user.total_storage_limit
+        ))
+        
+    return results
 
 
 @router.delete("/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -599,13 +622,16 @@ def sync_gdrive_leaf_files(
 
         logger.info("GDrive sync: downloaded bytes=%s for file_id=%s", len(content), file_id)
 
-        # Upload to our storage (full + thumbnail).
-        storage_service.upload_roll_image(
+        # Upload to our storage (full + thumbnail) via TransferService.
+        # This ensures Pro auto-backup and storage tracking logic is applied.
+        from ...services.transfer_service import transfer_service
+        full_key = transfer_service.route_transfer(
+            db=db,
             user_id=str(current_user.id),
             roll_id=str(roll.id),
             image_id=file_id,
             file_content=content,
-            content_type=mime or "image/jpeg",
+            strategy="PERSONAL_CLOUD",  # GDrive sync is personal cloud strategy
         )
 
         db_image = Image(
@@ -860,12 +886,15 @@ def sync_gdrive_zip_images(
                     skipped_existing += 1
                     continue
 
-                storage_service.upload_roll_image(
+                # Upload via TransferService to apply Pro auto-sync/quota logic.
+                from ...services.transfer_service import transfer_service
+                full_key = transfer_service.route_transfer(
+                    db=db,
                     user_id=str(current_user.id),
                     roll_id=str(roll.id),
                     image_id=image_id,
                     file_content=file_content,
-                    content_type="image/jpeg",
+                    strategy="PERSONAL_CLOUD",
                 )
 
                 db_image = Image(

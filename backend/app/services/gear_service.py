@@ -1,22 +1,45 @@
 from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
-from ..db.models.camera import UserCamera, UserLens
-from ..db.schemas.camera import UserCameraCreate, UserLensCreate, UserCameraUpdate
+from ..db.models.camera import UserCamera, UserLens, Camera, Lens
+from ..db.schemas.camera import UserCameraCreate, UserLensCreate, UserCameraUpdate, UserLensUpdate
 
 def get_user_cameras(db: Session, user_id: str, skip: int = 0, limit: int = 100):
     return db.query(UserCamera).options(
         joinedload(UserCamera.camera),
-        joinedload(UserCamera.lenses),
+        joinedload(UserCamera.lenses).joinedload(UserLens.lens),
     ).filter(UserCamera.user_id == user_id).offset(skip).limit(limit).all()
 
 def get_user_camera_by_id(db: Session, user_camera_id: UUID, user_id: str):
     return db.query(UserCamera).options(
         joinedload(UserCamera.camera),
-        joinedload(UserCamera.lenses),
+        joinedload(UserCamera.lenses).joinedload(UserLens.lens),
     ).filter(UserCamera.id == user_camera_id, UserCamera.user_id == user_id).first()
 
 def create_user_camera(db: Session, user_camera: UserCameraCreate, user_id: str):
-    db_user_camera = UserCamera(**user_camera.dict(), user_id=user_id)
+    data = user_camera.dict(exclude_unset=True)
+    camera_id = data.get("camera_id")
+    
+    if not camera_id and data.get("brand") and data.get("model"):
+        # Look up or create master camera
+        brand = data.pop("brand")
+        model = data.pop("model")
+        master = db.query(Camera).filter(
+            Camera.brand.ilike(brand),
+            Camera.model.ilike(model)
+        ).first()
+        
+        if not master:
+            master = Camera(
+                brand=brand,
+                model=model,
+                camera_type='SLR' # Default for auto-created
+            )
+            db.add(master)
+            db.flush() # Get the new ID
+        camera_id = master.id
+        data["camera_id"] = camera_id
+    
+    db_user_camera = UserCamera(**data, user_id=user_id)
     db.add(db_user_camera)
     db.commit()
     db.refresh(db_user_camera)
@@ -34,11 +57,43 @@ def update_user_camera(db: Session, user_camera_id: UUID, user_id: str, update: 
     return row
 
 def create_user_lens(db: Session, user_lens: UserLensCreate, user_id: str):
-    db_user_lens = UserLens(**user_lens.dict(), user_id=user_id)
+    data = user_lens.dict(exclude_unset=True)
+    lens_id = data.get("lens_id")
+    
+    if not lens_id and data.get("brand") and data.get("model"):
+        # Look up or create master lens
+        brand = data.pop("brand")
+        model = data.pop("model")
+        master = db.query(Lens).filter(
+            Lens.brand.ilike(brand),
+            Lens.model.ilike(model)
+        ).first()
+        
+        if not master:
+            master = Lens(
+                brand=brand,
+                model=model
+            )
+            db.add(master)
+            db.flush()
+        lens_id = master.id
+        data["lens_id"] = lens_id
+        
+    db_user_lens = UserLens(**data, user_id=user_id)
     db.add(db_user_lens)
     db.commit()
-    db.refresh(db_user_lens)
-    return db_user_lens
+    # Reload with relations
+    return db.query(UserLens).options(joinedload(UserLens.lens)).filter(UserLens.id == db_user_lens.id).first()
+
+def update_user_lens(db: Session, user_lens_id: UUID, user_id: str, update: UserLensUpdate):
+    row = db.query(UserLens).filter(UserLens.id == user_lens_id, UserLens.user_id == user_id).first()
+    if not row:
+        return None
+    data = update.dict(exclude_unset=True)
+    for k, v in data.items():
+        setattr(row, k, v)
+    db.commit()
+    return db.query(UserLens).options(joinedload(UserLens.lens)).filter(UserLens.id == user_lens_id).first()
 
 def get_user_lenses(db: Session, user_id: str, skip: int = 0, limit: int = 100):
-    return db.query(UserLens).filter(UserLens.user_id == user_id).offset(skip).limit(limit).all()
+    return db.query(UserLens).options(joinedload(UserLens.lens)).filter(UserLens.user_id == user_id).offset(skip).limit(limit).all()

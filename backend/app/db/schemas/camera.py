@@ -31,13 +31,22 @@ class UserLensBase(BaseModel):
     parent_camera_id: Optional[UUID] = None
     gear_nickname: Optional[str] = None
 
-class UserLensCreate(UserLensBase):
-    pass
+class UserLensCreate(BaseModel):
+    lens_id: Optional[UUID] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    parent_camera_id: Optional[UUID] = None
+    gear_nickname: Optional[str] = None
+class UserLensUpdate(BaseModel):
+    parent_camera_id: Optional[UUID] = None
+    gear_nickname: Optional[str] = None
 
 class UserLensOut(UserLensBase):
     id: UUID
     user_id: str
     created_at: datetime
+    lens: Optional[LensOut] = None
     class Config:
         from_attributes = True
 
@@ -50,8 +59,13 @@ class UserCameraBase(BaseModel):
     image_urls: Optional[List[str]] = None
     primary_image_index: int = 0
 
-class UserCameraCreate(UserCameraBase):
-    pass
+class UserCameraCreate(BaseModel):
+    camera_id: Optional[UUID] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    gear_nickname: Optional[str] = None
+    image_urls: Optional[List[str]] = None
+    primary_image_index: int = 0
 
 class UserCameraUpdate(BaseModel):
     """Partial update for user camera (e.g. gear images)."""

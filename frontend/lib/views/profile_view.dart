@@ -98,6 +98,13 @@ class ProfileView extends ConsumerWidget {
               child: Column(
                 children: [
                   _ProfileOption(
+                    icon: Icons.star_border_rounded,
+                    label: 'Halide Premium',
+                    color: const Color(0xFFF97316),
+                    onTap: () => context.push('/paywall'),
+                  ),
+                  const Divider(color: Colors.white12, height: 1),
+                  _ProfileOption(
                     icon: Icons.edit_outlined,
                     label: 'Edit Profile',
                     onTap: () => context.push('/profile/edit'),

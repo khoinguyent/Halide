@@ -3,12 +3,24 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from ...db.session import get_db
-from ...db.schemas.camera import UserCameraCreate, UserCameraOut, UserCameraUpdate, UserLensCreate, UserLensOut
+from ...db.schemas.camera import UserCameraCreate, UserCameraOut, UserCameraUpdate, UserLensCreate, UserLensOut, UserLensUpdate
 from ...db.models.user import User
 from ...core.dependencies import get_current_user
 from ...services import gear_service
 
 router = APIRouter()
+
+@router.patch("/user_lenses/{user_lens_id}", response_model=UserLensOut)
+def update_user_lens(
+    user_lens_id: UUID,
+    body: UserLensUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    row = gear_service.update_user_lens(db, user_lens_id, current_user.id, body)
+    if not row:
+        raise HTTPException(status_code=404, detail="User lens not found")
+    return row
 
 @router.get("/user_cameras", response_model=List[UserCameraOut])
 def read_user_cameras(

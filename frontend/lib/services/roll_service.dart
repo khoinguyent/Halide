@@ -91,4 +91,19 @@ class RollService {
       throw Exception('Failed to create roll: ${response.body}');
     }
   }
+
+  Future<void> addLocalImagesToRoll(String token, String rollId, List<String> localPaths) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiUrl}/rolls/$rollId/local-images'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'local_paths': localPaths}),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to add local images: ${response.body}');
+    }
+  }
 }

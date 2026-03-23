@@ -104,7 +104,7 @@ class Camera {
 
   String get displayName {
     if (nickname.isNotEmpty) {
-      return '$nickname - $model';
+      return '$nickname - $brand $model';
     }
     return '$brand $model';
   }
