@@ -48,11 +48,6 @@ class _LoginViewState extends ConsumerState<LoginView> {
       await action();
       // Sync with backend to ensure user record exists
       await ref.read(authServiceProvider).syncWithBackend();
-      // Log current user so you can verify login worked (see debug console)
-      final user = ref.read(authServiceProvider).currentUser;
-      if (user != null) {
-        debugPrint('[Auth] Login OK — uid: ${user.uid}, email: ${user.email}, displayName: ${user.displayName}');
-      }
       // On success, GoRouter will handle redirection via AuthNotifier
     } catch (e) {
       if (mounted) _showError(e.toString());
@@ -260,9 +255,16 @@ class _LoginViewState extends ConsumerState<LoginView> {
                     const SizedBox(height: 16),
                     _buildContinueButton('Continue with Apple', Icons.apple_rounded, _loginWithApple),
                   ] else ...[
-                    _buildTextField(_otpController, 'Verification Code', Icons.sms_outlined),
+                    HalideTextField(
+                      controller: _otpController,
+                      label: 'Verification Code',
+                      prefixIcon: Icons.sms_outlined,
+                    ),
                     const SizedBox(height: 24),
-                    _buildActionButton('Verify & Login', _signInWithOTP),
+                    HalideActionButton(
+                      text: 'Verify & Login',
+                      onPressed: _signInWithOTP,
+                    ),
                     TextButton(
                       onPressed: () => setState(() => _showOTPField = false),
                       child: const Text('Back to options', style: TextStyle(color: Colors.white60)),
@@ -316,23 +318,6 @@ class _LoginViewState extends ConsumerState<LoginView> {
     );
   }
 
-  Widget _buildActionButton(String text, VoidCallback onPressed) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white.withOpacity(0.95),
-          foregroundColor: Colors.black,
-          shape: const StadiumBorder(),
-          elevation: 0,
-        ),
-        child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-      ),
-    );
-  }
-
   Widget _buildFooter() {
     return Column(
       children: [
@@ -360,7 +345,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
         child: Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: _BaseAuthModal(
+          child: HalideModalContainer(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -371,9 +356,18 @@ class _LoginViewState extends ConsumerState<LoginView> {
                   textAlign: TextAlign.left,
                 ),
                 const SizedBox(height: 16),
-                _buildTextField(_emailController, 'Email', Icons.email_outlined),
+                HalideTextField(
+                  controller: _emailController,
+                  label: 'Email',
+                  prefixIcon: Icons.email_outlined,
+                ),
                 const SizedBox(height: 16),
-                _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
+                HalideTextField(
+                  controller: _passwordController,
+                  label: 'Password',
+                  prefixIcon: Icons.lock_outline,
+                  obscureText: true,
+                ),
                 const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -383,25 +377,14 @@ class _LoginViewState extends ConsumerState<LoginView> {
                       child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
                     ),
                     const SizedBox(width: 8),
-                    SizedBox(
+                    HalideActionButton(
+                      text: 'Login',
+                      width: 100,
                       height: 40,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _loginWithEmail();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withOpacity(0.95),
-                          foregroundColor: Colors.black,
-                          shape: const StadiumBorder(),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                        ),
-                        child: const Text(
-                          'Login',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _loginWithEmail();
+                      },
                     ),
                   ],
                 ),
@@ -423,7 +406,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
           insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           child: Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-            child: _BaseAuthModal(
+            child: HalideModalContainer(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -439,66 +422,26 @@ class _LoginViewState extends ConsumerState<LoginView> {
                     style: TextStyle(color: Colors.white54, fontSize: 14),
                   ),
                   const SizedBox(height: 24),
-                  _buildTextField(
-                    _phoneController,
-                    'Phone Number',
-                    Icons.phone_outlined,
+                  HalideTextField(
+                    controller: _phoneController,
+                    label: 'Phone Number',
+                    prefixIcon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
                   ),
                   const SizedBox(height: 24),
-                  _buildActionButton('Send Verification Code', () {
-                    Navigator.pop(context);
-                    _verifyPhone();
-                  }),
+                  HalideActionButton(
+                    text: 'Send Verification Code',
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _verifyPhone();
+                    },
+                  ),
                 ],
               ),
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool obscureText = false, TextInputType? keyboardType}) {
-    return TextField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      maxLines: 1,
-      expands: false,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-        prefixIcon: Icon(icon, color: Colors.white24),
-        isDense: true,
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.blueAccent)),
-      ),
-    );
-  }
-}
-
-class _BaseAuthModal extends StatelessWidget {
-  final Widget child;
-
-  const _BaseAuthModal({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    return Container(
-      width: width * 0.9,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1C29),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: child,
     );
   }
 }

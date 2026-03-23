@@ -211,3 +211,159 @@ class HalideSimpleDialog extends StatelessWidget {
     );
   }
 }
+
+/// A standardized dark glass container for modals and dialogs.
+class HalideModalContainer extends StatelessWidget {
+  final Widget child;
+  final double borderRadius;
+  final EdgeInsets padding;
+  final bool hasInnerBorder;
+
+  const HalideModalContainer({
+    Key? key,
+    required this.child,
+    this.borderRadius = 24,
+    this.padding = const EdgeInsets.all(24),
+    this.hasInnerBorder = true,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        width: width * 0.9,
+        padding: padding,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1C29),
+          borderRadius: BorderRadius.circular(borderRadius),
+          border: hasInnerBorder ? Border.all(color: Colors.white.withOpacity(0.12)) : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 30,
+              spreadRadius: 10,
+            ),
+          ],
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// A standardized text field for premium modals.
+class HalideTextField extends StatelessWidget {
+  final TextEditingController? controller;
+  final String label;
+  final IconData? prefixIcon;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onTap;
+  final int maxLines;
+  final FocusNode? focusNode;
+
+  const HalideTextField({
+    Key? key,
+    this.controller,
+    required this.label,
+    this.prefixIcon,
+    this.obscureText = false,
+    this.keyboardType,
+    this.errorText,
+    this.onChanged,
+    this.onTap,
+    this.maxLines = 1,
+    this.focusNode,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      onChanged: onChanged,
+      onTap: onTap,
+      maxLines: maxLines,
+      focusNode: focusNode,
+      style: const TextStyle(color: Colors.white, fontSize: 15),
+      decoration: InputDecoration(
+        labelText: label,
+        errorText: errorText,
+        labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.white24, size: 20) : null,
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.blueAccent, width: 1.5),
+        ),
+        errorStyle: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.orangeAccent),
+        ),
+      ),
+    );
+  }
+}
+
+/// A standardized action button (White/Black) for modals.
+class HalideActionButton extends StatelessWidget {
+  final String text;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final double? width;
+  final double height;
+
+  const HalideActionButton({
+    Key? key,
+    required this.text,
+    this.onPressed,
+    this.isLoading = false,
+    this.width,
+    this.height = 48,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width ?? double.infinity,
+      height: height,
+      child: ElevatedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white.withOpacity(0.95),
+          foregroundColor: Colors.black,
+          shape: const StadiumBorder(),
+          elevation: 0,
+          disabledBackgroundColor: Colors.white.withOpacity(0.3),
+        ),
+        child: isLoading
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54),
+              )
+            : Text(
+                text,
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              ),
+      ),
+    );
+  }
+}

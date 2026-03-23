@@ -108,14 +108,7 @@ class _CloudProviderGroupState extends State<_CloudProviderGroup> {
           child: SingleChildScrollView(
             child: Padding(
               padding: EdgeInsets.only(bottom: MediaQuery.of(dialogContext).viewInsets.bottom),
-              child: Container(
-                width: MediaQuery.of(dialogContext).size.width * 0.9,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1C29),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.12)),
-                ),
+              child: HalideModalContainer(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -135,80 +128,20 @@ class _CloudProviderGroupState extends State<_CloudProviderGroup> {
                       style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.35),
                     ),
                     const SizedBox(height: 20),
-                    TextField(
+                    HalideTextField(
                       controller: hostController,
-                      maxLines: 1,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Host',
-                        labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Colors.blueAccent),
-                        ),
-                      ),
+                      label: 'Host',
                     ),
                     const SizedBox(height: 16),
-                    TextField(
+                    HalideTextField(
                       controller: usernameController,
-                      maxLines: 1,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Username',
-                        labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Colors.blueAccent),
-                        ),
-                      ),
+                      label: 'Username',
                     ),
                     const SizedBox(height: 16),
-                    TextField(
+                    HalideTextField(
                       controller: passwordController,
-                      maxLines: 1,
+                      label: 'Password',
                       obscureText: true,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Colors.blueAccent),
-                        ),
-                      ),
                     ),
                     const SizedBox(height: 24),
                     Row(
@@ -219,39 +152,28 @@ class _CloudProviderGroupState extends State<_CloudProviderGroup> {
                           child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
                         ),
                         const SizedBox(width: 8),
-                        SizedBox(
+                        HalideActionButton(
+                          text: 'Connect',
+                          width: 110,
                           height: 42,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              final host = hostController.text.trim();
-                              final username = usernameController.text.trim();
-                              final password = passwordController.text;
+                          onPressed: () {
+                            final host = hostController.text.trim();
+                            final username = usernameController.text.trim();
+                            final password = passwordController.text;
 
-                              if (host.isEmpty || username.isEmpty || password.isEmpty) {
-                                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please fill in host, username, and password.'),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              Navigator.of(dialogContext).pop(
-                                _NasConfig(host: host, username: username, password: password),
+                            if (host.isEmpty || username.isEmpty || password.isEmpty) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please fill in host, username, and password.'),
+                                ),
                               );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.95),
-                              foregroundColor: Colors.black,
-                              shape: const StadiumBorder(),
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 18),
-                            ),
-                            child: const Text(
-                              'Connect',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                          ),
+                              return;
+                            }
+
+                            Navigator.of(dialogContext).pop(
+                              _NasConfig(host: host, username: username, password: password),
+                            );
+                          },
                         ),
                       ],
                     ),
