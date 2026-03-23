@@ -136,94 +136,20 @@ Future<T?> showHalideModalBottomSheet<T>({
     },
   );
 }
-class HalideSimpleDialog extends StatelessWidget {
-  final String title;
-  final String message;
-  final String buttonText;
-  final VoidCallback? onButtonPressed;
 
-  const HalideSimpleDialog({
-    Key? key,
-    required this.title,
-    required this.message,
-    this.buttonText = 'OK',
-    this.onButtonPressed,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: MediaQuery.of(context).size.width * 0.85,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1C29),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 30,
-            spreadRadius: 10,
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.65),
-              fontSize: 14,
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 28),
-          ElevatedButton(
-            onPressed: onButtonPressed ?? () => Navigator.of(context).pop(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.95),
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              elevation: 0,
-            ),
-            child: Text(
-              buttonText,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+/// A standardized dark glass container for modals and dialogs.
 class HalideModalContainer extends StatelessWidget {
   final Widget child;
   final double borderRadius;
-  final bool hasInnerBorder;
   final EdgeInsets padding;
+  final bool hasInnerBorder;
 
   const HalideModalContainer({
     Key? key,
     required this.child,
-    this.borderRadius = 24,
+    this.borderRadius = 32,
+    this.padding = const EdgeInsets.all(32),
     this.hasInnerBorder = true,
-    this.padding = const EdgeInsets.all(24),
   }) : super(key: key);
 
   @override
@@ -235,13 +161,13 @@ class HalideModalContainer extends StatelessWidget {
         width: width * 0.9,
         padding: padding,
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1C29),
+          color: const Color(0xFF1A1C29).withOpacity(0.95),
           borderRadius: BorderRadius.circular(borderRadius),
-          border: hasInnerBorder ? Border.all(color: Colors.white.withOpacity(0.12)) : null,
+          border: hasInnerBorder ? Border.all(color: Colors.white.withOpacity(0.08)) : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
-              blurRadius: 30,
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 40,
               spreadRadius: 10,
             ),
           ],
@@ -252,21 +178,32 @@ class HalideModalContainer extends StatelessWidget {
   }
 }
 
+/// A minimalist premium text field with underline border and uppercase labels.
 class HalideTextField extends StatelessWidget {
-  final TextEditingController controller;
+  final TextEditingController? controller;
   final String label;
   final IconData? prefixIcon;
   final bool obscureText;
-  final TextInputType keyboardType;
+  final TextInputType? keyboardType;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onTap;
+  final int maxLines;
+  final FocusNode? focusNode;
   final String? Function(String?)? validator;
 
   const HalideTextField({
     Key? key,
-    required this.controller,
+    this.controller,
     required this.label,
     this.prefixIcon,
     this.obscureText = false,
-    this.keyboardType = TextInputType.text,
+    this.keyboardType,
+    this.errorText,
+    this.onChanged,
+    this.onTap,
+    this.maxLines = 1,
+    this.focusNode,
     this.validator,
   }) : super(key: key);
 
@@ -276,36 +213,47 @@ class HalideTextField extends StatelessWidget {
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      onChanged: onChanged,
+      onTap: onTap,
+      maxLines: maxLines,
+      focusNode: focusNode,
       validator: validator,
-      style: const TextStyle(color: Colors.white, fontSize: 16),
+      style: const TextStyle(
+        color: Colors.white, 
+        fontSize: 16,
+        letterSpacing: 0.5,
+      ),
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
-        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.white70, size: 20) : null,
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        labelText: label.toUpperCase(),
+        errorText: errorText,
+        labelStyle: TextStyle(
+          color: Colors.white.withOpacity(0.4), 
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 2.0,
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.white24),
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.white24, size: 20) : null,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        enabledBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.redAccent.withOpacity(0.5)),
+        focusedBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Colors.white),
         ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.redAccent),
+        errorBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Colors.redAccent),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        focusedErrorBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Colors.redAccent, width: 2),
+        ),
+        errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 11),
       ),
     );
   }
 }
 
+/// A standardized action button (White/Black) for modals.
 class HalideActionButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
@@ -332,19 +280,76 @@ class HalideActionButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
-          shape: const StadiumBorder(),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           elevation: 0,
+          disabledBackgroundColor: Colors.white.withOpacity(0.5),
         ),
         child: isLoading
             ? const SizedBox(
                 height: 24,
                 width: 24,
-                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black),
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black54),
               )
             : Text(
-                text,
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 1),
+                text.toUpperCase(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900, 
+                  fontSize: 15, 
+                  letterSpacing: 1.5,
+                ),
               ),
+      ),
+    );
+  }
+}
+
+class HalideSimpleDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final String buttonText;
+  final VoidCallback? onButtonPressed;
+
+  const HalideSimpleDialog({
+    Key? key,
+    required this.title,
+    required this.message,
+    this.buttonText = 'OK',
+    this.onButtonPressed,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return HalideModalContainer(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 14,
+              height: 1.6,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          HalideActionButton(
+            text: buttonText,
+            onPressed: onButtonPressed ?? () => Navigator.of(context).pop(),
+          ),
+        ],
       ),
     );
   }

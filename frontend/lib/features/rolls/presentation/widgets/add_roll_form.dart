@@ -5,6 +5,7 @@ import 'package:frontend/models/film_stock.dart';
 import 'package:frontend/models/camera.dart';
 import 'package:frontend/features/rolls/data/rolls_repository.dart';
 import 'package:frontend/features/rolls/presentation/bloc/rolls_bloc.dart';
+import 'package:frontend/core/widgets/halide_dialog.dart';
 
 class AddRollForm extends StatefulWidget {
   final RollsRepository repository;
@@ -36,10 +37,20 @@ class _AddRollFormState extends State<AddRollForm> {
   bool _isLoading = true;
   bool _showValidationError = false;
 
+  final _stockController = TextEditingController();
+  final _cameraController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _stockController.dispose();
+    _cameraController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -52,7 +63,7 @@ class _AddRollFormState extends State<AddRollForm> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -61,31 +72,22 @@ class _AddRollFormState extends State<AddRollForm> {
     return s.replaceAll('\u200b', '').trim();
   }
 
-  /// When query is empty, show all items for better browsing.
   Iterable<FilmStock> _filmStockOptionsForQuery(String query) {
     final q = _normalizeAutocompleteQuery(query).toLowerCase();
-    if (q.isEmpty) {
-      return _stocks;
-    }
+    if (q.isEmpty) return _stocks;
     return _stocks.where(
-      (stock) =>
-          stock.name.toLowerCase().contains(q) ||
-          stock.brand.toLowerCase().contains(q),
+      (stock) => stock.name.toLowerCase().contains(q) || stock.brand.toLowerCase().contains(q),
     );
   }
 
   Iterable<Camera> _cameraOptionsForQuery(String query) {
     final q = _normalizeAutocompleteQuery(query).toLowerCase();
-    if (q.isEmpty) {
-      return _cameras;
-    }
+    if (q.isEmpty) return _cameras;
     return _cameras.where(
       (camera) => camera.displayName.toLowerCase().contains(q),
     );
   }
 
-  /// RawAutocomplete only refreshes options when the field text changes; a brief
-  /// invisible character forces an update on tap so empty-query options appear.
   void _kickAutocompleteOptions(TextEditingController controller) {
     if (controller.text.isNotEmpty) return;
     controller.value = const TextEditingValue(
@@ -114,78 +116,75 @@ class _AddRollFormState extends State<AddRollForm> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
         }
       },
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Material(
-              type: MaterialType.transparency,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 500),
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                ),
-                child: _isLoading 
-                  ? const Center(child: CircularProgressIndicator())
-                  : SingleChildScrollView(
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'ADD NEW ROLL',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 2
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            _buildTextField('TITLE', (val) => _title = val),
-                            const SizedBox(height: 16),
-                            _buildTextField('DESCRIPTION', (val) => _description = val, maxLines: 3),
-                            const SizedBox(height: 16),
-                            _buildSearchableStockPicker(),
-                            const SizedBox(height: 16),
-                            _buildSearchableCameraPicker(),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(child: _buildNumberField('ISO', (val) => _shotAtIso = val)),
-                                const SizedBox(width: 16),
-                                Expanded(child: _buildNumberField('EXPIRED YEAR', (val) => _expiredYear = val)),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            _buildNumberField('TOTAL FRAMES (e.g. 36)', (val) => _maxFrames = val ?? 36),
-                            const SizedBox(height: 32),
-                            ElevatedButton(
-                              onPressed: _submit,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black,
-                                minimumSize: const Size(double.infinity, 50),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: const Text('INITIALIZE ROLL'),
-                            ),
-                          ],
-                        ),
+      child: HalideModalContainer(
+        padding: const EdgeInsets.all(32),
+        child: _isLoading 
+          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          : SingleChildScrollView(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'ADD NEW ROLL'.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 2.5,
                       ),
                     ),
+                    const SizedBox(height: 32),
+                    HalideTextField(
+                      label: 'TITLE',
+                      onChanged: (val) => _title = val,
+                    ),
+                    const SizedBox(height: 16),
+                    HalideTextField(
+                      label: 'DESCRIPTION',
+                      onChanged: (val) => _description = val,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildSearchableStockPicker(),
+                    const SizedBox(height: 16),
+                    _buildSearchableCameraPicker(),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: HalideTextField(
+                            label: 'ISO',
+                            keyboardType: TextInputType.number,
+                            onChanged: (val) => _shotAtIso = int.tryParse(val),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: HalideTextField(
+                            label: 'EXPIRED YEAR',
+                            keyboardType: TextInputType.number,
+                            onChanged: (val) => _expiredYear = int.tryParse(val),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    HalideTextField(
+                      label: 'TOTAL FRAMES (E.G. 36)',
+                      keyboardType: TextInputType.number,
+                      onChanged: (val) => _maxFrames = int.tryParse(val) ?? 36,
+                    ),
+                    const SizedBox(height: 48),
+                    HalideActionButton(
+                      text: 'INITIALIZE ROLL',
+                      onPressed: _submit,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
-        ),
       ),
     );
   }
@@ -193,22 +192,17 @@ class _AddRollFormState extends State<AddRollForm> {
   Widget _buildSearchableStockPicker() {
     return Autocomplete<FilmStock>(
       displayStringForOption: (stock) => '${stock.brand} ${stock.name}',
-      optionsBuilder: (textEditingValue) {
-        return _filmStockOptionsForQuery(textEditingValue.text);
-      },
+      optionsBuilder: (textEditingValue) => _filmStockOptionsForQuery(textEditingValue.text),
       onSelected: (stock) => setState(() {
         _selectedStock = stock;
         _showValidationError = false;
       }),
       fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-        return TextField(
+        return HalideTextField(
           controller: controller,
           focusNode: focusNode,
-          style: const TextStyle(color: Colors.white),
-          decoration: _inputDecoration(
-            'FILM STOCK (*)', 
-            errorText: (_showValidationError && _selectedStock == null) ? 'Please select a film stock' : null,
-          ),
+          label: 'FILM STOCK (*)', 
+          errorText: (_showValidationError && _selectedStock == null) ? 'PLEASE SELECT A FILM STOCK' : null,
           onTap: () => _kickAutocompleteOptions(controller),
         );
       },
@@ -218,12 +212,13 @@ class _AddRollFormState extends State<AddRollForm> {
           child: Material(
             color: Colors.transparent,
             child: Container(
-              width: MediaQuery.of(context).size.width - 96,
-              constraints: const BoxConstraints(maxHeight: 300),
+              width: MediaQuery.of(context).size.width * 0.8,
+              constraints: const BoxConstraints(maxHeight: 250),
+              margin: const EdgeInsets.only(top: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                color: const Color(0xFF1A1C29),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
               ),
               child: ListView.builder(
                 padding: EdgeInsets.zero,
@@ -248,16 +243,13 @@ class _AddRollFormState extends State<AddRollForm> {
   Widget _buildSearchableCameraPicker() {
     return Autocomplete<Camera>(
       displayStringForOption: (camera) => camera.displayName,
-      optionsBuilder: (textEditingValue) {
-        return _cameraOptionsForQuery(textEditingValue.text);
-      },
+      optionsBuilder: (textEditingValue) => _cameraOptionsForQuery(textEditingValue.text),
       onSelected: (camera) => setState(() => _selectedCamera = camera),
       fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-        return TextField(
+        return HalideTextField(
           controller: controller,
           focusNode: focusNode,
-          style: const TextStyle(color: Colors.white),
-          decoration: _inputDecoration('GEAR'),
+          label: 'GEAR',
           onTap: () => _kickAutocompleteOptions(controller),
         );
       },
@@ -267,12 +259,13 @@ class _AddRollFormState extends State<AddRollForm> {
           child: Material(
             color: Colors.transparent,
             child: Container(
-              width: MediaQuery.of(context).size.width - 96,
+              width: MediaQuery.of(context).size.width * 0.8,
               constraints: const BoxConstraints(maxHeight: 250),
+              margin: const EdgeInsets.only(top: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                color: const Color(0xFF1A1C29),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
               ),
               child: ListView.builder(
                 padding: EdgeInsets.zero,
@@ -291,36 +284,6 @@ class _AddRollFormState extends State<AddRollForm> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildTextField(String label, Function(String?) onSaved, {int maxLines = 1}) {
-    return TextField(
-      maxLines: maxLines,
-      style: const TextStyle(color: Colors.white),
-      onChanged: onSaved,
-      decoration: _inputDecoration(label),
-    );
-  }
-
-  Widget _buildNumberField(String label, Function(int?) onSaved) {
-    return TextField(
-      keyboardType: TextInputType.number,
-      style: const TextStyle(color: Colors.white),
-      onChanged: (val) => onSaved(int.tryParse(val)),
-      decoration: _inputDecoration(label),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label, {String? errorText}) {
-    return InputDecoration(
-      labelText: label,
-      errorText: errorText,
-      labelStyle: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
-      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.3))),
-      focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)),
-      errorStyle: const TextStyle(color: Colors.orangeAccent),
-      errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.orangeAccent)),
     );
   }
 

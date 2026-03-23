@@ -46,14 +46,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
     setState(() => _isLoading = true);
     try {
       await action();
-      // Sync with backend to ensure user record exists
       await ref.read(authServiceProvider).syncWithBackend();
-      // Log current user so you can verify login worked (see debug console)
-      final user = ref.read(authServiceProvider).currentUser;
-      if (user != null) {
-        debugPrint('[Auth] Login OK — uid: ${user.uid}, email: ${user.email}, displayName: ${user.displayName}');
-      }
-      // On success, GoRouter will handle redirection via AuthNotifier
     } catch (e) {
       if (mounted) _showError(e.toString());
     } finally {
@@ -127,16 +120,12 @@ class _LoginViewState extends ConsumerState<LoginView> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Local background image for premium aesthetic
           Positioned.fill(
             child: Image.asset(
               'assets/images/login_bg.png',
               fit: BoxFit.cover,
-              height: double.infinity,
-              width: double.infinity,
             ),
           ),
-          // Gradient Overlay
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -159,9 +148,19 @@ class _LoginViewState extends ConsumerState<LoginView> {
                 child: Column(
                   children: [
                     _buildLogoHeader(),
+                    const SizedBox(height: 48),
+                    if (!_showOTPField) ...[
+                      _buildAuthButton('Login with Email', Icons.email_outlined, _showEmailDialog),
+                      const SizedBox(height: 16),
+                      _buildAuthButton('Login with Phone', Icons.phone_android_outlined, _showPhoneInput),
+                      const SizedBox(height: 16),
+                      _buildAuthButton('Login with Google', Icons.g_mobiledata_rounded, _loginWithGoogle),
+                      const SizedBox(height: 16),
+                      _buildAuthButton('Login with Apple', Icons.apple_rounded, _loginWithApple),
+                    ] else ...[
+                      _buildOTPView(),
+                    ],
                     const SizedBox(height: 32),
-                    _buildGlassCard(),
-                    const SizedBox(height: 24),
                     _buildFooter(),
                   ],
                 ),
@@ -187,124 +186,53 @@ class _LoginViewState extends ConsumerState<LoginView> {
   Widget _buildLogoHeader() {
     return Column(
       children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
-                color: Colors.white.withOpacity(0.05),
-              ),
-            ),
-            const Icon(Icons.camera_rounded, color: Colors.white, size: 48),
-          ],
-        ),
-        const SizedBox(height: 20),
+        const Icon(Icons.camera_rounded, color: Colors.white, size: 64),
+        const SizedBox(height: 16),
         const Text(
-          'Halide',
+          'HALIDE',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 42,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
+            fontSize: 48,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 4,
           ),
         ),
-        const Text(
-          'Film Photography',
-          style: TextStyle(color: Colors.white54, fontSize: 14, letterSpacing: 1),
+        Text(
+          'FILM PHOTOGRAPHY'.toUpperCase(),
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.5), 
+            fontSize: 12, 
+            letterSpacing: 3,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildGlassCard() {
-    final width = MediaQuery.of(context).size.width;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              width: width * 0.9,
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: Colors.white.withOpacity(0.15)),
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    'Sign in to Halide',
-                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Start capturing analog moments again.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white60, fontSize: 14),
-                  ),
-                  const SizedBox(height: 40),
-
-                  if (!_showOTPField) ...[
-                    _buildContinueButton('Continue with Email', Icons.email_outlined, _showEmailDialog),
-                    const SizedBox(height: 16),
-                    _buildContinueButton('Continue with Phone', Icons.phone_android_outlined, _showPhoneInput),
-                    const SizedBox(height: 16),
-                    _buildContinueButton('Continue with Google', Icons.g_mobiledata_rounded, _loginWithGoogle),
-                    const SizedBox(height: 16),
-                    _buildContinueButton('Continue with Apple', Icons.apple_rounded, _loginWithApple),
-                  ] else ...[
-                    _buildTextField(_otpController, 'Verification Code', Icons.sms_outlined),
-                    const SizedBox(height: 24),
-                    _buildActionButton('Verify & Login', _signInWithOTP),
-                    TextButton(
-                      onPressed: () => setState(() => _showOTPField = false),
-                      child: const Text('Back to options', style: TextStyle(color: Colors.white60)),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContinueButton(String text, IconData icon, VoidCallback onPressed) {
+  Widget _buildAuthButton(String text, IconData icon, VoidCallback onPressed) {
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.white.withOpacity(0.2)),
-          shape: const StadiumBorder(),
-          backgroundColor: Colors.white.withOpacity(0.02),
+          side: BorderSide(color: Colors.white.withOpacity(0.15)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white.withOpacity(0.05),
         ),
         child: Row(
           children: [
             Icon(icon, color: Colors.white70, size: 24),
             Expanded(
               child: Center(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    text,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
+                child: Text(
+                  text.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
                   ),
                 ),
               ),
@@ -316,38 +244,51 @@ class _LoginViewState extends ConsumerState<LoginView> {
     );
   }
 
-  Widget _buildActionButton(String text, VoidCallback onPressed) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white.withOpacity(0.95),
-          foregroundColor: Colors.black,
-          shape: const StadiumBorder(),
-          elevation: 0,
-        ),
-        child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+  Widget _buildOTPView() {
+    return HalideModalContainer(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'VERIFY PHONE',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 2),
+          ),
+          const SizedBox(height: 32),
+          HalideTextField(
+            controller: _otpController,
+            label: 'VERIFICATION CODE',
+            prefixIcon: Icons.sms_outlined,
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 32),
+          HalideActionButton(
+            text: 'VERIFY & LOGIN',
+            onPressed: _signInWithOTP,
+          ),
+          TextButton(
+            onPressed: () => setState(() => _showOTPField = false),
+            child: Text(
+              'BACK TO OPTIONS'.toUpperCase(), 
+              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildFooter() {
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Don\'t have an account? ', style: TextStyle(color: Colors.white38)),
-            GestureDetector(
-              onTap: () => context.push('/register'),
-              child: const Text('Sign Up', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
+        Text('NEW HERE? '.toUpperCase(), style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11, fontWeight: FontWeight.bold)),
+        GestureDetector(
+          onTap: () => context.push('/register'),
+          child: Text(
+            'CREATE ACCOUNT'.toUpperCase(), 
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1),
+          ),
         ),
-        const SizedBox(height: 16),
-        const Text('Forgot password?', style: TextStyle(color: Colors.white24, fontSize: 13)),
       ],
     );
   }
@@ -355,59 +296,47 @@ class _LoginViewState extends ConsumerState<LoginView> {
   void _showEmailDialog() {
     showHalideDialog(
       context: context,
-      builder: (context) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: _BaseAuthModal(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Email Sign In',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.left,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(_emailController, 'Email', Icons.email_outlined),
-                const SizedBox(height: 16),
-                _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 40,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _loginWithEmail();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withOpacity(0.95),
-                          foregroundColor: Colors.black,
-                          shape: const StadiumBorder(),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                        ),
-                        child: const Text(
-                          'Login',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+      builder: (context) => HalideModalContainer(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'EMAIL SIGN IN',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2),
+              textAlign: TextAlign.center,
             ),
-          ),
+            const SizedBox(height: 32),
+            HalideTextField(
+              controller: _emailController,
+              label: 'EMAIL',
+              prefixIcon: Icons.email_outlined,
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 16),
+            HalideTextField(
+              controller: _passwordController,
+              label: 'PASSWORD',
+              prefixIcon: Icons.lock_outline,
+              obscureText: true,
+            ),
+            const SizedBox(height: 40),
+            HalideActionButton(
+              text: 'LOGIN',
+              onPressed: () {
+                Navigator.pop(context);
+                _loginWithEmail();
+              },
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'CANCEL'.toUpperCase(), 
+                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -416,89 +345,51 @@ class _LoginViewState extends ConsumerState<LoginView> {
   void _showPhoneInput() {
     showHalideDialog(
       context: context,
-      builder: (context) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-            child: _BaseAuthModal(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Continue with Phone',
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.left,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'We will send a code to your number',
-                    style: TextStyle(color: Colors.white54, fontSize: 14),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildTextField(
-                    _phoneController,
-                    'Phone Number',
-                    Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 24),
-                  _buildActionButton('Send Verification Code', () {
-                    Navigator.pop(context);
-                    _verifyPhone();
-                  }),
-                ],
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: HalideModalContainer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'PHONE SIGN IN',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2),
+                textAlign: TextAlign.center,
               ),
-            ),
+              const SizedBox(height: 12),
+              Text(
+                'WE WILL SEND A CODE TO YOUR NUMBER'.toUpperCase(),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+              ),
+              const SizedBox(height: 32),
+              HalideTextField(
+                controller: _phoneController,
+                label: 'PHONE NUMBER',
+                prefixIcon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 40),
+              HalideActionButton(
+                text: 'SEND CODE',
+                onPressed: () {
+                  Navigator.pop(context);
+                  _verifyPhone();
+                },
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'CANCEL'.toUpperCase(), 
+                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool obscureText = false, TextInputType? keyboardType}) {
-    return TextField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      maxLines: 1,
-      expands: false,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-        prefixIcon: Icon(icon, color: Colors.white24),
-        isDense: true,
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.blueAccent)),
-      ),
-    );
-  }
-}
-
-class _BaseAuthModal extends StatelessWidget {
-  final Widget child;
-
-  const _BaseAuthModal({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    return Container(
-      width: width * 0.9,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1C29),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: child,
     );
   }
 }

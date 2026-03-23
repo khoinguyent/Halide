@@ -67,7 +67,7 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_gearType} added successfully'),
+            content: Text('${_gearType.toUpperCase()} ADDED SUCCESSFULLY'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -77,7 +77,7 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add gear: $e'),
+            content: Text('FAILED TO ADD GEAR: $e'),
             backgroundColor: Colors.orangeAccent,
             behavior: SnackBarBehavior.floating,
           ),
@@ -107,38 +107,34 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w900,
                       color: Colors.white,
-                      letterSpacing: 2,
+                      letterSpacing: 2.5,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   _buildGearTypeSelector(),
                   const SizedBox(height: 32),
                   HalideTextField(
                     controller: _nicknameController,
                     label: 'NICKNAME',
-                    prefixIcon: Icons.label_outline,
                   ),
                   const SizedBox(height: 16),
                   HalideTextField(
                     controller: _brandController,
                     label: 'MANUFACTURER',
-                    prefixIcon: Icons.business_outlined,
                   ),
                   const SizedBox(height: 16),
                   HalideTextField(
                     controller: _modelController,
                     label: 'MODEL',
-                    prefixIcon: Icons.camera_alt_outlined,
                   ),
                   const SizedBox(height: 16),
                   HalideTextField(
                     controller: _serialController,
                     label: 'SERIAL NUMBER',
-                    prefixIcon: Icons.tag,
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 48),
                   HalideActionButton(
                     text: 'SAVE ${_gearType.toUpperCase()}',
                     isLoading: _isLoading,
@@ -181,10 +177,10 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
         child: Text(
           type.toUpperCase(),
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white38,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-            fontSize: 12,
+            color: isSelected ? Colors.white : Colors.white24,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2.0,
+            fontSize: 11,
           ),
         ),
       ),

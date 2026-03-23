@@ -379,93 +379,63 @@ class _DriveUrlBottomSheetState extends ConsumerState<_DriveUrlBottomSheet> {
     super.dispose();
   }
 
-  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: HalideModalContainer(
+        padding: const EdgeInsets.only(top: 32, left: 24, right: 24, bottom: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'LINK DRIVE URL',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 32),
+            HalideTextField(
+              controller: _controller,
+              label: 'DRIVE LINK',
+              prefixIcon: Icons.link_rounded,
+            ),
+            const SizedBox(height: 48),
+            HalideActionButton(
+              text: 'SAVE & SYNC',
+              isLoading: _isSaving,
+              onPressed: () async {
+                final url = _controller.text.trim();
+                if (url.isEmpty) return;
+                setState(() => _isSaving = true);
+                debugPrint('Linking drive URL for roll=${widget.rollId}: $url');
+                try {
+                  await _api.patch(
+                    '/api/v1/rolls/${widget.rollId}/drive-url',
+                    data: {'drive_url': url},
+                  );
+                  // Refresh any roll lists/details so the icon state updates.
+                  ref.invalidate(dashboardRollsProvider);
+                  ref.invalidate(rollDetailProvider(widget.rollId));
+                  if (context.mounted) Navigator.of(context).pop();
+                  // After saving, immediately trigger fetch (as requested).
+                  await widget.onSavedFetch?.call(url);
+                } catch (e) {
+                  if (!context.mounted) return;
+                  setState(() => _isSaving = false);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to save drive URL: $e')),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
         ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Link Drive URL',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            controller: _controller,
-            style: const TextStyle(color: Colors.black87),
-            decoration: InputDecoration(
-              labelText: 'Drive URL (folder or ZIP)',
-              labelStyle: const TextStyle(color: Colors.black54, fontSize: 13),
-              filled: true,
-              fillColor: Colors.grey.withOpacity(0.10),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: Colors.black.withOpacity(0.10)),
-              ),
-              focusedBorder: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(16)),
-                borderSide: BorderSide(color: Colors.blueAccent),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _isSaving
-                ? null
-                : () async {
-                    final url = _controller.text.trim();
-                    if (url.isEmpty) return;
-                    setState(() => _isSaving = true);
-                    debugPrint('Linking drive URL for roll=${widget.rollId}: $url');
-                    try {
-                      await _api.patch(
-                        '/api/v1/rolls/${widget.rollId}/drive-url',
-                        data: {'drive_url': url},
-                      );
-                      // Refresh any roll lists/details so the icon state updates.
-                      ref.invalidate(dashboardRollsProvider);
-                      ref.invalidate(rollDetailProvider(widget.rollId));
-                      Navigator.of(context).pop();
-                      // After saving, immediately trigger fetch (as requested).
-                      await widget.onSavedFetch?.call(url);
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      setState(() => _isSaving = false);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to save drive URL: $e')),
-                      );
-                    }
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            child: _isSaving
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('SAVE', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 8),
-        ],
       ),
     );
   }
