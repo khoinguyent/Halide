@@ -65,6 +65,7 @@ class _MeterViewState extends ConsumerState<MeterView> {
     double selected = current.iso;
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: const Color(0xFF09090B),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -153,6 +154,7 @@ class _MeterViewState extends ConsumerState<MeterView> {
     double comp = current.evComp;
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: const Color(0xFF09090B),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -230,6 +232,7 @@ class _MeterViewState extends ConsumerState<MeterView> {
     double selected = current.aperture;
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: const Color(0xFF09090B),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -329,6 +332,7 @@ class _MeterViewState extends ConsumerState<MeterView> {
     double selected = current.shutterSpeed;
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: const Color(0xFF09090B),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

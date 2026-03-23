@@ -50,6 +50,7 @@ class CameraDetailView extends ConsumerWidget {
             onPressed: () {
               showModalBottomSheet(
                 context: context,
+                useRootNavigator: true,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
                 builder: (modalContext) {
@@ -398,6 +399,7 @@ class CameraDetailView extends ConsumerWidget {
     final maxHeight = MediaQuery.of(context).size.height - bottomInset - navBarHeight;
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => ConstrainedBox(
@@ -418,6 +420,7 @@ class CameraDetailView extends ConsumerWidget {
   void _showLinkLensSheet(BuildContext context, WidgetRef ref, String cameraId) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: const Color(0xFF1C1C1C),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
@@ -429,6 +432,7 @@ class CameraDetailView extends ConsumerWidget {
   static void _showCreateLensSheet(BuildContext context, WidgetRef ref, String cameraId) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _CreateLensSheet(cameraId: cameraId),

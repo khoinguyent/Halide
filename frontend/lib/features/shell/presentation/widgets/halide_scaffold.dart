@@ -8,6 +8,8 @@ import 'package:frontend/providers/rolls_provider.dart';
 import 'package:frontend/providers/dashboard_provider.dart';
 import 'package:frontend/features/rolls/presentation/widgets/add_roll_form.dart';
 import 'package:frontend/features/rolls/presentation/bloc/rolls_bloc.dart';
+import 'package:frontend/features/gear/presentation/widgets/add_gear_form.dart';
+import 'package:frontend/providers/gear_provider.dart';
 
 class HalideScaffold extends ConsumerWidget {
   final Widget child;
@@ -48,18 +50,25 @@ class HalideScaffold extends ConsumerWidget {
                       if (isActive) {
                         context.read<FrameLoggingBloc>().add(LogFrame({}));
                       } else {
-                        // Show premium glass Add Roll form
+                        // Context-aware FAB: Add Roll on Home(0), Add Gear on Locker(1)
+                        final isLocker = currentIndex == 1;
+                        
                         showHalideDialog(
                           context: context,
-                          builder: (context) => BlocProvider.value(
-                            value: ref.read(rollsBlocProvider),
-                            child: AddRollForm(
-                              repository: ref.read(rollsRepositoryProvider),
-                              onRollAdded: () {
-                                ref.invalidate(dashboardRollsProvider);
-                              },
-                            ),
-                          ),
+                          builder: (context) {
+                            if (isLocker) {
+                              return AddGearForm(
+                                onGearAdded: () => ref.invalidate(userGearProvider),
+                              );
+                            }
+                            return BlocProvider.value(
+                              value: ref.read(rollsBlocProvider),
+                              child: AddRollForm(
+                                repository: ref.read(rollsRepositoryProvider),
+                                onRollAdded: () => ref.invalidate(dashboardRollsProvider),
+                              ),
+                            );
+                          },
                         );
                       }
                     },

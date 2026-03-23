@@ -35,23 +35,10 @@ class LockerView extends ConsumerWidget {
         foregroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.white, size: 26),
         actions: [
-          Consumer(
-            builder: (context, ref, child) {
-              final plan = ref.watch(userPlanProvider);
-              final cameras = gearAsync.value ?? [];
-              
-              if (plan == UserPlan.free && cameras.length >= 1) {
-                return const SizedBox.shrink();
-              }
-              // PRO and PLUS users can add more gear. 
-              // (User specifically asked for Pro to have unlimited)
-
-              return IconButton(
-                icon: const Icon(Icons.add_rounded),
-                tooltip: 'Add gear',
-                onPressed: () => context.push('/locker/add-gear'),
-              );
-            },
+          IconButton(
+            icon: const Icon(Icons.add_rounded),
+            tooltip: 'Add gear',
+            onPressed: () => context.push('/locker/add-gear'),
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
@@ -120,6 +107,7 @@ class LockerView extends ConsumerWidget {
   static void _showGearStatusSheet(BuildContext context, WidgetRef ref, Camera camera) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (_) => GearStatusSelector(
         currentStatus: camera.status,
