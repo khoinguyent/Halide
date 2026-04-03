@@ -1,0 +1,143 @@
+{
+  "identifier" : "B9E2B2D1",
+  "nonRenewingSubscriptions" : [ ],
+  "products" : [ ],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingThresholdAmount" : "unlimited",
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : [
+      {
+        "currentError" : {
+          "index" : 2,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "currentError" : {
+          "index" : 1,
+          "type" : "purchase"
+        },
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "currentError" : {
+          "index" : 0,
+          "type" : "verification"
+        },
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "currentError" : {
+          "index" : 2,
+          "type" : "restore"
+        },
+        "enabled" : false,
+        "name" : "App Store Sync"
+      }
+    ],
+    "_timeRate" : 1000
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "7E2C9G1H",
+      "localizations" : [ ],
+      "name" : "Halide Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "3.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "PLUS_MONTHLY",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlocked gear, Drive syncing, and more.",
+              "displayName" : "Halide Plus Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "halide_plus_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Plus Monthly",
+          "subscriptionGroupID" : "7E2C9G1H",
+          "type" : "Auto-Renewable Subscription"
+        },
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "39.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "PLUS_ANNUAL",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "The best value for Plus features.",
+              "displayName" : "Halide Plus Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "halide_plus_annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Plus Annual",
+          "subscriptionGroupID" : "7E2C9G1H",
+          "type" : "Auto-Renewable Subscription"
+        },
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "5.99",
+          "familyShareable" : false,
+          "groupNumber" : 3,
+          "internalID" : "PRO_MONTHLY",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Cloud storage and light metering.",
+              "displayName" : "Halide Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "halide_pro_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "7E2C9G1H",
+          "type" : "Auto-Renewable Subscription"
+        },
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "59.99",
+          "familyShareable" : false,
+          "groupNumber" : 4,
+          "internalID" : "PRO_ANNUAL",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "The ultimate Halide experience.",
+              "displayName" : "Halide Pro Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "halide_pro_annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Annual",
+          "subscriptionGroupID" : "7E2C9G1H",
+          "type" : "Auto-Renewable Subscription"
+        }
+      ]
+    }
+  ],
+  "version" : [
+    1,
+    2
+  ]
+}

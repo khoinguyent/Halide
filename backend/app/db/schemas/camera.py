@@ -50,6 +50,8 @@ class UserLensOut(UserLensBase):
     class Config:
         from_attributes = True
 
+from ..models.camera import GearStatusEnum
+
 class UserCameraBase(BaseModel):
     camera_id: UUID
     gear_nickname: Optional[str] = None
@@ -58,6 +60,7 @@ class UserCameraBase(BaseModel):
     rating_looking: Optional[int] = None
     image_urls: Optional[List[str]] = None
     primary_image_index: int = 0
+    status: GearStatusEnum = GearStatusEnum.active
 
 class UserCameraCreate(BaseModel):
     camera_id: Optional[UUID] = None
@@ -66,12 +69,14 @@ class UserCameraCreate(BaseModel):
     gear_nickname: Optional[str] = None
     image_urls: Optional[List[str]] = None
     primary_image_index: int = 0
+    status: GearStatusEnum = GearStatusEnum.active
 
 class UserCameraUpdate(BaseModel):
     """Partial update for user camera (e.g. gear images)."""
     gear_nickname: Optional[str] = None
     image_urls: Optional[List[str]] = None
     primary_image_index: Optional[int] = None
+    status: Optional[GearStatusEnum] = None
 
 class UserCameraOut(UserCameraBase):
     id: UUID

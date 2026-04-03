@@ -2,13 +2,14 @@ import io
 import re
 from sqlalchemy.orm import Session
 from ..db.session import SessionLocal
+from ..db.models.user import User
 from ..db.models.storage_credential import StorageCredential, StorageProviderEnum
 from ..db.models.roll import Roll, RollStatusEnum
 from ..db.models.image import Image
 from .storage_service import storage_service
 from .roll_service import get_roll, update_roll_status
 from ..core.encryption import decrypt_credential
-from ..db.models.user import User
+from ..core.config import settings
 import time
 import random
 
@@ -55,7 +56,11 @@ class TransferService:
                 else: # LOCAL
                     main_key = self._handle_local_transfer(db, user_id, roll_id, image_id, file_content)
                 
-                # We return the main strategy key, but the system_cloud upload happened in background
+                # If we have a system (R2) key, and we're a pro user, we often prefer that
+                # over personal cloud (gdrive://) because gdrive isn't directly displayable on mobile.
+                if is_pro and system_key and main_key and main_key.startswith("gdrive://"):
+                    return system_key
+
                 return main_key or system_key
             except Exception as e:
                 if attempt == max_retries - 1:
@@ -70,14 +75,24 @@ class TransferService:
             raise Exception("User not found")
         
         file_size = len(file_content)
-        if user.storage_used_bytes + file_size > user.storage_limit_bytes:
+        if user.storage_used_bytes + file_size > user.total_storage_limit:
             raise Exception("Storage quota exceeded")
             
         s3_key = storage_service.upload_roll_image(user_id, roll_id, image_id, file_content)
         
         user.storage_used_bytes += file_size
         db.commit()
-        return s3_key
+
+        base_url = settings.R2_PUBLIC_BASE_URL.rstrip("/")
+        bucket = (settings.S3_BUCKET_NAME or "").strip()
+        
+        # Ensure bucket is in the public URL if it's not a custom domain pointing directly to it
+        if bucket and not base_url.endswith("/" + bucket):
+            url_base = f"{base_url}/{bucket}"
+        else:
+            url_base = base_url
+            
+        return f"{url_base}/{s3_key}"
 
     def _handle_personal_cloud(self, db: Session, user_id: str, roll_id: str, image_id: str, file_content: bytes):
         primary_cred = db.query(StorageCredential).filter(
@@ -114,62 +129,8 @@ class TransferService:
         
         # Let's say we retrieved a list of files matching `Inbox/{roll_id}/image_x.jpg`
         # We will simulate finding a file if we can query pending rolls for this user
-        self._mock_sync_pending_rolls(db, cred.user_id)
-
-    def _mock_sync_pending_rolls(self, db: Session, user_id: str):
-        # Find rolls for this user that are 'lab' or 'shooting'
-        pending_rolls = db.query(Roll).filter(
-            Roll.user_id == user_id, 
-            Roll.status.in_([RollStatusEnum.lab, RollStatusEnum.shooting])
-        ).all()
         
-        # Check if user has a designated archive storage
-        archive_cred = db.query(StorageCredential).filter(
-            StorageCredential.user_id == user_id,
-            StorageCredential.is_archive == True
-        ).first()
-
-        for roll in pending_rolls:
-            # Simulate downloading an image and organizing it
-            fake_image_content = b"fake jpeg content"
-            
-            # Create an Image record
-            new_image = Image(
-                roll_id=roll.id,
-                frame_number=1,
-                image_url="", # Will be updated
-            )
-            db.add(new_image)
-            db.commit()
-            db.refresh(new_image)
-            
-            # Determine strategy (Simplified: for now we check if they have a primary personal cloud)
-            primary_cred = db.query(StorageCredential).filter(
-                StorageCredential.user_id == user_id,
-                StorageCredential.is_primary == True
-            ).first()
-            
-            strategy = "PERSONAL_CLOUD" if primary_cred else "SYSTEM_CLOUD"
-            
-            try:
-                s3_key = self.route_transfer(
-                    db=db,
-                    user_id=user_id,
-                    roll_id=str(roll.id),
-                    image_id=str(new_image.id),
-                    file_content=fake_image_content,
-                    strategy=strategy
-                )
-                
-                # Update Image with the actual S3 key/url
-                new_image.image_url = s3_key
-                
-                # Update Roll status to scanned
-                roll.status = RollStatusEnum.scanned
-                
-                db.commit()
-            except Exception as e:
-                print(f"Failed to route transfer for roll {roll.id}: {e}")
-                db.rollback()
+        # self._mock_sync_pending_rolls(db, cred.user_id) # REMOVED: Prematurely updates status to SCANNED
+        pass
 
 transfer_service = TransferService()

@@ -51,7 +51,7 @@ class _HalideDialogBarrier extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
+    final viewInsets = MediaQuery.of(context).viewInsets;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final navBarHeight = kHalideModalNavBarReservedHeight + bottomPadding;
 
@@ -69,7 +69,7 @@ class _HalideDialogBarrier extends StatelessWidget {
             behavior: HitTestBehavior.opaque,
             child: ClipRect(
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                 child: Container(color: barrierColor),
               ),
             ),
@@ -87,8 +87,30 @@ class _HalideDialogBarrier extends StatelessWidget {
             child: Container(color: barrierColor),
           ),
         ),
-        // Dialog content
-        Center(child: child),
+        // Dialog content - Keyboard aware with scrolling support
+        Padding(
+          padding: EdgeInsets.only(
+            bottom: viewInsets.bottom,
+            top: MediaQuery.of(context).padding.top + 16, // Ensure title doesn't hide under status bar
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Align(
+                alignment: Alignment.center,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    // Limit height to available area minus the nav bar and some margin
+                    maxHeight: constraints.maxHeight - navBarHeight - 16,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: child,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
@@ -137,7 +159,7 @@ Future<T?> showHalideModalBottomSheet<T>({
   );
 }
 
-/// A standardized dark glass container for modals and dialogs.
+/// A standardized high-transparency glass container for modals and dialogs.
 class HalideModalContainer extends StatelessWidget {
   final Widget child;
   final double borderRadius;
@@ -159,20 +181,31 @@ class HalideModalContainer extends StatelessWidget {
       type: MaterialType.transparency,
       child: Container(
         width: width * 0.9,
-        padding: padding,
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1C29).withOpacity(0.95),
           borderRadius: BorderRadius.circular(borderRadius),
-          border: hasInnerBorder ? Border.all(color: Colors.white.withOpacity(0.08)) : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.4),
+              color: Colors.black.withOpacity(0.2),
               blurRadius: 40,
               spreadRadius: 10,
             ),
           ],
         ),
-        child: child,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              padding: padding,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(borderRadius),
+                border: hasInnerBorder ? Border.all(color: Colors.white.withOpacity(0.07)) : null,
+              ),
+              child: child,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -218,36 +251,37 @@ class HalideTextField extends StatelessWidget {
       maxLines: maxLines,
       focusNode: focusNode,
       validator: validator,
+      cursorColor: Colors.white,
       style: const TextStyle(
         color: Colors.white, 
-        fontSize: 16,
+        fontSize: 15,
         letterSpacing: 0.5,
       ),
       decoration: InputDecoration(
         labelText: label.toUpperCase(),
         errorText: errorText,
         labelStyle: TextStyle(
-          color: Colors.white.withOpacity(0.4), 
-          fontSize: 10,
+          color: Colors.white.withOpacity(0.35), 
+          fontSize: 9.5,
           fontWeight: FontWeight.w600,
-          letterSpacing: 2.0,
+          letterSpacing: 1.2,
         ),
-        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.white24, size: 20) : null,
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.white24, size: 18) : null,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
         enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
         ),
         focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white),
+          borderSide: BorderSide(color: Colors.white, width: 1.2),
         ),
         errorBorder: const UnderlineInputBorder(
           borderSide: BorderSide(color: Colors.redAccent),
         ),
         focusedErrorBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.redAccent, width: 2),
+          borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
         ),
-        errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 11),
+        errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 10, height: 1.2),
       ),
     );
   }
@@ -280,7 +314,7 @@ class HalideActionButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
           disabledBackgroundColor: Colors.white.withOpacity(0.5),
         ),
@@ -294,8 +328,8 @@ class HalideActionButton extends StatelessWidget {
                 text.toUpperCase(),
                 style: const TextStyle(
                   fontWeight: FontWeight.w900, 
-                  fontSize: 15, 
-                  letterSpacing: 1.5,
+                  fontSize: 14, 
+                  letterSpacing: 1.0,
                 ),
               ),
       ),
@@ -328,7 +362,7 @@ class HalideSimpleDialog extends StatelessWidget {
             title.toUpperCase(),
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w900,
               letterSpacing: 1.5,
             ),
@@ -339,8 +373,8 @@ class HalideSimpleDialog extends StatelessWidget {
             message,
             style: TextStyle(
               color: Colors.white.withOpacity(0.65),
-              fontSize: 14,
-              height: 1.6,
+              fontSize: 13,
+              height: 1.5,
             ),
             textAlign: TextAlign.center,
           ),

@@ -45,7 +45,6 @@ class GearStatusSelector extends StatelessWidget {
               trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
               onTap: () {
                 onStatusSelected(status);
-                Navigator.pop(context);
               },
             );
           }),

@@ -7,6 +7,7 @@ class RollStatusEnum(str, enum.Enum):
     loaded = 'loaded'
     shooting = 'shooting'
     lab = 'lab'
+    syncing = 'syncing'
     scanned = 'scanned'
     archived = 'archived'
 
@@ -25,4 +26,5 @@ class Roll(Base):
     description = Column(String(), nullable=True)
     # Google Drive shared Drive folder URL (or file ZIP URL/id) used for syncing scans.
     drive_url = Column(String(), nullable=True)
+    shot_offset = Column(Integer, server_default=text('0'))
     created_at = Column(DateTime, server_default=text('NOW()'))

@@ -12,6 +12,8 @@ class FullScreenViewer extends StatefulWidget {
   final Camera? camera;
   final int? iso;
   final DateTime? dateScanned;
+  final List<dynamic>? shots;
+  final int shotOffset;
 
   const FullScreenViewer({
     Key? key,
@@ -22,6 +24,8 @@ class FullScreenViewer extends StatefulWidget {
     this.camera,
     this.iso,
     this.dateScanned,
+    this.shots,
+    this.shotOffset = 0,
   }) : super(key: key);
 
   @override
@@ -162,7 +166,9 @@ class _FullScreenViewerState extends State<FullScreenViewer> {
                           'Scanned: ${widget.dateScanned!.toLocal().toString().split(' ')[0]}',
                           style: const TextStyle(color: Colors.white54, fontSize: 12),
                         ),
-                      ]
+                      ],
+                      if (widget.shots != null && widget.shots!.isNotEmpty)
+                        _buildShotMetadataOverlay(_currentIndex),
                     ],
                   ),
                 ),
@@ -171,6 +177,52 @@ class _FullScreenViewerState extends State<FullScreenViewer> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildShotMetadataOverlay(int imageIndex) {
+    if (widget.shots == null || widget.shots!.isEmpty) return const SizedBox.shrink();
+    
+    // The backend already shifts image_urls based on offset.
+    final shotIndex = imageIndex;
+    if (shotIndex < 0 || shotIndex >= widget.shots!.length) return const SizedBox.shrink();
+
+    final shot = widget.shots![shotIndex];
+    final aperture = shot['aperture'];
+    final speed = shot['shutter_speed'];
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _infoTile(Icons.camera_rounded, aperture != null ? 'f/$aperture' : '---'),
+              const SizedBox(width: 24),
+              _infoTile(Icons.timer_outlined, speed ?? '---'),
+              const Spacer(),
+              if (shot['location_lat'] != null)
+                const Icon(Icons.location_on_outlined, color: Colors.orange, size: 14),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoTile(IconData icon, String label) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.orange, size: 14),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 }

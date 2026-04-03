@@ -27,10 +27,6 @@ def run_seed(user_id: str = "test_user_123"):
         service.seed_master_data(db)
         print("Master data seeded.")
         
-        print(f"Populating developer data for user {user_id}...")
-        service.populate_dev_data(db, user_id)
-        print("Developer data populated.")
-        
     except Exception as e:
         print(f"Error during seeding: {e}")
         db.rollback()

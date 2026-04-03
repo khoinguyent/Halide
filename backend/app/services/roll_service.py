@@ -41,12 +41,12 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
             if lens:
                 lens_name = f"{lens.brand} {lens.model}"
     images = (
-        db.query(Image.image_url)
+        db.query(Image)
         .filter(Image.roll_id == r.id)
         .order_by(Image.frame_number)
         .all()
     )
-    keys = [row[0] for row in images]
+    keys = [row.image_url for row in images if row.image_url]
 
     # Image.image_url is stored as a storage key (not a full URL). Convert it
     # to an HTTP URL so the Flutter gallery can render via Image.network.
@@ -81,9 +81,16 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
             continue
         if k.startswith("users/"):
             image_urls.append(f"{url_base}/{k}".rstrip("/"))
-        elif k.startswith("/"):
-            # Local path reference for free tier
+        elif k.startswith("/") or k.startswith("http://") or k.startswith("https://"):
+            # Local path reference or full public URL
             image_urls.append(k)
+
+    # Apply shot_offset shift for alignment calibration
+    # Moves the first N frames to the end of the list.
+    if r.shot_offset and r.shot_offset > 0 and len(image_urls) > 0:
+        offset = r.shot_offset % len(image_urls)
+        image_urls = image_urls[offset:] + image_urls[:offset]
+
     total_frames = (r.max_frames if r.max_frames is not None else 36)
     actual_frames = len(image_urls)
     return RollOutDashboard(
@@ -93,6 +100,7 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         color=color,
         status=r.status.value,
         image_urls=image_urls,
+        shots=images,
         drive_url=getattr(r, "drive_url", None),
         title=r.title,
         description=r.description,
@@ -102,6 +110,7 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         lens_name=lens_name,
         frame_count=actual_frames,
         max_frames=total_frames,
+        shot_offset=r.shot_offset,
         created_at=r.created_at,
     )
 
@@ -155,6 +164,14 @@ def update_roll_status(db: Session, roll_id: str, new_status: RollStatusEnum, us
     current_idx = order.get(db_roll.status)
     new_idx = order.get(new_status)
     
+    if current_idx is None or new_idx is None:
+        # Handle unknown status or just log and proceed if order doesn't apply
+        db_roll.status = new_status
+        db.add(db_roll)
+        db.commit()
+        db.refresh(db_roll)
+        return db_roll
+        
     if new_idx < current_idx:
         raise HTTPException(
             status_code=400, 
@@ -178,8 +195,12 @@ def update_roll_meta(db: Session, roll_id: str, meta: RollMetaUpdate, user_id: s
 
     # Patch semantics: missing fields are treated as no-op at the DB layer by setting directly.
     # Frontend always sends title/description (possibly null) for editing.
-    db_roll.title = meta.title
-    db_roll.description = meta.description
+    if meta.title is not None:
+        db_roll.title = meta.title
+    if meta.description is not None:
+        db_roll.description = meta.description
+    if meta.shot_offset is not None:
+        db_roll.shot_offset = meta.shot_offset
 
     db.add(db_roll)
     db.commit()
@@ -222,3 +243,27 @@ def add_local_images(db: Session, roll_id: str, local_paths: list[str], user_id:
 
     db.commit()
     return new_images
+
+
+def log_shot(db: Session, roll_id: str, aperture: float, shutter_speed: str, lat: float, lng: float, user_id: str):
+    db_roll = get_roll(db, roll_id, user_id)
+    if not db_roll:
+        raise HTTPException(status_code=404, detail="Roll not found")
+
+    # Get current max frame number
+    max_frame = db.query(func.max(Image.frame_number)).filter(Image.roll_id == str(roll_id)).scalar()
+    start_frame = (max_frame + 1) if max_frame is not None else 0
+
+    db_image = Image(
+        roll_id=str(roll_id),
+        frame_number=start_frame,
+        image_url=None,  # This is a log-only entry
+        aperture=aperture,
+        shutter_speed=shutter_speed,
+        location_lat=lat,
+        location_lng=lng
+    )
+    db.add(db_image)
+    db.commit()
+    db.refresh(db_image)
+    return db_image

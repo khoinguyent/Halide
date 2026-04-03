@@ -14,6 +14,10 @@ import '../providers/roll_provider.dart';
 import '../services/api_service.dart';
 import 'synced_image.dart';
 import 'status_selector.dart';
+import 'exif_capture_modal.dart';
+import '../services/roll_service.dart';
+import '../core/providers/notification_provider.dart';
+import '../core/models/notification_model.dart';
 
 class RollCard extends ConsumerStatefulWidget {
   final Roll roll;
@@ -50,28 +54,21 @@ class _RollCardState extends ConsumerState<RollCard> {
       final synced = (data is Map && data['synced_count'] != null)
           ? data['synced_count'].toString()
           : null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            synced != null ? 'Imported $synced new image(s).'
-              : 'Fetch completed.',
-          ),
-        ),
-      );
+      // No snackbar for background sync as per user request
     } on DioException catch (e) {
       if (!mounted) return;
       final data = e.response?.data;
       final detail = data is Map && data['detail'] != null ? data['detail'].toString() : null;
       debugPrint('[RollCard] Fetch failed: status=${e.response?.statusCode} detail=$detail data=$data');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fetch failed: ${detail ?? e.message ?? e.toString()}'),
-        ),
+      ref.read(notificationProvider.notifier).show(
+        'COULDN\'T RETRIEVE PHOTOS. PLEASE CHECK YOUR DRIVE LINK.',
+        type: NotificationType.error,
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Fetch failed: $e')),
+      ref.read(notificationProvider.notifier).show(
+        'SOMETHING WENT WRONG WHILE FETCHING PHOTOS.',
+        type: NotificationType.error,
       );
     } finally {
       if (!mounted) return;
@@ -92,146 +89,136 @@ class _RollCardState extends ConsumerState<RollCard> {
     final driveUrl = (roll.driveUrl ?? '').trim();
     final hasDriveUrl = driveUrl.isNotEmpty;
 
-    return GlassPanel(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Row: Status Badge (tappable quick action) and Timestamp
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                GestureDetector(
-                  onTap: () => _showQuickStatusSheet(context, ref, roll),
-                  child: _StatusBadge(status: roll.status),
-                ),
-                if (roll.createdAt != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _formatDate(roll.createdAt!),
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 12,
-                        ),
-                      ),
-                      if (showLinkFetchAction && !isFree) ...[
-                        const SizedBox(width: 10),
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () async {
-                            // Important: this must not trigger the parent's gallery/roll navigation tap.
-                            // The gesture is handled here, and the parent gesture should not fire.
-                            if (_fetchingRollId == roll.id) return;
-                            if (hasDriveUrl) {
-                              await _handleFetchScans(roll.id, driveUrl);
-                            } else {
-                              await _showUrlBottomSheet(
-                                context,
-                                roll,
-                                onSavedFetch: (url) => _handleFetchScans(
-                                  roll.id,
-                                  url,
-                                ),
-                              );
-                            }
-                          },
-                          child: _fetchingRollId == roll.id
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text(
-                                      'SYNCING',
-                                      style: TextStyle(
-                                        color: Colors.blueAccent,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
-                                      ),
+    return GestureDetector(
+      onTap: () => context.push('/roll/${roll.id}'),
+      child: GlassPanel(
+        padding: EdgeInsets.zero,
+        child: InkWell(
+          onTap: () => context.push('/roll/${roll.id}'),
+          borderRadius: BorderRadius.circular(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Row: Status Badge (tappable quick action) and Timestamp
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _showQuickStatusSheet(context, ref, roll),
+                      child: _StatusBadge(status: roll.status),
+                    ),
+                    if (roll.createdAt != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatDate(roll.createdAt!),
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (showLinkFetchAction && !isFree) ...[
+                            const SizedBox(width: 10),
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () async {
+                                if (_fetchingRollId == roll.id) return;
+                                if (hasDriveUrl) {
+                                  await _handleFetchScans(roll.id, driveUrl);
+                                } else {
+                                  await _showUrlBottomSheet(
+                                    context,
+                                    roll,
+                                    onSavedFetch: (url) => _handleFetchScans(
+                                      roll.id,
+                                      url,
                                     ),
-                                    const SizedBox(width: 8),
-                                    const SizedBox(
-                                      width: 12,
-                                      height: 12,
+                                  );
+                                }
+                              },
+                              child: (_fetchingRollId == roll.id || roll.status == RollStatus.syncing)
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                         valueColor: AlwaysStoppedAnimation<Color>(
                                           Colors.blueAccent,
                                         ),
                                       ),
+                                    )
+                                  : Icon(
+                                      hasDriveUrl
+                                          ? Icons.cloud_download
+                                          : Icons.link_outlined,
+                                      size: 20,
+                                      color: hasDriveUrl
+                                          ? Colors.blueAccent
+                                          : Colors.white.withOpacity(0.55),
                                     ),
-                                  ],
-                                )
-                              : Icon(
-                                  hasDriveUrl
-                                      ? Icons.cloud_download
-                                      : Icons.link_outlined,
-                                  size: 20,
-                                  color: hasDriveUrl
-                                      ? Colors.blueAccent
-                                      : Colors.white.withOpacity(0.55),
-                                ),
-                        ),
-                      ],
-                    ],
-                  ),
-              ],
-            ),
+                            ),
+                          ],
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+
+              // Main Title & Subtitle
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (roll.title?.trim().isNotEmpty ?? false)
+                          ? roll.title!.trim()
+                          : roll.name,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${roll.name} - ${roll.cameraName ?? "Unknown Camera"}${roll.lensName != null && roll.lensName!.trim().isNotEmpty ? " + ${roll.lensName!.trim()}" : ""}',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: Colors.white.withOpacity(0.72),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      (roll.description?.trim().isNotEmpty ?? false)
+                          ? roll.description!.trim()
+                          : '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.7),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // State-specific content
+              _buildStateContent(),
+
+              const SizedBox(height: 16),
+            ],
           ),
-
-          // Main Title & Subtitle
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  (roll.title?.trim().isNotEmpty ?? false)
-                      ? roll.title!.trim()
-                      : roll.name,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${roll.name} - ${roll.cameraName ?? "Unknown Camera"}${roll.lensName != null && roll.lensName!.trim().isNotEmpty ? " + ${roll.lensName!.trim()}" : ""}',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    color: Colors.white.withOpacity(0.72),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  (roll.description?.trim().isNotEmpty ?? false)
-                      ? roll.description!.trim()
-                      : '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.7),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // State-specific content
-          _buildStateContent(),
-
-          const SizedBox(height: 16),
-        ],
+        ),
       ),
     );
   }
@@ -240,10 +227,20 @@ class _RollCardState extends ConsumerState<RollCard> {
     final roll = widget.roll;
     switch (roll.status) {
       case RollStatus.shooting:
-        return _ShootingContent(maxFrames: roll.maxFrames);
+        return _ShootingContent(
+          rollId: roll.id,
+          maxFrames: roll.maxFrames,
+        );
       case RollStatus.lab:
-        return _LabContent(maxFrames: roll.maxFrames);
+        return _LabContent(rollId: roll.id, maxFrames: roll.maxFrames);
       case RollStatus.scanned:
+        return _ScannedContent(
+          rollId: roll.id,
+          imageUrls: roll.imageUrls,
+          actualFrames: roll.imageUrls.length,
+          totalFrames: roll.maxFrames,
+        );
+      case RollStatus.syncing:
         return _ScannedContent(
           rollId: roll.id,
           imageUrls: roll.imageUrls,
@@ -278,13 +275,13 @@ class _RollCardState extends ConsumerState<RollCard> {
           try {
             await rollService.updateRollStatus(token, roll.id, newStatus.name);
             ref.refresh(dashboardRollsProvider);
-            // Ensure the detail screen doesn't keep a stale cached roll status.
             ref.invalidate(rollDetailProvider(roll.id));
             return true;
           } catch (_) {
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Failed to update status')),
+              ref.read(notificationProvider.notifier).show(
+                'WE COULDN\'T UPDATE THE STATUS. PLEASE TRY AGAIN.',
+                type: NotificationType.error,
               );
             }
             return false;
@@ -324,6 +321,7 @@ class _StatusBadge extends StatelessWidget {
       case RollStatus.shooting: color = Colors.orange; break;
       case RollStatus.lab: color = Colors.blue; break;
       case RollStatus.scanned: color = Colors.green; break;
+      case RollStatus.syncing: color = Colors.blueAccent; break;
       case RollStatus.archived: color = Colors.grey; break;
     }
 
@@ -379,6 +377,7 @@ class _DriveUrlBottomSheetState extends ConsumerState<_DriveUrlBottomSheet> {
     super.dispose();
   }
 
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -412,23 +411,21 @@ class _DriveUrlBottomSheetState extends ConsumerState<_DriveUrlBottomSheet> {
                 final url = _controller.text.trim();
                 if (url.isEmpty) return;
                 setState(() => _isSaving = true);
-                debugPrint('Linking drive URL for roll=${widget.rollId}: $url');
                 try {
                   await _api.patch(
                     '/api/v1/rolls/${widget.rollId}/drive-url',
                     data: {'drive_url': url},
                   );
-                  // Refresh any roll lists/details so the icon state updates.
                   ref.invalidate(dashboardRollsProvider);
                   ref.invalidate(rollDetailProvider(widget.rollId));
                   if (context.mounted) Navigator.of(context).pop();
-                  // After saving, immediately trigger fetch (as requested).
                   await widget.onSavedFetch?.call(url);
                 } catch (e) {
                   if (!context.mounted) return;
                   setState(() => _isSaving = false);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to save drive URL: $e')),
+                  ref.read(notificationProvider.notifier).show(
+                    'COULDN\'T SAVE DRIVE LINK. PLEASE VERIFY THE URL.',
+                    type: NotificationType.error,
                   );
                 }
               },
@@ -441,43 +438,155 @@ class _DriveUrlBottomSheetState extends ConsumerState<_DriveUrlBottomSheet> {
   }
 }
 
-/// Not scanned: show total frames only (user input when creating roll).
-class _ShootingContent extends StatelessWidget {
+class _ShootingContent extends ConsumerWidget {
+  final String rollId;
   final int maxFrames;
 
-  const _ShootingContent({Key? key, required this.maxFrames}) : super(key: key);
+  const _ShootingContent({Key? key, required this.rollId, required this.maxFrames}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Text(
-        '$maxFrames Frames',
-        style: const TextStyle(color: Colors.white70, fontSize: 13),
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Text(
+            '$maxFrames Frames',
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: () => context.push('/roll/$rollId'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'VIEW LOGS →',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (ctx) => ExifCaptureModal(
+                      onLog: (aperture, shutter, lat, lng) async {
+                        final rollService = ref.read(rollServiceProvider);
+                        final user = ref.read(userProvider);
+                        if (user == null) return;
+                        final token = await user.getIdToken();
+                        if (token == null) return;
+
+                        try {
+                          await rollService.logShot(
+                            token,
+                            rollId,
+                            aperture: aperture,
+                            shutterSpeed: shutter,
+                            lat: lat,
+                            lng: lng,
+                          );
+                          ref.invalidate(dashboardRollsProvider);
+                          if (context.mounted) {
+                            ref.read(notificationProvider.notifier).show(
+                              'SHOT RECORDED!',
+                              type: NotificationType.success,
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ref.read(notificationProvider.notifier).show(
+                              'COULDN\'T RECORD SHOT. PLEASE TRY AGAIN.',
+                              type: NotificationType.error,
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  );
+                },
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: const Icon(Icons.camera_rounded, color: Colors.orange, size: 20),
+                ),
+                tooltip: 'Record Shot',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
-/// Not scanned: show total frames only.
 class _LabContent extends StatelessWidget {
+  final String rollId;
   final int maxFrames;
 
-  const _LabContent({Key? key, required this.maxFrames}) : super(key: key);
+  const _LabContent({Key? key, required this.rollId, required this.maxFrames}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Text(
-        '$maxFrames Frames',
-        style: const TextStyle(color: Colors.white70, fontSize: 13),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Text(
+            '$maxFrames Frames',
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: TextButton(
+            onPressed: () => context.push('/roll/$rollId'),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'VIEW LOGS →',
+              style: TextStyle(
+                color: Colors.blue,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                letterSpacing: 1,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
-/// Scanned: show actual/total frames (e.g. 38/36 or 20/36).
 class _ScannedContent extends StatelessWidget {
   final String rollId;
   final List<String> imageUrls;
@@ -494,72 +603,74 @@ class _ScannedContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Treat blank/empty URLs as "no preview images yet".
-    // Also ignore non-displayable values (e.g. storage keys like users/.../x.jpg).
     final urls = imageUrls
         .where((u) => u.trim().isNotEmpty)
         .where((u) => u.startsWith('http') || u.startsWith('/'))
         .toList(growable: false);
     final effectiveActualFrames = urls.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(
-            '$effectiveActualFrames/$totalFrames Frames',
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
-          ),
-        ),
-        if (urls.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 100,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: urls.length,
-              itemBuilder: (context, index) {
-                return Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  width: 140,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.white.withOpacity(0.08),
-                  ),
-                  child: SyncedImage(
-                    rollId: rollId,
-                    imageUrl: urls[index],
-                    fit: BoxFit.cover,
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: TextButton(
-            onPressed: urls.isEmpty ? null : () => context.push('/roll/$rollId'),
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => context.push('/roll/$rollId'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
-              'OPEN GALLERY →',
-              style: TextStyle(
-                color: Colors.blueAccent,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-                letterSpacing: 1,
+              '$effectiveActualFrames/$totalFrames Frames',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ),
+          if (urls.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 100,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: urls.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    width: 140,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white.withOpacity(0.08),
+                    ),
+                    child: SyncedImage(
+                      rollId: rollId,
+                      imageUrl: urls[index],
+                      fit: BoxFit.cover,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: TextButton(
+              onPressed: () => context.push('/roll/$rollId'),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'OPEN GALLERY →',
+                style: TextStyle(
+                  color: Colors.blueAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  letterSpacing: 1,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

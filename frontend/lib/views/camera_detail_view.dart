@@ -8,6 +8,9 @@ import '../models/camera.dart';
 import '../models/lens.dart';
 import '../models/gear_status.dart';
 import '../models/user_profile.dart';
+import '../widgets/gear_image_uploader_widget.dart';
+import '../core/providers/notification_provider.dart';
+import '../core/models/notification_model.dart';
 import '../providers/gear_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/upload_service.dart';
@@ -291,7 +294,10 @@ class CameraDetailView extends ConsumerWidget {
                 GestureDetector(
                   onTap: () {
                     if (plan == UserPlan.free && camera.lenses.length >= 1) {
-                      showHalideSnackBar('Free tier is limited to 1 lens. Upgrade to add more.');
+                      ref.read(notificationProvider.notifier).show(
+                        'Free tier is limited to 1 lens. Upgrade to add more.',
+                        type: NotificationType.error,
+                      );
                       return;
                     }
                     _showLinkLensSheet(context, ref, cameraId);
@@ -542,7 +548,10 @@ class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
     final model = _modelController.text.trim();
     
     if (brand.isEmpty || model.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Brand and Model are required')));
+      ref.read(notificationProvider.notifier).show(
+        'BRAND AND MODEL ARE REQUIRED.',
+        type: NotificationType.error,
+      );
       return;
     }
 
@@ -556,7 +565,12 @@ class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
       }, widget.cameraId);
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to create lens: $e')));
+      if (mounted) {
+        ref.read(notificationProvider.notifier).show(
+          'WE COULDN\'T CREATE THE LENS. PLEASE TRY AGAIN.',
+          type: NotificationType.error,
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -972,6 +986,7 @@ class _EditGearSheetState extends State<_EditGearSheet> {
   late TextEditingController _serialController;
   late TextEditingController _formatController;
   late GearStatus _status;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -998,7 +1013,7 @@ class _EditGearSheetState extends State<_EditGearSheet> {
   Widget build(BuildContext context) {
     // Reserve space so save button stays above bottom nav bar (match nav bar height used in showModalBottomSheet)
     const navBarHeight = 88.0;
-    final bottomPadding = MediaQuery.of(context).padding.bottom + navBarHeight;
+    final bottomPadding = MediaQuery.of(context).padding.bottom + MediaQuery.of(context).viewInsets.bottom + navBarHeight;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.88,
@@ -1051,7 +1066,8 @@ class _EditGearSheetState extends State<_EditGearSheet> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
-                        onPressed: () {
+                        onPressed: _isSaving ? null : () {
+                          setState(() => _isSaving = true);
                           widget.onSave(
                             _nicknameController.text.trim(),
                             _brandController.text.trim(),
@@ -1063,7 +1079,9 @@ class _EditGearSheetState extends State<_EditGearSheet> {
                           Navigator.pop(context);
                         },
                         style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14)),
-                        child: const Text('Save changes'),
+                        child: _isSaving 
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54))
+                          : const Text('Save changes'),
                       ),
                     ),
                   ],

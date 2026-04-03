@@ -9,6 +9,7 @@ import 'package:frontend/features/rolls/data/rolls_repository.dart';
 import 'package:frontend/models/film_stock.dart';
 import 'package:frontend/models/camera.dart';
 import 'package:frontend/models/roll.dart';
+import 'package:frontend/models/roll_status.dart';
 
 class MockRollsRepository implements RollsRepository {
   @override
@@ -21,13 +22,39 @@ class MockRollsRepository implements RollsRepository {
   Future<List<Camera>> getCameras() async => [];
   
   @override
-  Future<Roll> createRoll({required String filmStockId, required String userCameraId, int? shotAtIso, int? expiredYear}) async {
+  Future<Roll> createRoll({
+    required String filmStockId,
+    String? userCameraId,
+    String? title,
+    String? description,
+    int? shotAtIso,
+    int? expiredYear,
+    int? maxFrames,
+  }) async {
     return Roll(
       id: 'new_id',
       userId: 'user',
       filmStockId: filmStockId,
-      userCameraId: userCameraId,
-      status: 'shooting',
+      userCameraId: userCameraId ?? '',
+      brand: 'TestBrand',
+      name: 'TestFilm',
+      color: Colors.grey,
+      status: RollStatus.shooting,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<Roll> updateRollStatus(String rollId, String status) async {
+    return Roll(
+      id: rollId,
+      userId: 'user',
+      filmStockId: 'fs_1',
+      userCameraId: 'cam_1',
+      brand: 'TestBrand',
+      name: 'TestFilm',
+      color: Colors.grey,
+      status: statusFromString(status),
       createdAt: DateTime.now(),
     );
   }

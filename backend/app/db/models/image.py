@@ -7,7 +7,7 @@ class Image(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     roll_id = Column(UUID(as_uuid=True), ForeignKey("rolls.id"))
     frame_number = Column(Integer)
-    image_url = Column(String, nullable=False)
+    image_url = Column(String, nullable=True)
     aperture = Column(Float)
     shutter_speed = Column(String(20))
     notes = Column(String)

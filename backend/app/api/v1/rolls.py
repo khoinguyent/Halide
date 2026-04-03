@@ -94,3 +94,28 @@ def add_local_images(
         user_id=current_user.id
     )
 
+
+class ShotCreate(BaseModel):
+    aperture: float
+    shutter_speed: str
+    lat: float
+    lng: float
+
+
+@router.post("/rolls/{id}/shots", response_model=ImageOut)
+def log_shot(
+    id: UUID,
+    shot: ShotCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return roll_service.log_shot(
+        db=db,
+        roll_id=str(id),
+        aperture=shot.aperture,
+        shutter_speed=shot.shutter_speed,
+        lat=shot.lat,
+        lng=shot.lng,
+        user_id=current_user.id
+    )
+

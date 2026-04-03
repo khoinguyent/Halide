@@ -60,11 +60,13 @@ class GearService {
     List<String>? imageUrls,
     int? primaryImageIndex,
     String? gearNickname,
+    String? status,
   }) async {
     final body = <String, dynamic>{};
     if (imageUrls != null) body['image_urls'] = imageUrls;
     if (primaryImageIndex != null) body['primary_image_index'] = primaryImageIndex;
     if (gearNickname != null) body['gear_nickname'] = gearNickname;
+    if (status != null) body['status'] = status;
 
     final response = await http.patch(
       Uri.parse('${AppConfig.apiUrl}/user_cameras/$userCameraId'),

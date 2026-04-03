@@ -2,6 +2,7 @@
 /venv/
 __pycache__/
 *.pyc
+.DS_Store
 
 # Secrets and credentials (never commit)
 /keys/
@@ -11,8 +12,6 @@ __pycache__/
 *-service-account*.json
 *adminsdk*.json
 .env
-.env.local
-.env.*.local
-.env.*.example.local
+.env.*
 secrets/
 credentials/

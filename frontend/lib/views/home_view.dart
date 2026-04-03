@@ -80,8 +80,11 @@ class _HomeViewState extends ConsumerState<HomeView> {
           final filtered = _statusFilter == null
               ? rolls.where((r) => r.status != RollStatus.archived).toList()
               : rolls.where((r) => r.status == _statusFilter).toList();
+
           if (filtered.isEmpty) {
-            return _buildEmptyOrNoMatch(rolls.isEmpty);
+            // If we have rolls but they're all filtered out (e.g. all archived),
+            // and no specific filter is selected, show the empty state.
+            return _buildEmptyOrNoMatch(rolls.isEmpty || _statusFilter == null);
           }
           return RefreshIndicator(
             onRefresh: () async => ref.refresh(dashboardRollsProvider),
@@ -155,7 +158,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
             const Icon(Icons.filter_list_off, size: 48, color: Colors.white38),
             const SizedBox(height: 16),
             Text(
-              'No rolls with status "${_statusFilter!.label}"',
+              'No rolls with status "${_statusFilter?.label ?? 'active'}"',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white70, fontSize: 16),
             ),

@@ -1,6 +1,7 @@
 enum RollStatus {
   shooting('Shooting'),
   lab('At Lab'),
+  syncing('Syncing...'),
   scanned('Scanned'),
   archived('Archived');
 

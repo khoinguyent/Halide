@@ -65,7 +65,7 @@ class Camera {
 
   factory Camera.fromJson(Map<String, dynamic> json) {
     final camera = json['camera'] as Map<String, dynamic>?;
-    final urls = json['image_urls'] ?? camera?['image_urls'];
+    final urls = json['image_urls'];
     final urlList = urls is List ? urls.map((e) => e.toString()).toList() : <String>[];
     final primaryIdx = json['primary_image_index'] is int
         ? json['primary_image_index'] as int

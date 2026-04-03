@@ -1,83 +1,202 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:purchases_flutter/purchases_flutter.dart' as rc;
-import '../../../../core/widgets/glass_panel.dart';
-import '../../../../core/widgets/halide_scaffold.dart';
 import '../bloc/billing_bloc.dart';
-import 'package:frontend/features/billing/models/plan_model.dart';
+import '../../../../core/providers/notification_provider.dart';
+import '../../../../core/models/notification_model.dart';
+import '../../../../core/utils/subscription_trial_text.dart';
 
-class PaywallView extends StatefulWidget {
+class PaywallView extends ConsumerStatefulWidget {
   const PaywallView({Key? key}) : super(key: key);
 
   @override
-  State<PaywallView> createState() => _PaywallViewState();
+  ConsumerState<PaywallView> createState() => _PaywallViewState();
 }
 
-class _PaywallViewState extends State<PaywallView> {
-  bool _isProMode = true; // Default to Pro
-  final PageController _pageController = PageController(viewportFraction: 0.85, initialPage: 2); 
-  int _currentPage = 2;
+class _PaywallViewState extends ConsumerState<PaywallView> {
+  bool _isAnnual = true;
+  int _selectedPlanIndex = 1; // Default to Pro Plan
+  rc.Offerings? _cachedOfferings;
+  bool _isPurchasing = false;
+  late final BillingBloc _billingBloc;
+
+  final Map<int, List<String>> _planFeatures = {
+    0: [
+      'Unlimited rolls and gear',
+      'Fetch images from Lab Drive',
+      'Personal cloud (Drive, NAS)',
+      'Standard EXIF logging',
+      'Basic roll management',
+    ],
+    1: [
+      'Everything in Free',
+      '5GB dedicated cloud storage',
+      'Full Light Metering features',
+      'Precision Scan Alignment',
+      'Advanced AI metering advice',
+      'Priority support access',
+    ],
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _billingBloc = BillingBloc()..add(LoadOfferings());
+  }
 
   @override
   void dispose() {
-    _pageController.dispose();
+    _billingBloc.close();
     super.dispose();
+  }
+
+  /// Shown under Pro pricing; uses StoreKit/Play intro offer when loaded.
+  String? _proTrialFooterLine() {
+    final offerings = _cachedOfferings;
+    if (offerings == null) return null;
+    final pkg = proPackageForSelection(offerings, annual: _isAnnual);
+    if (pkg == null) return null;
+    return introOfferShortLabel(pkg.storeProduct);
+  }
+
+  String _subscribeButtonLabel(rc.Offerings? offerings) {
+    final pkg = offerings == null
+        ? null
+        : proPackageForSelection(offerings, annual: _isAnnual);
+    final intro = pkg?.storeProduct.introductoryPrice;
+    final freeTrial = intro != null && intro.price <= 0.001;
+    if (freeTrial) return 'Start free trial';
+    return 'Get Halide Pro';
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentPlans = _isProMode ? proPlans : plusPlans;
-
-    return BlocProvider(
-      create: (context) => BillingBloc()..add(LoadOfferings()),
-      child: HalideScaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: () => context.pop(),
-          ),
-          title: const Text(
-            'HALIDE PREMIUM',
-            style: TextStyle(
-              color: Colors.white,
-              letterSpacing: 2.5,
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-            ),
-          ),
-          centerTitle: true,
-        ),
-        child: BlocConsumer<BillingBloc, BillingState>(
+    return BlocProvider.value(
+      value: _billingBloc,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: BlocConsumer<BillingBloc, BillingState>(
           listener: (context, state) {
-            if (state is PurchaseSuccess) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Welcome to Halide Premium!')),
-              );
-              context.pop();
+            if (state is OfferingsLoaded) {
+              _cachedOfferings = state.offerings;
+              _isPurchasing = false;
+            } else if (state is PurchaseSuccess) {
+              if (_isPurchasing) {
+                _isPurchasing = false;
+                ref.read(notificationProvider.notifier).show(
+                  'Welcome to Halide Premium! Your plan is now active.',
+                  type: NotificationType.success,
+                );
+              }
+              // Navigate to profile instead of just popping
+              context.go('/profile');
             } else if (state is BillingError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error: ${state.message}')),
+              _isPurchasing = false;
+              ref.read(notificationProvider.notifier).show(
+                'Purchase could not be completed. Please try again.',
+                type: NotificationType.error,
               );
+              // Re-load offerings so button stays functional
+              _billingBloc.add(LoadOfferings());
+            } else if (state is BillingLoading) {
+              // Only mark as purchasing if we already have offerings loaded
+              if (_cachedOfferings != null) {
+                _isPurchasing = true;
+              }
             }
           },
           builder: (context, state) {
-            return Column(
+            final activeFeatures = _planFeatures[_selectedPlanIndex] ?? [];
+            return Stack(
               children: [
-                const SizedBox(height: 12),
-                _buildTierToggle(),
-                const SizedBox(height: 32),
-                Expanded(
-                  child: _buildCarousel(state, currentPlans),
+                // Background Image
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/paywall_bg.png',
+                    fit: BoxFit.cover,
+                  ),
                 ),
-                const SizedBox(height: 20),
-                _buildPageIndicator(currentPlans.length),
-                const SizedBox(height: 24),
-                _buildFooterLinks(context),
-                const SizedBox(height: 40),
+                // Gradient Overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.3),
+                          Colors.black.withOpacity(0.8),
+                          Colors.black,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Content
+                SafeArea(
+                  child: Column(
+                    children: [
+                      // Close Button
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                            onPressed: () => context.pop(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Header
+                      const Text(
+                        'Choose Your Plan',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Text(
+                          'Unlock professional gear tracking, cloud-syncing, and advanced light metering',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      // Billing Toggle
+                      _buildBillingToggle(),
+                      const SizedBox(height: 40),
+                      // Features Checklist
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 48),
+                          child: SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            child: Column(
+                              children: activeFeatures.map((f) => _buildFeatureItem(f)).toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Plan Selector
+                      _buildPlanSelector(),
+                      const SizedBox(height: 32),
+                      // Subscribe Button
+                      _buildSubscribeButton(),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
               ],
             );
           },
@@ -86,249 +205,254 @@ class _PaywallViewState extends State<PaywallView> {
     );
   }
 
-  Widget _buildTierToggle() {
-    return Container(
-      width: 200,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
-      child: Row(
-        children: [
-          _buildToggleItem('PLUS', !_isProMode),
-          _buildToggleItem('PRO', _isProMode),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleItem(String label, bool isSelected) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() {
-          _isProMode = (label == 'PRO');
-        }),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 240),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFF97316) : Colors.transparent,
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white38,
-                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                fontSize: 11,
-                letterSpacing: 1.0,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCarousel(BillingState state, List<PlanDetails> plans) {
-    return PageView.builder(
-      controller: _pageController,
-      onPageChanged: (idx) => setState(() => _currentPage = idx),
-      itemCount: plans.length,
-      itemBuilder: (context, index) {
-        final plan = plans[index];
-        final isSelected = _currentPage == index;
-        return AnimatedScale(
-          scale: isSelected ? 1.0 : 0.9,
-          duration: const Duration(milliseconds: 240),
-          child: _PlanCard(
-            plan: plan,
-            isSelected: isSelected,
-            isPro: _isProMode,
-            onPurchase: (p) => context.read<BillingBloc>().add(PurchasePackage(p)),
-            offerings: (state is OfferingsLoaded) ? state.offerings : null,
-            isLoading: state is BillingLoading,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPageIndicator(int count) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(count, (index) {
-        final isActive = _currentPage == index;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 240),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 12 : 6,
-          height: 6,
-          decoration: BoxDecoration(
-            color: isActive ? const Color(0xFFF97316) : Colors.white24,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildFooterLinks(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _footerLink('Restore Purchases', () => context.read<BillingBloc>().add(RestorePurchases())),
-        _footerDivider(),
-        _footerLink('Terms of Service', () {}),
-        _footerDivider(),
-        _footerLink('Privacy Policy', () {}),
-      ],
-    );
-  }
-
-  Widget _footerLink(String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
-    );
-  }
-
-  Widget _footerDivider() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Text('|', style: TextStyle(color: Colors.white.withOpacity(0.1), fontSize: 10)),
-    );
-  }
-}
-
-class _PlanCard extends StatelessWidget {
-  final PlanDetails plan;
-  final bool isSelected;
-  final bool isPro;
-  final void Function(rc.Package) onPurchase;
-  final rc.Offerings? offerings;
-  final bool isLoading;
-
-  const _PlanCard({
-    required this.plan,
-    required this.isSelected,
-    required this.isPro,
-    required this.onPurchase,
-    this.offerings,
-    this.isLoading = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const orange500 = Color(0xFFF97316);
-
-    // Find RC Package from specific offering (plus or pro)
-    rc.Package? package;
-    if (offerings != null) {
-      final offeringId = isPro ? 'pro' : 'plus';
-      final specificOffering = offerings!.all[offeringId];
-      if (specificOffering != null) {
-        if (plan.id.contains('weekly')) package = specificOffering.weekly;
-        if (plan.id.contains('monthly')) package = specificOffering.monthly;
-        if (plan.id.contains('annually')) package = specificOffering.annual;
-      } else if (offerings!.current != null) {
-        // Fallback to current offering if specific ones are not set up yet
-        final current = offerings!.current!;
-        if (plan.id.contains('weekly')) package = current.weekly;
-        if (plan.id.contains('monthly')) package = current.monthly;
-        if (plan.id.contains('annually')) package = current.annual;
-      }
+  Widget _buildBillingToggle() {
+    // Hide toggle for Free plan
+    if (_selectedPlanIndex == 0) {
+      return const SizedBox(height: 50);
     }
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 240),
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      padding: const EdgeInsets.all(24),
+    return Container(
+      width: 280,
+      height: 50,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(
-          color: isSelected ? orange500.withOpacity(0.5) : Colors.white.withOpacity(0.1),
-          width: isSelected ? 2 : 1,
-        ),
-        boxShadow: isSelected 
-          ? [BoxShadow(color: orange500.withOpacity(0.1), blurRadius: 30, spreadRadius: 2)]
-          : [],
+        color: Colors.black.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: Colors.blue.withOpacity(0.3)),
       ),
-      child: Column(
+      child: Stack(
         children: [
-          Icon(plan.icon, color: isSelected ? orange500 : Colors.white30, size: 32),
-          const SizedBox(height: 16),
-          Text(
-            plan.title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.0,
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            alignment: _isAnnual ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 140,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(25),
+              ),
             ),
           ),
-          if (plan.isBestValue) ...[
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: orange500, borderRadius: BorderRadius.circular(6)),
-              child: const Text('BEST VALUE', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
-            ),
-          ],
-          const SizedBox(height: 24),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: plan.features.map((f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle, color: orange500, size: 16),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          f.title,
-                          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w300),
-                        ),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _isAnnual = false),
+                  child: Center(
+                    child: Text(
+                      'Monthly billing',
+                      style: TextStyle(
+                        color: _isAnnual ? Colors.white70 : Colors.white,
+                        fontWeight: _isAnnual ? FontWeight.normal : FontWeight.bold,
                       ),
-                    ],
+                    ),
                   ),
-                )).toList(),
+                ),
               ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _isAnnual = true),
+                  child: Center(
+                    child: Text(
+                      'Annual billing',
+                      style: TextStyle(
+                        color: _isAnnual ? Colors.white : Colors.white70,
+                        fontWeight: _isAnnual ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem(String feature) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.blue.withOpacity(0.5)),
             ),
+            child: const Icon(Icons.check, color: Colors.blue, size: 18),
           ),
-          const SizedBox(height: 20),
-          Text(
-            '${plan.price}${plan.duration}',
-            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
-          ),
-          if (plan.footerText != null) 
-             Text(plan.footerText!, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: (package == null || isLoading) ? null : () => onPurchase(package!),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: orange500,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                elevation: 0,
-              ),
-              child: isLoading 
-                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white))
-                : Text(
-                    plan.buttonText.toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 14),
-                  ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              feature,
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPlanSelector() {
+    final plans = [
+      {'name': 'Free', 'monthly': '0', 'annual': '0'},
+      {'name': 'Pro', 'monthly': '5.99', 'annual': '59.99'},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(plans.length, (index) {
+          final isSelected = _selectedPlanIndex == index;
+          final plan = plans[index];
+          
+          String displayPrice = _isAnnual ? plan['annual']! : plan['monthly']!;
+          String duration = _isAnnual ? '/yr' : '/mo';
+          if (index == 0) duration = '';
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedPlanIndex = index),
+              child: Container(
+                width: (MediaQuery.of(context).size.width - 80) / 2,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.blue.withOpacity(0.1) : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected ? Colors.blue : Colors.white.withOpacity(0.1),
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    if (_isAnnual && index > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        margin: const EdgeInsets.only(bottom: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'SAVE 20%',
+                          style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    Text(
+                      plan['name']!,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          index == 0 ? 'Free' : '\$$displayPrice',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: index == 0 ? 18 : 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(duration, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      index == 0
+                          ? 'Forever'
+                          : (_proTrialFooterLine() ?? 'Free trial where eligible'),
+                      style: const TextStyle(color: Colors.white54, fontSize: 9),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildSubscribeButton() {
+    if (_selectedPlanIndex == 0) return const SizedBox(height: 60);
+
+    final offerings = _cachedOfferings;
+    final bool isReady = offerings != null && !_isPurchasing;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: SizedBox(
+        width: double.infinity,
+        height: 60,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            gradient: LinearGradient(
+              colors: isReady
+                  ? [const Color(0xFF3B82F6), const Color(0xFF60A5FA)]
+                  : [Colors.grey.shade800, Colors.grey.shade700],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (isReady ? Colors.blue : Colors.grey).withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: isReady
+                ? () {
+                    debugPrint('[Paywall] Purchase attempt: index=$_selectedPlanIndex, annual=$_isAnnual');
+                    final specificOffering = offerings.all.values.firstWhere(
+                      (o) => o.identifier.toLowerCase().contains('pro'),
+                      orElse: () => offerings.current!,
+                    );
+
+                    final package = _isAnnual ? specificOffering.annual : specificOffering.monthly;
+                    if (package != null) {
+                      debugPrint('[Paywall] Purchasing package: ${package.identifier}');
+                      _billingBloc.add(PurchasePackage(package));
+                    } else {
+                      debugPrint('[Paywall] No ${_isAnnual ? "annual" : "monthly"} package found for pro');
+                      ref.read(notificationProvider.notifier).show(
+                        'This plan is not available yet. Please try another option.',
+                        type: NotificationType.warning,
+                      );
+                    }
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              disabledBackgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            ),
+            child: _isPurchasing
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                : Text(
+                    _subscribeButtonLabel(offerings),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ),
       ),
     );
   }

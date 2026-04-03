@@ -1,14 +1,18 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:frontend/models/user_profile.dart';
+
 
 class GlassNavigationDock extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTabSelected;
+  final UserPlan plan;
 
   const GlassNavigationDock({
     Key? key,
     required this.currentIndex,
     required this.onTabSelected,
+    required this.plan,
   }) : super(key: key);
 
   @override
@@ -36,7 +40,7 @@ class GlassNavigationDock extends StatelessWidget {
                 _buildNavItem(Icons.home_outlined, 0),
                 _buildNavItem(Icons.grid_view_outlined, 1), // Locker (Grid)
                 const SizedBox(width: 48), // central FAB space
-                _buildNavItem(Icons.exposure_outlined, 2),  // Meter (Exposure)
+                _buildNavItem(Icons.exposure_outlined, 2, showLock: !plan.isPro),  // Meter (Exposure)
                 _buildNavItem(Icons.person_outline, 3),    // Profile
               ],
             ),
@@ -46,14 +50,36 @@ class GlassNavigationDock extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(IconData icon, int index) {
+  Widget _buildNavItem(IconData icon, int index, {bool showLock = false}) {
     final isSelected = currentIndex == index;
     return GestureDetector(
       onTap: () => onTabSelected(index),
-      child: Icon(
-        icon,
-        color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
-        size: 28,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+            size: 28,
+          ),
+          if (showLock)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.orangeAccent,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.lock,
+                  size: 10,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

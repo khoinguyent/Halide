@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'roll_status.dart';
+import 'shot.dart';
 
 class Roll {
   final String id;
@@ -15,12 +16,14 @@ class Roll {
   final int? expiredYear;
   final RollStatus status;
   final List<String> imageUrls;
+  final List<Shot> shots;
   final String? driveUrl;
   final String? nickname;
   final String? cameraName;
   final String? lensName;
   final int frameCount;
   final int maxFrames;
+  final int shotOffset;
   final DateTime createdAt;
 
   Roll({
@@ -37,12 +40,14 @@ class Roll {
     this.expiredYear,
     this.status = RollStatus.shooting,
     this.imageUrls = const [],
+    this.shots = const [],
     this.driveUrl,
     this.nickname,
     this.cameraName,
     this.lensName,
     this.frameCount = 0,
     this.maxFrames = 36,
+    this.shotOffset = 0,
     required this.createdAt,
   });
 
@@ -55,10 +60,12 @@ class Roll {
     String? lensName,
     int? frameCount,
     int? maxFrames,
+    int? shotOffset,
     String? title,
     String? description,
     int? shotAtIso,
     int? expiredYear,
+    List<Shot>? shots,
   }) {
     return Roll(
       id: id,
@@ -76,11 +83,13 @@ class Roll {
       lensName: lensName ?? this.lensName,
       frameCount: frameCount ?? this.frameCount,
       maxFrames: maxFrames ?? this.maxFrames,
+      shotOffset: shotOffset ?? this.shotOffset,
       createdAt: createdAt,
       title: title ?? this.title,
       description: description ?? this.description,
       shotAtIso: shotAtIso ?? this.shotAtIso,
       expiredYear: expiredYear ?? this.expiredYear,
+      shots: shots ?? this.shots,
     );
   }
 
@@ -99,12 +108,14 @@ class Roll {
       expiredYear: json['expired_year'],
       status: statusFromString(json['status'] ?? 'shooting'),
       imageUrls: List<String>.from(json['image_urls'] ?? []),
+      shots: (json['shots'] as List<dynamic>?)?.map((s) => Shot.fromJson(Map<String, dynamic>.from(s))).toList() ?? [],
       driveUrl: (json['drive_url'] ?? json['driveUrl'])?.toString(),
       nickname: json['nickname'],
       cameraName: json['camera_name'],
       lensName: json['lens_name'],
       frameCount: json['frame_count'] ?? 0,
       maxFrames: json['max_frames'] ?? 36,
+      shotOffset: json['shot_offset'] ?? 0,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
     );
   }

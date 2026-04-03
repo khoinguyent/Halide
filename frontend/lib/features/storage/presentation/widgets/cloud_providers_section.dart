@@ -1,6 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:frontend/core/providers/notification_provider.dart';
+import 'package:frontend/core/models/notification_model.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
 import 'package:frontend/features/storage/presentation/bloc/storage_accounts_bloc.dart';
 import 'package:frontend/models/storage_account.dart';
@@ -76,21 +79,23 @@ class CloudProvidersSection extends StatelessWidget {
 
 enum ConnectionState { idle, connecting, success }
 
-class _CloudProviderGroup extends StatefulWidget {
-  final CloudProviderInfo provider;
-  final List<StorageAccount> connectedAccounts;
-
-  const _CloudProviderGroup({
-    Key? key,
-    required this.provider,
-    required this.connectedAccounts,
-  }) : super(key: key);
-
-  @override
-  State<_CloudProviderGroup> createState() => _CloudProviderGroupState();
+class _NasConfig {
+  final String host;
+  final String username;
+  final String password;
+  _NasConfig({required this.host, required this.username, required this.password});
 }
 
-class _CloudProviderGroupState extends State<_CloudProviderGroup> {
+class _CloudProviderGroup extends ConsumerStatefulWidget {
+  final CloudProviderInfo provider;
+  final List<StorageAccount> connectedAccounts;
+  const _CloudProviderGroup({Key? key, required this.provider, required this.connectedAccounts}) : super(key: key);
+
+  @override
+  _CloudProviderGroupState createState() => _CloudProviderGroupState();
+}
+
+class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
   ConnectionState _viewState = ConnectionState.idle;
 
   Future<_NasConfig?> _showNasConfigDialog() async {
@@ -157,10 +162,9 @@ class _CloudProviderGroupState extends State<_CloudProviderGroup> {
                   final password = passwordController.text;
 
                   if (host.isEmpty || username.isEmpty || password.isEmpty) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      const SnackBar(
-                        content: Text('PLEASE FILL IN ALL FIELDS'),
-                      ),
+                    ref.read(notificationProvider.notifier).show(
+                      'PLEASE FILL IN ALL FIELDS',
+                      type: NotificationType.error,
                     );
                     return;
                   }
@@ -558,14 +562,3 @@ class _FeatureToggleRow extends StatelessWidget {
   }
 }
 
-class _NasConfig {
-  final String host;
-  final String username;
-  final String password;
-
-  const _NasConfig({
-    required this.host,
-    required this.username,
-    required this.password,
-  });
-}

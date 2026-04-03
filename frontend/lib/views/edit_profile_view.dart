@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
+import '../core/widgets/halide_dialog.dart';
+import '../core/providers/notification_provider.dart';
+import '../core/models/notification_model.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
@@ -183,15 +186,17 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
                               );
                           ref.invalidate(userProfileProvider);
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Profile saved')),
+                            ref.read(notificationProvider.notifier).show(
+                              'PROFILE UPDATED SUCCESSFULLY!',
+                              type: NotificationType.success,
                             );
                             context.pop();
                           }
                         } catch (e) {
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to save: $e')),
+                            ref.read(notificationProvider.notifier).show(
+                              'COULDN\'T UPDATE PROFILE. PLEASE TRY AGAIN.',
+                              type: NotificationType.error,
                             );
                           }
                         }
@@ -207,6 +212,7 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
                 child: const Text('Save changes'),
               ),
             ),
+            const SizedBox(height: 100), // Extra space for keyboard scrolling
           ],
         ),
       ),
@@ -262,11 +268,9 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
           _avatarLoading = false;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Photo saved on this device. Tap "Save changes" to update profile.'),
-              behavior: SnackBarBehavior.floating,
-            ),
+          ref.read(notificationProvider.notifier).show(
+            'PHOTO SAVED ON THIS DEVICE. TAP "SAVE CHANGES" TO UPDATE PROFILE.',
+            type: NotificationType.info,
           );
         }
       } else {
@@ -275,8 +279,9 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
     } catch (_) {
       if (mounted) setState(() => _avatarLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save photo')),
+        ref.read(notificationProvider.notifier).show(
+          'COULD NOT SAVE PHOTO. PLEASE TRY AGAIN.',
+          type: NotificationType.error,
         );
       }
     }

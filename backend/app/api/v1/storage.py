@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
@@ -634,12 +634,23 @@ def sync_gdrive_leaf_files(
             strategy="PERSONAL_CLOUD",  # GDrive sync is personal cloud strategy
         )
 
-        db_image = Image(
-            roll_id=roll.id,
-            image_url=full_key,
-            frame_number=idx,
+        # Match or create Image record by roll_id and frame_number
+        existing_frame = (
+            db.query(Image)
+            .filter(Image.roll_id == roll.id, Image.frame_number == idx)
+            .first()
         )
-        db.add(db_image)
+        if existing_frame:
+            existing_frame.image_url = full_key
+            logger.info("GDrive sync: updated existing frame %d with url", idx)
+        else:
+            db_image = Image(
+                roll_id=roll.id,
+                image_url=full_key,
+                frame_number=idx,
+            )
+            db.add(db_image)
+            logger.info("GDrive sync: created new frame %d", idx)
         synced_count += 1
 
     # Mark roll as scanned once sync completes successfully.
@@ -897,12 +908,23 @@ def sync_gdrive_zip_images(
                     strategy="PERSONAL_CLOUD",
                 )
 
-                db_image = Image(
-                    roll_id=roll.id,
-                    image_url=full_key,
-                    frame_number=idx,
+                # Match or create Image record by roll_id and frame_number
+                existing_frame = (
+                    db.query(Image)
+                    .filter(Image.roll_id == roll.id, Image.frame_number == idx)
+                    .first()
                 )
-                db.add(db_image)
+                if existing_frame:
+                    existing_frame.image_url = full_key
+                    logger.info("GDrive sync: [zip] updated existing frame %d with url", idx)
+                else:
+                    db_image = Image(
+                        roll_id=roll.id,
+                        image_url=full_key,
+                        frame_number=idx,
+                    )
+                    db.add(db_image)
+                    logger.info("GDrive sync: [zip] created new frame %d", idx)
                 synced_count += 1
 
             # Mark roll as scanned once sync completes successfully.
@@ -938,9 +960,83 @@ class GDriveSyncImagesFromUrlRequest(BaseModel):
     gdrive_url_or_id: str
 
 
+def _perform_gdrive_sync(user_id: str, roll_id: str, gdrive_url_or_id: str):
+    """Refactored background worker task for GDrive sync."""
+    from ...db.session import SessionLocal
+    db = SessionLocal()
+    try:
+        current_user = db.query(User).filter(User.id == user_id).first()
+        if not current_user:
+            logger.error(f"[Sync] User {user_id} not found")
+            return
+
+        roll = db.query(Roll).filter(Roll.id == roll_id).first()
+        if not roll:
+            logger.error(f"[Sync] Roll {roll_id} not found")
+            return
+
+        # 1. Status is already set to syncing by the request handler for immediate feedback
+        # roll.status = RollStatusEnum.syncing
+        # db.add(roll)
+        # db.commit()
+
+        # 2. Perform the sync
+        payload = GDriveSyncImagesFromUrlRequest(roll_id=roll_id, gdrive_url_or_id=gdrive_url_or_id)
+        # Note: We call the endpoint function but it works because it's just a function.
+        # However, we need to handle the return value or errors.
+        try:
+            # We must use 'await' if we call it directly, but wait...
+            # sync_images_from_url is now async.
+            # In a background task (which is sync), we should call a sync version of the logic.
+            # Actually, sync_images_from_url just routes to sync_gdrive_leaf_files (sync)
+            # or sync_gdrive_zip_images (sync).
+            # So let's just do the routing here.
+            
+            raw = (payload.gdrive_url_or_id or "").strip()
+            raw_lower = raw.lower()
+            result = None
+            if "/folders/" in raw_lower:
+                result = sync_gdrive_leaf_files(
+                    payload=GDriveSyncRequest(roll_id=payload.roll_id, folder_url_or_id=raw),
+                    current_user=current_user,
+                    db=db,
+                )
+            elif "/file/d/" in raw_lower or "export=download" in raw_lower or raw_lower.endswith(".zip"):
+                result = sync_gdrive_zip_images(
+                    payload=GDriveZipSyncRequest(roll_id=payload.roll_id, zip_url_or_id=raw),
+                    current_user=current_user,
+                    db=db,
+                )
+            
+            # If no images were found, revert status to 'lab' so user can try again
+            if result and result.get("total_image_candidates", 0) == 0:
+                logger.info(f"[Sync] No images found for roll {roll_id}, reverting to LAB")
+                roll.status = RollStatusEnum.lab
+            else:
+                # MARK as scanned here only if images were actually found
+                # (The sub-functions also set scanned, but we re-assert it here for safety)
+                roll.status = RollStatusEnum.scanned
+            
+            # 3. Explicitly commit the final status
+            db.commit()
+            db.refresh(roll)
+                
+        except Exception as e:
+            logger.exception(f"[Sync] Background sync failed for roll {roll_id}: {e}")
+            # Reset status to lab so user can try again
+            db.refresh(roll)
+            roll.status = RollStatusEnum.lab
+            db.add(roll)
+            db.commit()
+
+    finally:
+        db.close()
+
+
 @router.post("/storage/gdrive/sync_images_from_url")
-def sync_images_from_url(
+async def sync_images_from_url(
     payload: GDriveSyncImagesFromUrlRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -949,7 +1045,7 @@ def sync_images_from_url(
     - If URL looks like a Drive folder: route to `sync_leaf_files`.
     - If URL looks like a Drive file: route to `sync_zip_images`.
 
-    For raw IDs (no /folders/ or /file/d/), the route is ambiguous -> 400.
+    If background_tasks is provided, this returns 202 immediately and runs in background.
     """
     # Premium sync: requires Plus or Pro tier.
     if current_user.subscription_tier not in ["plus", "pro"]:
@@ -957,6 +1053,17 @@ def sync_images_from_url(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Google Drive sync is a premium feature. Please upgrade to the Plus or Pro plan."
         )
+
+    if background_tasks:
+        # Set status to syncing immediately so frontend sees it on re-fetch
+        roll = db.query(Roll).filter(Roll.id == payload.roll_id, Roll.user_id == current_user.id).first()
+        if roll:
+            roll.status = RollStatusEnum.syncing
+            db.add(roll)
+            db.commit()
+            
+        background_tasks.add_task(_perform_gdrive_sync, current_user.id, payload.roll_id, payload.gdrive_url_or_id)
+        return {"detail": "Sync started in background"}
 
     raw = (payload.gdrive_url_or_id or "").strip()
     if not raw:

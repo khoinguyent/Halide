@@ -1,13 +1,16 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/models/film_stock.dart';
 import 'package:frontend/models/camera.dart';
 import 'package:frontend/features/rolls/data/rolls_repository.dart';
 import 'package:frontend/features/rolls/presentation/bloc/rolls_bloc.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
+import 'package:frontend/core/providers/notification_provider.dart';
+import 'package:frontend/core/models/notification_model.dart';
 
-class AddRollForm extends StatefulWidget {
+class AddRollForm extends ConsumerStatefulWidget {
   final RollsRepository repository;
   final Function() onRollAdded;
 
@@ -21,7 +24,7 @@ class AddRollForm extends StatefulWidget {
   _AddRollFormState createState() => _AddRollFormState();
 }
 
-class _AddRollFormState extends State<AddRollForm> {
+class _AddRollFormState extends ConsumerState<AddRollForm> {
   final _formKey = GlobalKey<FormState>();
   
   FilmStock? _selectedStock;
@@ -111,21 +114,27 @@ class _AddRollFormState extends State<AddRollForm> {
       listener: (context, state) {
         if (state is RollActionSuccess) {
           widget.onRollAdded();
+          ref.read(notificationProvider.notifier).show(
+            'YOUR NEW ROLL IS READY TO SHOOT!',
+            type: NotificationType.success,
+          );
           Navigator.of(context).pop();
         } else if (state is RollsError) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
+          ref.read(notificationProvider.notifier).show(
+            state.message,
+            type: NotificationType.error,
+          );
         }
       },
       child: HalideModalContainer(
         padding: const EdgeInsets.all(32),
         child: _isLoading 
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : SingleChildScrollView(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+          : Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                     Text(
                       'ADD NEW ROLL'.toUpperCase(),
                       style: const TextStyle(
@@ -185,7 +194,6 @@ class _AddRollFormState extends State<AddRollForm> {
                 ),
               ),
             ),
-      ),
     );
   }
 

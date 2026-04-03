@@ -16,24 +16,7 @@ class UserGearNotifier extends AsyncNotifier<List<Camera>> {
 
       final user = authService.currentUser;
       if (user == null) {
-        return [
-          Camera(
-            id: '1',
-            nickname: 'Main Shooter',
-            brand: 'Leica',
-            model: 'M6',
-            serialNumber: '2468135',
-            lenses: [],
-          ),
-          Camera(
-            id: '2',
-            nickname: 'Pocket Beast',
-            brand: 'Contax',
-            model: 'T2',
-            serialNumber: '9876543',
-            lenses: [],
-          ),
-        ];
+        return [];
       }
 
       final token = await user.getIdToken();
@@ -53,6 +36,7 @@ class UserGearNotifier extends AsyncNotifier<List<Camera>> {
       final updated = List<Camera>.from(cameras);
       updated[index] = cameras[index].copyWith(status: newStatus);
       state = AsyncValue.data(updated);
+      _persistCameraStatus(id, newStatus);
     });
   }
 
@@ -78,6 +62,15 @@ class UserGearNotifier extends AsyncNotifier<List<Camera>> {
         status: status ?? c.status,
       );
       state = AsyncValue.data(updated);
+      _persistCameraDetails(
+        id,
+        nickname: nickname,
+        brand: brand,
+        model: model,
+        serialNumber: serialNumber,
+        format: format,
+        status: status,
+      );
     });
   }
 
@@ -118,6 +111,36 @@ class UserGearNotifier extends AsyncNotifier<List<Camera>> {
       state = AsyncValue.data(updated);
       _persistPrimaryImage(id, primaryImageIndex);
     });
+  }
+
+  Future<void> _persistCameraStatus(String id, GearStatus status) async {
+    try {
+      final user = ref.read(authServiceProvider).currentUser;
+      final token = user == null ? null : await user.getIdToken();
+      if (token == null) return;
+      await ref.read(gearServiceProvider).updateUserCamera(token, id, status: status.label);
+    } catch (_) {}
+  }
+
+  Future<void> _persistCameraDetails(String id, {
+    String? nickname,
+    String? brand,
+    String? model,
+    String? serialNumber,
+    String? format,
+    GearStatus? status,
+  }) async {
+    try {
+      final user = ref.read(authServiceProvider).currentUser;
+      final token = user == null ? null : await user.getIdToken();
+      if (token == null) return;
+      await ref.read(gearServiceProvider).updateUserCamera(
+        token,
+        id,
+        gearNickname: nickname,
+        status: status?.label,
+      );
+    } catch (_) {}
   }
 
   Future<void> _persistCameraImages(String id, List<String> imageUrls) async {

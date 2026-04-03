@@ -61,3 +61,36 @@ async def update_profile(
     db.refresh(current_user)
     
     return current_user
+
+
+@router.patch("/onboarding-seen", response_model=UserOut)
+def mark_onboarding_seen(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.has_seen_onboarding = True
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/roll-guide-seen", response_model=UserOut)
+def mark_roll_guide_seen(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.has_seen_roll_guide = True
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/lab-guide-seen", response_model=UserOut)
+def mark_lab_guide_seen(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.has_seen_lab_guide = True
+    db.commit()
+    db.refresh(current_user)
+    return current_user

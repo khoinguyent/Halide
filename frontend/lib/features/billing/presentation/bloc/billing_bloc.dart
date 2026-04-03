@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../../../services/purchase_service.dart';
+import '../../../../services/api_service.dart';
 
 // Events
 abstract class BillingEvent extends Equatable {
@@ -65,6 +66,7 @@ class BillingError extends BillingState {
 
 class BillingBloc extends Bloc<BillingEvent, BillingState> {
   final PurchaseService _purchaseService = PurchaseService();
+  final ApiService _apiService = ApiService();
 
   BillingBloc() : super(BillingInitial()) {
     on<LoadOfferings>(_onLoadOfferings);
@@ -92,6 +94,14 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     try {
       final success = await _purchaseService.purchasePackage(event.package);
       if (success) {
+        // Sync with backend immediately to update tier and storage limits
+        try {
+          await _apiService.post('/api/v1/billing/sync');
+        } catch (e) {
+          // If sync fails, the webhook should still catch it later, 
+          // but we log it for debugging.
+          print('Backend sync failed after purchase: $e');
+        }
         emit(PurchaseSuccess("active_plan"));
       } else {
         emit(BillingError("Purchase failed."));

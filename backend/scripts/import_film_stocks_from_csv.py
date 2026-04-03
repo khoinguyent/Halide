@@ -6,7 +6,6 @@ existing film stocks, then inserts CSV rows.
 
 Usage (from repo root or backend/):
   cd backend && python scripts/import_film_stocks_from_csv.py
-  python scripts/import_film_stocks_from_csv.py --csv ../docs/film_stock.csv
 """
 from __future__ import annotations
 
@@ -25,7 +24,7 @@ from sqlalchemy import text
 from app.db.models.film_stock import FilmStock, FormatEnum, ColorTypeEnum
 from app.db.session import SessionLocal
 
-DEFAULT_CSV = REPO_ROOT / "docs" / "film_stock.csv"
+DEFAULT_CSV = BACKEND_ROOT / "app" / "db" / "data" / "film_stock.csv"
 
 FORMAT_MAP = {
     "format_135": FormatEnum.format_135,

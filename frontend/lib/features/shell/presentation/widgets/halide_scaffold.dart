@@ -10,6 +10,8 @@ import 'package:frontend/features/rolls/presentation/widgets/add_roll_form.dart'
 import 'package:frontend/features/rolls/presentation/bloc/rolls_bloc.dart';
 import 'package:frontend/features/gear/presentation/widgets/add_gear_form.dart';
 import 'package:frontend/providers/gear_provider.dart';
+import 'package:frontend/providers/auth_provider.dart';
+import 'package:frontend/providers/ui_state_provider.dart';
 
 class HalideScaffold extends ConsumerWidget {
   final Widget child;
@@ -34,7 +36,12 @@ class HalideScaffold extends ConsumerWidget {
             body: child,
             bottomNavigationBar: GlassNavigationDock(
               currentIndex: currentIndex,
-              onTabSelected: onTabSelected,
+              onTabSelected: (index) {
+                // Keep the active tab provider in sync for individual views (like Light Meter camera)
+                ref.read(homeTabIndexProvider.notifier).setIndex(index);
+                onTabSelected(index);
+              },
+              plan: ref.watch(userPlanProvider),
             ),
           ),
           Positioned(

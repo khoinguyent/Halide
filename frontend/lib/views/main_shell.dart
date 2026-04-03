@@ -1,18 +1,37 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../config/app_config.dart';
+import '../core/providers/notification_provider.dart';
+import '../core/models/notification_model.dart';
+import '../providers/auth_provider.dart';
+import '../providers/profile_provider.dart';
+import '../widgets/onboarding_overlay.dart';
 
-class MainShell extends StatefulWidget {
+/// Provider that signals the Profile view to highlight "Settings".
+final showSettingsGuideProvider = NotifierProvider<ShowSettingsGuide, bool>(ShowSettingsGuide.new);
+
+class ShowSettingsGuide extends Notifier<bool> {
+  @override
+  bool build() => false;
+  
+  set state(bool value) => super.state = value;
+}
+
+class MainShell extends ConsumerStatefulWidget {
   final Widget child;
 
   const MainShell({Key? key, required this.child}) : super(key: key);
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends ConsumerState<MainShell> {
   int _currentIndex = 1; // Default to Rolls tab
+  bool _showOnboarding = false;
+  bool _onboardingChecked = false;
 
   void _onItemTapped(int index) {
     setState(() {
@@ -27,28 +46,65 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
+  void _checkOnboarding() {
+    if (_onboardingChecked) return;
+    final profileAsync = ref.read(userProfileProvider);
+    profileAsync.whenData((profile) {
+      if (profile != null && !profile.hasSeenOnboarding && !_onboardingChecked) {
+        _onboardingChecked = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _showOnboarding = true);
+        });
+      } else {
+        _onboardingChecked = true;
+      }
+    });
+  }
+
+  void _completeOnboarding() {
+    setState(() => _showOnboarding = false);
+    final service = ref.read(profileServiceProvider);
+    service.markOnboardingSeen();
+    ref.invalidate(userProfileProvider);
+
+    // Navigate to Profile tab and trigger the Settings highlight guide.
+    _onItemTapped(3);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(showSettingsGuideProvider.notifier).state = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: widget.child,
-      bottomNavigationBar: _GlassBottomNav(
-        currentIndex: _currentIndex,
-        onTap: _onItemTapped,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: _GlassFAB(
-        onTap: () {
-          if (_currentIndex == 0) {
-            context.go('/locker/add-gear');
-          } else {
-            // Default behavior for other tabs (Log Frame)
-             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Logging frame...')),
-            );
-          }
-        },
-      ),
+    ref.listen(userProfileProvider, (_, __) => _checkOnboarding());
+    _checkOnboarding();
+
+    return Stack(
+      children: [
+        Scaffold(
+          extendBody: true,
+          body: widget.child,
+          bottomNavigationBar: _GlassBottomNav(
+            currentIndex: _currentIndex,
+            onTap: _onItemTapped,
+          ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+          floatingActionButton: _GlassFAB(
+            onTap: () {
+              if (_currentIndex == 0) {
+                context.go('/locker/add-gear');
+              } else {
+                ref.read(notificationProvider.notifier).show(
+                  'Logging frame...',
+                  type: NotificationType.info,
+                );
+              }
+            },
+          ),
+        ),
+        if (_showOnboarding)
+          OnboardingOverlay(onComplete: _completeOnboarding),
+      ],
     );
   }
 }

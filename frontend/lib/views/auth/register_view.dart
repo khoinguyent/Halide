@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../core/widgets/halide_dialog.dart';
+import '../../core/providers/notification_provider.dart';
+import '../../core/models/notification_model.dart';
 
 class RegisterView extends ConsumerStatefulWidget {
   const RegisterView({Key? key}) : super(key: key);
@@ -25,14 +28,25 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
     super.dispose();
   }
 
+  String _cleanErrorMessage(String raw) {
+    final regex = RegExp(r'\[firebase_auth/[^\]]+\]\s*');
+    var cleaned = raw.replaceAll(regex, '').trim();
+    if (cleaned.startsWith('Exception: ')) {
+      cleaned = cleaned.substring('Exception: '.length);
+    }
+    if (cleaned.isNotEmpty) {
+      cleaned = cleaned[0].toUpperCase() + cleaned.substring(1);
+    }
+    if (cleaned.isNotEmpty && !cleaned.endsWith('.')) {
+      cleaned = '$cleaned.';
+    }
+    return cleaned;
+  }
+
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.redAccent.withOpacity(0.9),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+    ref.read(notificationProvider.notifier).show(
+      _cleanErrorMessage(message),
+      type: NotificationType.error,
     );
   }
 
@@ -103,89 +117,96 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                   ),
                 ),
                 Expanded(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.camera_rounded, size: 56, color: Colors.white),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Join Halide',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 2,
-                            ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.asset(
+                            'assets/images/app_icon.jpg',
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
                           ),
-                          const Text(
-                            'Capture your analog journey',
-                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Join Halide',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 2,
                           ),
-                          const SizedBox(height: 48),
-                          // Glassmorphic Card
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(32),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 400),
-                                child: Container(
-                                  padding: const EdgeInsets.all(32),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.07),
-                                    borderRadius: BorderRadius.circular(32),
-                                    border: Border.all(color: Colors.white.withOpacity(0.15)),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      _buildTextField(_emailController, 'Email', Icons.email_outlined),
-                                      const SizedBox(height: 16),
-                                      _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
-                                      const SizedBox(height: 16),
-                                      _buildTextField(_confirmPasswordController, 'Confirm Password', Icons.lock_outline, obscureText: true),
-                                      const SizedBox(height: 40),
-                                      SizedBox(
-                                        height: 56,
-                                        child: ElevatedButton(
-                                          onPressed: _register,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.white.withOpacity(0.95),
-                                            foregroundColor: Colors.black,
-                                            shape: const StadiumBorder(),
-                                            elevation: 0,
-                                          ),
-                                          child: const Text(
-                                            'Create Account',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                        ),
+                        const Text(
+                          'Capture your analog journey',
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        const SizedBox(height: 48),
+                        // Glassmorphic Card
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(32),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 400),
+                              child: Container(
+                                padding: const EdgeInsets.all(32),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.07),
+                                  borderRadius: BorderRadius.circular(32),
+                                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildTextField(_emailController, 'Email', Icons.email_outlined),
+                                    const SizedBox(height: 16),
+                                    _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
+                                    const SizedBox(height: 16),
+                                    _buildTextField(_confirmPasswordController, 'Confirm Password', Icons.lock_outline, obscureText: true),
+                                    const SizedBox(height: 40),
+                                    SizedBox(
+                                      height: 56,
+                                      child: ElevatedButton(
+                                        onPressed: _register,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white.withOpacity(0.95),
+                                          foregroundColor: Colors.black,
+                                          shape: const StadiumBorder(),
+                                          elevation: 0,
+                                        ),
+                                        child: const Text(
+                                          'Create Account',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          TextButton(
-                            onPressed: () => context.pop(),
-                            child: const Text(
-                              'Already have an account? Sign In',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w500,
-                              ),
+                        ),
+                        const SizedBox(height: 24),
+                        TextButton(
+                          onPressed: () => context.pop(),
+                          child: const Text(
+                            'Already have an account? Sign In',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 40), // Extra space to ensure bottom field is scrollable above keyboard
+                      ],
                     ),
                   ),
                 ),

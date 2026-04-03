@@ -109,13 +109,20 @@ class LockerView extends ConsumerWidget {
       context: context,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => GearStatusSelector(
-        currentStatus: camera.status,
-        onStatusSelected: (s) {
-          ref.read(userGearProvider.notifier).updateCameraStatus(camera.id, s);
-          Navigator.pop(context);
-        },
-      ),
+      builder: (modalContext) {
+        bool isPopping = false;
+        return GearStatusSelector(
+          currentStatus: camera.status,
+          onStatusSelected: (s) {
+            if (isPopping) return;
+            isPopping = true;
+            ref.read(userGearProvider.notifier).updateCameraStatus(camera.id, s);
+            if (modalContext.mounted) {
+              Navigator.of(modalContext).pop();
+            }
+          },
+        );
+      },
     );
   }
 }

@@ -21,6 +21,7 @@ import '../features/storage/presentation/views/storage_account_list_view.dart';
 import '../features/storage/presentation/views/storage_strategy_view.dart';
 import '../views/edit_profile_view.dart';
 import '../features/billing/presentation/views/paywall_view.dart';
+import '../providers/ui_state_provider.dart';
 
 // Global keys for navigation
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -40,10 +41,20 @@ class AuthNotifier extends ChangeNotifier {
 
 final _authNotifier = AuthNotifier();
 
+/// Simple observer to log screen access
+class LoggingNavigatorObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    debugPrint('[Halide Navigation] Accessing: ${route.settings.name ?? route.toString()}');
+  }
+}
+
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
   refreshListenable: _authNotifier,
+  observers: [LoggingNavigatorObserver()],
   redirect: (context, state) {
     final user = FirebaseAuth.instance.currentUser;
     final loggingIn =
@@ -81,6 +92,7 @@ final appRouter = GoRouter(
 
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
+        debugPrint('[Halide Navigation] Shell Tab Index: ${navigationShell.currentIndex}');
         const branchPaths = ['/', '/locker', '/meter', '/profile'];
         return _ShellArchiveRefresh(
           navigationShell: navigationShell,
@@ -98,6 +110,7 @@ final appRouter = GoRouter(
         // Tab 1: Home
         StatefulShellBranch(
           navigatorKey: _shellNavigatorHomeKey,
+          observers: [LoggingNavigatorObserver()],
           routes: [
             GoRoute(
               path: '/',
@@ -108,6 +121,7 @@ final appRouter = GoRouter(
         // Tab 2: Locker
         StatefulShellBranch(
           navigatorKey: _shellNavigatorLockerKey,
+          observers: [LoggingNavigatorObserver()],
           routes: [
             GoRoute(
               path: '/locker',
@@ -131,6 +145,7 @@ final appRouter = GoRouter(
         // Tab 3: Meter
         StatefulShellBranch(
           navigatorKey: _shellNavigatorMeterKey,
+          observers: [LoggingNavigatorObserver()],
           routes: [
             GoRoute(
               path: '/meter',
@@ -141,6 +156,7 @@ final appRouter = GoRouter(
         // Tab 4: Profile
         StatefulShellBranch(
           navigatorKey: _shellNavigatorProfileKey,
+          observers: [LoggingNavigatorObserver()],
           routes: [
             GoRoute(
               path: '/profile',

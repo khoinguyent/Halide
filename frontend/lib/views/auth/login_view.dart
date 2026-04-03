@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
+import '../../core/providers/notification_provider.dart';
+import '../../core/models/notification_model.dart';
 import '../../providers/auth_provider.dart';
 
 class LoginView extends ConsumerStatefulWidget {
@@ -31,14 +33,29 @@ class _LoginViewState extends ConsumerState<LoginView> {
     super.dispose();
   }
 
+  String _cleanErrorMessage(String raw) {
+    // Strip [firebase_auth/xxx] prefix
+    final regex = RegExp(r'\[firebase_auth/[^\]]+\]\s*');
+    var cleaned = raw.replaceAll(regex, '').trim();
+    // Strip leading "Exception: " if present
+    if (cleaned.startsWith('Exception: ')) {
+      cleaned = cleaned.substring('Exception: '.length);
+    }
+    // Capitalize first letter
+    if (cleaned.isNotEmpty) {
+      cleaned = cleaned[0].toUpperCase() + cleaned.substring(1);
+    }
+    // Remove trailing period if not present
+    if (cleaned.isNotEmpty && !cleaned.endsWith('.')) {
+      cleaned = '$cleaned.';
+    }
+    return cleaned;
+  }
+
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.redAccent.withOpacity(0.9),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+    ref.read(notificationProvider.notifier).show(
+      _cleanErrorMessage(message),
+      type: NotificationType.error,
     );
   }
 
@@ -186,7 +203,15 @@ class _LoginViewState extends ConsumerState<LoginView> {
   Widget _buildLogoHeader() {
     return Column(
       children: [
-        const Icon(Icons.camera_rounded, color: Colors.white, size: 64),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/images/app_icon.jpg',
+            width: 80,
+            height: 80,
+            fit: BoxFit.cover,
+          ),
+        ),
         const SizedBox(height: 16),
         const Text(
           'HALIDE',
@@ -345,9 +370,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
   void _showPhoneInput() {
     showHalideDialog(
       context: context,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: HalideModalContainer(
+      builder: (context) => HalideModalContainer(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -389,7 +412,6 @@ class _LoginViewState extends ConsumerState<LoginView> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }

@@ -2,9 +2,10 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
+import os
 # Resolve .env relative to backend/ so it loads regardless of cwd
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
-_ENV_FILE = _BACKEND_DIR / ".env"
+_ENV_FILE = os.getenv("ENV_FILE", str(_BACKEND_DIR / ".env"))
 
 class Settings(BaseSettings):
     # Database
@@ -36,8 +37,11 @@ class Settings(BaseSettings):
     # Billing (optional for local dev)
     REVENUE_CAT_WEBHOOK_SECRET: Optional[str] = None
     REVENUE_CAT_SECRET_KEY: Optional[str] = None
+    REVENUE_CAT_PROJECT_ID: Optional[str] = None
     IS_REVENUE_CAT_SANDBOX: bool = True
+    REVENUE_CAT_PRO_ENTITLEMENT_IDS: str = "pro,plus,halide pro,halide_pro"
 
     model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 
 settings = Settings()
+print(f"[Config] Loaded REVENUE_CAT_PROJECT_ID: '{settings.REVENUE_CAT_PROJECT_ID}'")

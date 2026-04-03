@@ -11,6 +11,8 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../models/user_profile.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
 import 'package:frontend/core/utils/notifications.dart';
+import '../../../../core/providers/notification_provider.dart';
+import '../../../../core/models/notification_model.dart';
 
 class StorageStrategyView extends riverpod.ConsumerStatefulWidget {
   final StorageAccountsBloc? bloc;
@@ -29,7 +31,7 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
   void initState() {
     super.initState();
     final plan = ref.read(userPlanProvider);
-    _selectedTierIndex = (plan == UserPlan.plus || plan == UserPlan.pro) ? 1 : 0;
+    _selectedTierIndex = plan != UserPlan.free ? 1 : 0;
   }
 
   @override
@@ -71,7 +73,10 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
                 isFree: isFree,
                 onSelected: (index) {
                   if (isFree && index > 0) {
-                    showHalideSnackBar('Free tier is limited to Local Storage. Upgrade to enable Cloud syncing.');
+                    ref.read(notificationProvider.notifier).show(
+                      'Free tier is limited to Local Storage. Upgrade to enable Cloud syncing.',
+                      type: NotificationType.warning,
+                    );
                     return;
                   }
                   setState(() => _selectedTierIndex = index);

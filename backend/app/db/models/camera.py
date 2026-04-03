@@ -22,6 +22,12 @@ class Camera(Base):
     best_practice = Column(String)
     image_urls = Column(JSONB)
 
+class GearStatusEnum(str, enum.Enum):
+    active = 'Active'
+    repair = 'In Repair'
+    sold = 'Sold'
+    archived = 'Archived'
+
 class UserCamera(Base):
     __tablename__ = "user_cameras"
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
@@ -31,6 +37,11 @@ class UserCamera(Base):
     rating_functional = Column(Integer, CheckConstraint('rating_functional BETWEEN 1 AND 10'))
     rating_view = Column(Integer, CheckConstraint('rating_view BETWEEN 1 AND 10'))
     rating_looking = Column(Integer, CheckConstraint('rating_looking BETWEEN 1 AND 10'))
+    status = Column(
+        Enum(*(e.value for e in GearStatusEnum), name="gearstatusenum"),
+        server_default=text("'Active'"),
+        nullable=False
+    )
     created_at = Column(DateTime, server_default=text('NOW()'))
     image_urls = Column(JSONB)  # user-uploaded gear photo URLs; first or primary_image_index used as card thumb
     primary_image_index = Column(Integer, server_default=text('0'), nullable=False)  # which image to show as thumbnail

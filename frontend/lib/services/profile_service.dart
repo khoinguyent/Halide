@@ -12,6 +12,18 @@ class ProfileService {
     return UserProfile.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<void> markOnboardingSeen() async {
+    await _api.patch('/api/v1/user/onboarding-seen');
+  }
+
+  Future<void> markRollGuideSeen() async {
+    await _api.patch('/api/v1/user/roll-guide-seen');
+  }
+
+  Future<void> markLabGuideSeen() async {
+    await _api.patch('/api/v1/user/lab-guide-seen');
+  }
+
   /// Update profile (PATCH /api/v1/user/profile) with optional avatar file.
   Future<UserProfile> updateProfile({
     String? name,

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
 import 'package:frontend/providers/auth_provider.dart';
 import 'package:frontend/providers/gear_provider.dart';
+import '../../../../core/providers/notification_provider.dart';
+import '../../../../core/models/notification_model.dart';
 
 class AddGearForm extends ConsumerStatefulWidget {
   final VoidCallback? onGearAdded;
@@ -65,22 +67,16 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
           widget.onGearAdded!();
         }
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${_gearType.toUpperCase()} ADDED SUCCESSFULLY'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
+        ref.read(notificationProvider.notifier).show(
+          'YOUR ${_gearType.toUpperCase()} IS READY!',
+          type: NotificationType.success,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('FAILED TO ADD GEAR: $e'),
-            backgroundColor: Colors.orangeAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
+        ref.read(notificationProvider.notifier).show(
+          'WE COULDN\'T ADD YOUR ${_gearType.toUpperCase()}. PLEASE TRY AGAIN.',
+          type: NotificationType.error,
         );
       }
     } finally {
@@ -88,6 +84,17 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _onTypeChanged(String type) {
+    if (_gearType == type) return;
+    setState(() {
+      _gearType = type;
+    });
+    _nicknameController.clear();
+    _brandController.clear();
+    _modelController.clear();
+    _serialController.clear();
   }
 
   @override
@@ -165,7 +172,7 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
   Widget _buildTypeButton(String type) {
     final isSelected = _gearType == type;
     return GestureDetector(
-      onTap: () => setState(() => _gearType = type),
+      onTap: () => _onTypeChanged(type),
       child: Container(
         height: 48,
         decoration: BoxDecoration(

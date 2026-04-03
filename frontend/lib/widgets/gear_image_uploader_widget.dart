@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 // Note: Ideally there would be a GearUploadService, using generic for now
 import '../services/upload_service.dart';
 import '../providers/gear_provider.dart';
+import '../core/providers/notification_provider.dart';
+import '../core/models/notification_model.dart';
 
 class GearImageUploaderWidget extends ConsumerStatefulWidget {
   final String cameraId;
@@ -34,8 +36,9 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
   Future<void> _pickImages() async {
     final remainingSlots = widget.maxImages - (widget.currentImageCount + _selectedImages.length);
     if (remainingSlots <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximum of 3 images allowed per gear item.')),
+      ref.read(notificationProvider.notifier).show(
+        'Maximum of ${widget.maxImages} images allowed per gear item.',
+        type: NotificationType.error,
       );
       return;
     }
@@ -49,9 +52,10 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
       });
       if (images.length > remainingSlots) {
         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Only added $remainingSlots images to stay within the limit of 3.')),
-          );
+           ref.read(notificationProvider.notifier).show(
+          'Only added $remainingSlots images to stay within the limit of ${widget.maxImages}.',
+          type: NotificationType.info,
+        );
         }
       }
     }
@@ -99,12 +103,9 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Uploaded ${succeededPaths.length} image(s) successfully.'),
-          backgroundColor: Colors.green.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
+      ref.read(notificationProvider.notifier).show(
+        'SUCCESSFULLY UPLOADED ${succeededPaths.length} IMAGE(S)!',
+        type: NotificationType.success,
       );
     }
   }

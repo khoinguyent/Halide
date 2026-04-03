@@ -1,28 +1,44 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import '../config/app_config.dart';
 
 class PurchaseService {
   static final PurchaseService _instance = PurchaseService._internal();
   factory PurchaseService() => _instance;
   PurchaseService._internal();
 
-  // RevenueCat Test Keys from Dashboard
-  static const _apiKeyApple = 'test_wyzkattJBBUIIymeWTHhZNZUwke';
-  static const _apiKeyGoogle = 'test_wyzkattJBBUIIymeWTHhZNZUwke';
+  // RevenueCat Keys - Best passed via --dart-define during build
+  // TestFlight/Prod: Use the Public SDK Key (appl_...)
+  static const _apiKeyApple = String.fromEnvironment(
+    'REVENUE_CAT_APPLE_KEY', 
+    defaultValue: 'test_wyzkattJBBUIIymeWTHhZNZUwke',
+  );
+  
+  static const _apiKeyGoogle = String.fromEnvironment(
+    'REVENUE_CAT_GOOGLE_KEY',
+    defaultValue: 'test_wyzkattJBBUIIymeWTHhZNZUwke',
+  );
 
   Future<void> init() async {
     await Purchases.setLogLevel(kDebugMode ? LogLevel.debug : LogLevel.error);
 
     PurchasesConfiguration? configuration;
     if (Platform.isAndroid) {
+      if (_apiKeyGoogle.startsWith('test_')) {
+        debugPrint('[PurchaseService] WARNING: Using TEST key for Android');
+      }
       configuration = PurchasesConfiguration(_apiKeyGoogle);
     } else if (Platform.isIOS) {
+      if (_apiKeyApple.startsWith('test_')) {
+        debugPrint('[PurchaseService] ERROR: Using TEST key for iOS. IAP will NOT work on real devices.');
+      }
       configuration = PurchasesConfiguration(_apiKeyApple);
     }
 
     if (configuration != null) {
       await Purchases.configure(configuration);
+      debugPrint('[PurchaseService] Configured with flavor: ${AppConfig.flavor.name}');
     }
   }
 

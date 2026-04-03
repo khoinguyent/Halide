@@ -55,8 +55,9 @@ class RollService {
   Future<void> updateRollMeta(
     String token,
     String rollId, {
-    required String title,
-    required String description,
+    String? title,
+    String? description,
+    int? shotOffset,
   }) async {
     final response = await http.patch(
       Uri.parse('${AppConfig.apiUrl}/rolls/$rollId/meta'),
@@ -65,8 +66,9 @@ class RollService {
         'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
-        'title': title.isEmpty ? null : title,
-        'description': description.isEmpty ? null : description,
+        if (title != null) 'title': title.isEmpty ? null : title,
+        if (description != null) 'description': description.isEmpty ? null : description,
+        if (shotOffset != null) 'shot_offset': shotOffset,
       }),
     );
 
@@ -104,6 +106,33 @@ class RollService {
 
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Failed to add local images: ${response.body}');
+    }
+  }
+
+  Future<void> logShot(
+    String token,
+    String rollId, {
+    required double aperture,
+    required String shutterSpeed,
+    required double lat,
+    required double lng,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiUrl}/rolls/$rollId/shots'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'aperture': aperture,
+        'shutter_speed': shutterSpeed,
+        'lat': lat,
+        'lng': lng,
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to log shot: ${response.body}');
     }
   }
 }

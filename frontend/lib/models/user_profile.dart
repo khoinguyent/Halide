@@ -7,6 +7,8 @@ enum UserPlan {
   annually,
   lifetime;
 
+  bool get isPro => this != UserPlan.free;
+
   static UserPlan fromString(String? val) {
     if (val == null) return UserPlan.free;
     return UserPlan.values.firstWhere(
@@ -26,6 +28,9 @@ class UserProfile {
   final String? bio;
   final UserPlan plan;
   final DateTime? createdAt;
+  final bool hasSeenOnboarding;
+  final bool hasSeenRollGuide;
+  final bool hasSeenLabGuide;
 
   const UserProfile({
     required this.id,
@@ -36,6 +41,9 @@ class UserProfile {
     this.bio,
     this.plan = UserPlan.free,
     this.createdAt,
+    this.hasSeenOnboarding = false,
+    this.hasSeenRollGuide = false,
+    this.hasSeenLabGuide = false,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -50,6 +58,9 @@ class UserProfile {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
           : null,
+      hasSeenOnboarding: json['has_seen_onboarding'] as bool? ?? false,
+      hasSeenRollGuide: json['has_seen_roll_guide'] as bool? ?? false,
+      hasSeenLabGuide: json['has_seen_lab_guide'] as bool? ?? false,
     );
   }
 }

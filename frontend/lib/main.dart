@@ -7,6 +7,8 @@ import 'firebase_options.dart';
 import 'router/app_router.dart';
 import 'services/purchase_service.dart';
 import 'core/utils/notifications.dart';
+import 'core/widgets/halide_notification.dart';
+import 'providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,11 +27,14 @@ void main() async {
   );
 }
 
-class HalideApp extends StatelessWidget {
+class HalideApp extends ConsumerWidget {
   const HalideApp({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Initialize global subscription sync listener
+    ref.watch(entitlementListenerProvider);
+    
     return const AuthGate();
   }
 }
@@ -56,9 +61,33 @@ class AuthGate extends StatelessWidget {
           );
         }
         // Auth resolved — let the router take over
-        return MaterialApp.router(
+        Widget app = MaterialApp.router(
           scaffoldMessengerKey: scaffoldMessengerKey,
           title: 'Halide',
+          builder: (context, child) {
+            Widget result = child!;
+            if (AppConfig.flavor != AppFlavor.prod) {
+              result = Banner(
+                message: AppConfig.flavor.name.toUpperCase(),
+                location: BannerLocation.topEnd,
+                color: AppConfig.flavor == AppFlavor.staging 
+                    ? Colors.orange.withOpacity(0.8) 
+                    : Colors.red.withOpacity(0.8),
+                child: result,
+              );
+            }
+            return Stack(
+              children: [
+                result,
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: HalideNotification(),
+                ),
+              ],
+            );
+          },
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             primarySwatch: Colors.blue,
@@ -66,6 +95,7 @@ class AuthGate extends StatelessWidget {
           ),
           routerConfig: appRouter,
         );
+        return app;
       },
     );
   }

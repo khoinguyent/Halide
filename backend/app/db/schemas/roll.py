@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 from ..models.roll import RollStatusEnum
+from .image import ImageOut
 
 class RollBase(BaseModel):
     film_stock_id: UUID
@@ -12,6 +13,7 @@ class RollBase(BaseModel):
     max_frames: Optional[int] = 36
     title: Optional[str] = None
     description: Optional[str] = None
+    shot_offset: Optional[int] = 0
 
 class RollCreate(RollBase):
     pass
@@ -31,6 +33,7 @@ class RollStatusUpdate(BaseModel):
 class RollMetaUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    shot_offset: Optional[int] = None
 
 
 class RollDriveUrlUpdate(BaseModel):
@@ -46,6 +49,7 @@ class RollOutDashboard(BaseModel):
     color: str  # hex e.g. #FFCC33
     status: str
     image_urls: List[str] = []
+    shots: List[ImageOut] = []
     drive_url: Optional[str] = None
     nickname: Optional[str] = None
     title: Optional[str] = None
@@ -54,4 +58,5 @@ class RollOutDashboard(BaseModel):
     lens_name: Optional[str] = None
     frame_count: int = 0
     max_frames: int = 36
+    shot_offset: int = 0
     created_at: Optional[datetime] = None

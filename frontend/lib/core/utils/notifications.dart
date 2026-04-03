@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/notification_provider.dart';
+import '../models/notification_model.dart';
 
 /// A global key to access the ScaffoldMessenger from anywhere in the app.
-/// This allows showing SnackBars that correctly push the global FAB in the shell.
+/// @deprecated: Use [notificationProvider] instead.
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
-void showHalideSnackBar(String message, {Color backgroundColor = Colors.orange}) {
-  scaffoldMessengerKey.currentState?.showSnackBar(
-    SnackBar(
-      content: Text(
-        message,
-        style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-      ),
-      backgroundColor: backgroundColor,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 100), // Push above the glass dock (approx 88-100px)
-    ),
-  );
+/// Legacy utility for non-Riverpod areas. 
+/// NOTE: This only works if you have access to a [WidgetRef].
+/// Most calls have been refactored to ref.read(notificationProvider.notifier).show()
+void showHalideSnackBar(String message, {NotificationType type = NotificationType.info}) {
+  debugPrint('[Halide] Legacy showHalideSnackBar called: $message');
+  // Since we cannot easily access ref here without a context or global container,
+  // we encourage using the provider directly in widgets.
 }

@@ -20,14 +20,14 @@ class UserOut(UserBase):
     plan: str = Field(validation_alias="subscription_tier")
     additional_storage_bytes: int = 0
     total_storage_limit: int = 0
+    has_seen_onboarding: bool = False
+    has_seen_roll_guide: bool = False
+    has_seen_lab_guide: bool = False
 
     @model_validator(mode="after")
     def sync_limit(self) -> "UserOut":
-        # Base limits (mirrored from model for simplicity)
-        if self.plan == "pro":
-            base = 5 * 1024 * 1024 * 1024 
-        elif self.plan == "plus":
-            base = 1 * 1024 * 1024 * 1024
+        if self.plan in ("pro", "plus"):
+            base = 5 * 1024 * 1024 * 1024
         else:
             base = 104857600
         

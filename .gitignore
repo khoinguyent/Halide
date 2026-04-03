@@ -1,8 +1,6 @@
 # Environment and secrets (never commit)
 .env
-.env.local
-.env.*.local
-.env.*.example.local
+.env.*
 
 # Keys and credentials (never commit)
 **/keys/
@@ -14,3 +12,13 @@
 *-service-account*.json
 *firebase*adminsdk*.json
 **/key.properties
+
+# OS metadata
+.DS_Store
+**/.DS_Store
+
+# Build artifacts
+*.tar.gz
+
+# Git worktrees
+worktrees/
