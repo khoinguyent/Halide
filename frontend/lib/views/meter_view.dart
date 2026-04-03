@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
 import 'package:go_router/go_router.dart';
 import '../features/meter/providers/meter_provider.dart';
+import '../services/luminance_analyzer.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
+import '../providers/ui_state_provider.dart';
 
 class MeterView extends ConsumerStatefulWidget {
   const MeterView({Key? key}) : super(key: key);
@@ -15,16 +17,63 @@ class MeterView extends ConsumerStatefulWidget {
   @override
   ConsumerState<MeterView> createState() => _MeterViewState();
 }
-
-class _MeterViewState extends ConsumerState<MeterView> {
+class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserver {
   CameraController? _controller;
   bool _isCameraInitialized = false;
+  bool _isProcessing = false;
+  DateTime _lastProcessed = DateTime.now();
+  AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
 
   @override
   void initState() {
     super.initState();
-    _setupCamera();
+    WidgetsBinding.instance.addObserver(this);
+    // Initial setup if we are on the correct tab
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkCameraVisibility();
+    });
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    setState(() {
+      _lifecycleState = state;
+    });
+    _checkCameraVisibility();
+  }
+
+  void _checkCameraVisibility() {
+    if (!mounted) return;
+    
+    final currentTabIndex = ref.read(homeTabIndexProvider);
+    final isTabActive = currentTabIndex == 2; // Meter tab index
+    final isAppResumed = _lifecycleState == AppLifecycleState.resumed;
+    
+    final shouldRun = isTabActive && isAppResumed;
+    
+    if (shouldRun && !_isCameraInitialized && _controller == null) {
+      debugPrint('[MeterView] Starting camera - Tab Active & App Resumed');
+      _setupCamera();
+    } else if (!shouldRun && _controller != null) {
+      debugPrint('[MeterView] Stopping camera - Visibility lost');
+      _disposeCamera();
+    }
+  }
+
+  Future<void> _disposeCamera() async {
+    final controller = _controller;
+    _controller = null;
+    if (mounted) {
+      setState(() {
+        _isCameraInitialized = false;
+      });
+    }
+    if (controller != null) {
+      await controller.dispose();
+    }
+  }
+
+  static const _metadataChannel = MethodChannel('com.halide/camera_metadata');
 
   Future<void> _setupCamera() async {
     final cameras = await availableCameras();
@@ -34,10 +83,39 @@ class _MeterViewState extends ConsumerState<MeterView> {
       cameras[0],
       ResolutionPreset.medium,
       enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.bgra8888, // Standard for iOS processing
     );
 
     try {
       await _controller!.initialize();
+      
+      // Start Image Stream for Light Metering
+      await _controller!.startImageStream((image) async {
+        final now = DateTime.now();
+        if (now.difference(_lastProcessed).inMilliseconds < 300) return;
+        _lastProcessed = now;
+        
+        if (_isProcessing) return;
+        _isProcessing = true;
+        
+        try {
+          // Fetch real-time hardware metadata from iOS platform channel
+          final Map<dynamic, dynamic> metadata = await _metadataChannel.invokeMethod('getMetadata');
+          
+          ref.read(meterProvider.notifier).updateFromHardware(
+            iso: metadata['iso'] as double,
+            shutter: metadata['shutterSpeed'] as double,
+            aperture: metadata['aperture'] as double,
+          );
+        } catch (e) {
+          // Fallback to luminance heuristic only if platform metadata is unavailable
+          final luminance = LuminanceAnalyzer.calculateLuminance(image);
+          ref.read(meterProvider.notifier).updateLuminance(luminance);
+        } finally {
+          _isProcessing = false;
+        }
+      });
+
       if (mounted) {
         setState(() {
           _isCameraInitialized = true;
@@ -48,11 +126,6 @@ class _MeterViewState extends ConsumerState<MeterView> {
     }
   }
 
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
 
   void _handleLockToggle() {
     HapticFeedback.mediumImpact();
@@ -228,7 +301,7 @@ class _MeterViewState extends ConsumerState<MeterView> {
 
   Future<void> _showAperturePicker() async {
     final current = ref.read(meterProvider);
-    final stops = <double>[1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0];
+    final stops = <double>[1.0, 1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0];
     double selected = current.aperture;
     await showModalBottomSheet<void>(
       context: context,
@@ -407,10 +480,22 @@ class _MeterViewState extends ConsumerState<MeterView> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Watch tab index to trigger camera start/stop
+    ref.listen<int>(homeTabIndexProvider, (previous, next) {
+      _checkCameraVisibility();
+    });
+
     final meterState = ref.watch(meterProvider);
     final plan = ref.watch(userPlanProvider);
-    final isFree = plan == UserPlan.free;
+    final isPro = plan.isPro;
 
     return HalideScaffold(
       appBar: AppBar(
@@ -439,17 +524,24 @@ class _MeterViewState extends ConsumerState<MeterView> {
           else
             const Center(child: CircularProgressIndicator()),
 
-          if (isFree)
+          if (!isPro)
             Positioned.fill(
               child: Container(
-                color: Colors.black.withOpacity(0.8),
+                color: Colors.black.withOpacity(0.85),
                 child: Center(
                   child: GlassPanel(
                     padding: const EdgeInsets.all(32),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.lock_person_rounded, size: 64, color: Colors.orangeAccent),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.orangeAccent.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.lock_person_rounded, size: 64, color: Colors.orangeAccent),
+                        ),
                         const SizedBox(height: 24),
                         const Text(
                           'PRO FEATURE',
@@ -462,9 +554,22 @@ class _MeterViewState extends ConsumerState<MeterView> {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'Precision Light Metering is reserved for Plus and Pro members.',
+                          'Precision Light Metering is reserved for Halide Pro members.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white, fontSize: 16),
+                          style: TextStyle(
+                            color: Colors.white, 
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Unlock advanced spot metering, EV compensation, and manual exposure controls.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6), 
+                            fontSize: 14,
+                          ),
                         ),
                         const SizedBox(height: 32),
                         ElevatedButton(
@@ -472,10 +577,17 @@ class _MeterViewState extends ConsumerState<MeterView> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orangeAccent,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                            shape: const StadiumBorder(),
+                            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            elevation: 0,
                           ),
-                          child: const Text('UPGRADE NOW', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            'UPGRADE TO PRO', 
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                            )
+                          ),
                         ),
                       ],
                     ),
@@ -485,7 +597,8 @@ class _MeterViewState extends ConsumerState<MeterView> {
             )
           else ...[
             // Spot Metering Target
-            Center(
+            Align(
+              alignment: const Alignment(0, -0.3),
               child: Container(
                 width: 80,
                 height: 80,
@@ -602,7 +715,11 @@ class _MeterViewState extends ConsumerState<MeterView> {
   }
 
   String _formatShutterSpeed(double ss) {
-    if (ss >= 1) return ss.toStringAsFixed(1) + 's';
-    return '1/${(1 / ss).toStringAsFixed(0)}';
+    if (ss >= 1) {
+      return ss == ss.roundToDouble()
+          ? '${ss.round()}s'
+          : '${ss.toStringAsFixed(1)}s';
+    }
+    return '1/${(1 / ss).round()}';
   }
 }

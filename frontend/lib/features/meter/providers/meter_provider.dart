@@ -55,18 +55,6 @@ class MeterNotifier extends Notifier<MeterState> {
   final SensorService _sensorService = SensorService();
   StreamSubscription<double>? _luxSub;
 
-  static const List<double> _apertureStops = [
-    1.4,
-    2.0,
-    2.8,
-    4.0,
-    5.6,
-    8.0,
-    11.0,
-    16.0,
-    22.0,
-  ];
-
   @override
   MeterState build() {
     _luxSub ??= _sensorService.luxStream.listen((lux) {
@@ -95,21 +83,43 @@ class MeterNotifier extends Notifier<MeterState> {
 
   void updateISO(double iso) {
     if (state.isLocked) return;
-    final evBase = _sensorService.estimateEVFromLux(state.lux, iso: iso);
-    final next = state.copyWith(iso: iso, evBase: evBase);
-    state = _recalculateFrom(next);
+    state = _recalculateFrom(state.copyWith(iso: iso));
   }
 
   void updateEVComp(double evComp) {
     if (state.isLocked) return;
-    final next = state.copyWith(evComp: evComp);
-    state = _recalculateFrom(next);
+    state = _recalculateFrom(state.copyWith(evComp: evComp));
   }
 
   void updateShutterSpeed(double shutterSpeed) {
     if (state.isLocked) return;
-    final next = state.copyWith(shutterSpeed: shutterSpeed, lastChanged: ExposureControl.shutter);
-    state = _recalculateFrom(next);
+    state = _recalculateFrom(state.copyWith(shutterSpeed: shutterSpeed, lastChanged: ExposureControl.shutter));
+  }
+
+  void updateFromHardware({
+    required double iso,
+    required double shutter,
+    required double aperture,
+  }) {
+    if (state.isLocked) return;
+
+    final ev100 = _sensorService.calculateEV100(aperture, shutter, iso);
+    final lux = _sensorService.calculateLuxFromEV100(ev100);
+
+    state = _recalculateFrom(
+      state.copyWith(lux: lux, evBase: ev100),
+    );
+  }
+
+  void updateLuminance(double luminance) {
+    if (state.isLocked) return;
+
+    final evBase = _sensorService.estimateEVFromLuminance(luminance);
+    final lux = _sensorService.calculateLuxFromEV100(evBase);
+
+    state = _recalculateFrom(
+      state.copyWith(lux: lux, evBase: evBase),
+    );
   }
 
   void toggleLock() {
@@ -117,43 +127,24 @@ class MeterNotifier extends Notifier<MeterState> {
   }
 
   MeterState _recalculateFrom(MeterState current) {
-    final ev = current.ev;
-    if (ev <= 0) {
-      return current.copyWith(
-        shutterSpeed: current.shutterSpeed <= 0 ? 1 / 100 : current.shutterSpeed,
-        aperture: current.aperture <= 0 ? 2.8 : current.aperture,
-      );
-    }
+    final evAtUserIso = current.evBase
+        + (math.log(current.iso / 100.0) / math.ln2)
+        + current.evComp;
 
     if (current.lastChanged == ExposureControl.shutter) {
-      final a = _apertureFromShutterAndEv(current.shutterSpeed, ev);
-      final snapped = _snapAperture(a);
+      final a = _apertureFromShutterAndEv(current.shutterSpeed, evAtUserIso);
+      final snapped = SensorService.snapAperture(a);
       return current.copyWith(aperture: snapped);
     }
 
-    // Default: keep aperture fixed, compute shutter speed.
-    final shutter = _sensorService.calculateShutterSpeed(current.aperture, ev);
-    return current.copyWith(shutterSpeed: shutter);
+    final rawShutter = _sensorService.calculateShutterSpeed(current.aperture, evAtUserIso);
+    final snappedShutter = SensorService.snapShutterSpeed(rawShutter);
+    return current.copyWith(shutterSpeed: snappedShutter);
   }
 
   double _apertureFromShutterAndEv(double shutterSpeed, double ev) {
-    // From t = N^2 / 2^EV => N = sqrt(t * 2^EV)
     final t = shutterSpeed <= 0 ? 1 / 100 : shutterSpeed;
     return math.sqrt(t * math.pow(2, ev));
-  }
-
-  double _snapAperture(double value) {
-    final v = value.isFinite ? value : 2.8;
-    double best = _apertureStops.first;
-    double bestDist = (v - best).abs();
-    for (final s in _apertureStops.skip(1)) {
-      final d = (v - s).abs();
-      if (d < bestDist) {
-        bestDist = d;
-        best = s;
-      }
-    }
-    return best;
   }
 }
 
