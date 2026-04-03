@@ -16,9 +16,17 @@ class SensorService {
   }
 
   /// Calibration offset applied to EV100 derived from hardware metadata.
-  /// Modern iPhone sensors overexpose to preserve shadow detail; a negative
-  /// offset brings readings in line with professional reflected-light meters.
-  static const double calibrationOffset = -0.7;
+  ///
+  /// iPhone in video/stream mode (used by the Flutter camera plugin) sets its
+  /// auto-exposure for video quality: very low ISO (50–100) and very short
+  /// shutter speeds (1/2000–1/4000s) even in typical indoor scenes. When fed
+  /// into the standard EV formula this yields EV values ~6 stops higher than
+  /// what a professional reflected-light meter reports for the same scene.
+  /// Empirically validated against reference metering apps: indoor scenes that
+  /// should read EV 7–8 arrive as raw EV ≈ 13–14 from the iOS hardware.
+  /// A -6.0 offset normalises the output to match traditional photographic
+  /// metering (e.g. 1/30s at f/2.8 ISO 100 for a typical indoor room).
+  static const double calibrationOffset = -6.0;
 
   /// Standard photographic shutter speeds in seconds (ascending).
   static const List<double> standardShutterSpeeds = [

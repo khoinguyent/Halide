@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import '../../../services/sensor_service.dart';
@@ -103,8 +104,14 @@ class MeterNotifier extends Notifier<MeterState> {
   }) {
     if (state.isLocked) return;
 
+    final rawEv = _sensorService.calculateEV(aperture, shutter);
     final ev100 = _sensorService.calculateEV100(aperture, shutter, iso);
     final lux = _sensorService.calculateLuxFromEV100(ev100);
+
+    debugPrint('[Meter] hw: f/$aperture  t=1/${(1/shutter).round()}  ISO=$iso'
+        '  rawEV=${rawEv.toStringAsFixed(2)}'
+        '  ev100(calibrated)=${ev100.toStringAsFixed(2)}'
+        '  lux=${lux.toStringAsFixed(0)}');
 
     state = _recalculateFrom(
       state.copyWith(lux: lux, evBase: ev100),

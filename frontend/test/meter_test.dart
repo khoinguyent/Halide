@@ -36,19 +36,32 @@ void main() {
   group('Calibration offset', () {
     test('calculateEV100 applies calibration offset', () {
       // Raw EV100 = log2(N^2/t) - log2(ISO/100)
-      // N=1.8, t=1/1000, ISO=200
-      // log2(1.8^2 * 1000) = log2(3240) ≈ 11.6625
-      // log2(200/100) = 1
-      // Raw EV100 ≈ 10.6625
-      // Calibrated = 10.6625 + (-0.7) = 9.9625
-      final ev100 = sensorService.calculateEV100(1.8, 1 / 1000, 200);
-      final rawEv100 = math.log(math.pow(1.8, 2) / (1 / 1000)) / math.ln2
-          - math.log(200 / 100) / math.ln2;
+      // N=1.78, t=1/30, ISO=100 (typical iPhone video: would be much faster in practice)
+      // log2(1.78^2 * 30) = log2(95.05) ≈ 6.57
+      // log2(100/100) = 0
+      // Raw EV100 ≈ 6.57
+      // Calibrated = 6.57 + (-6.0) = 0.57
+      final ev100 = sensorService.calculateEV100(1.78, 1 / 30, 100);
+      final rawEv100 = math.log(math.pow(1.78, 2) / (1 / 30)) / math.ln2
+          - math.log(100 / 100) / math.ln2;
       expect(ev100, closeTo(rawEv100 + SensorService.calibrationOffset, 0.001));
     });
 
-    test('calibrationOffset is negative (compensates iPhone overexposure)', () {
+    test('calibrationOffset is negative (compensates iPhone video-mode overexposure)', () {
       expect(SensorService.calibrationOffset, lessThan(0));
+    });
+
+    test('calibrationOffset magnitude brings EV into photographic range', () {
+      // iPhone video mode reports raw EV ≈ 13-14 for indoor scenes.
+      // With -6.0 offset, a raw EV of 13.8 becomes 7.8 (correct for typical indoor).
+      // Verify: at f/2.8, ISO 100, the resulting shutter should be near 1/30s.
+      final rawIndoorEv100 = 13.8;
+      final calibrated = rawIndoorEv100 + SensorService.calibrationOffset;
+      // EV at ISO 100 with user aperture f/2.8: t = 2.8^2 / 2^calibrated
+      final t = math.pow(2.8, 2) / math.pow(2, calibrated);
+      // Should be between 1/60 and 1/8
+      expect(t, greaterThan(1 / 60));
+      expect(t, lessThan(1 / 8));
     });
   });
 
