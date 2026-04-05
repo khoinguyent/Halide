@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -18,6 +20,26 @@ _FILM_COLOR = {
 
 def get_roll(db: Session, roll_id: str, user_id: str):
     return db.query(Roll).filter(Roll.id == roll_id, Roll.user_id == user_id).first()
+
+
+def _halide_users_key_from_image_url_field(raw: Optional[str]) -> Optional[str]:
+    """
+    DB may store either an object key (users/...) or a legacy full public URL.
+    Extract the users/... key so we can build a canonical URL with current R2 settings.
+    """
+    if not raw or not isinstance(raw, str):
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    if s.startswith("users/"):
+        return s.split("?", 1)[0].rstrip("/")
+    low = s.lower()
+    if low.startswith("http://") or low.startswith("https://"):
+        idx = s.find("/users/")
+        if idx >= 0:
+            return s[idx + 1 :].split("?", 1)[0].rstrip("/")
+    return None
 
 
 def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
@@ -46,7 +68,10 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         .order_by(Image.frame_number)
         .all()
     )
-    keys = [row.image_url for row in images if row.image_url]
+    # Rows with a URL only — `image_urls` and `shots` must stay the same length and order
+    # so the gallery, overlays, and Pro rotate/replace use the same index (see Image.id).
+    image_rows = [row for row in images if row.image_url]
+    keys = [row.image_url for row in image_rows]
 
     # Image.image_url is stored as a storage key (not a full URL). Convert it
     # to an HTTP URL so the Flutter gallery can render via Image.network.
@@ -71,25 +96,24 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         else:
             url_base = (f"{base_url}/{bucket}").rstrip("/") if bucket else base_url.rstrip("/")
 
-    # `k` is stored as a key like: users/<uid>/rolls/<roll_id>/<image_id>.jpg (no leading slash).
-    # Avoid naive `replace("//","/")` because it breaks the `https://` scheme.
-    # Only render images stored via our storage uploader:
-    # keys look like `users/<uid>/rolls/<roll_id>/<image_id>.jpg`.
+    # `k` may be an object key (users/...) or a legacy full URL from older uploads.
+    # Rebuild from users/... + current public base so bucket/host always match R2 (see fix_r2_urls.py).
     image_urls = []
     for k in keys:
         if not isinstance(k, str):
             continue
-        if k.startswith("users/"):
-            image_urls.append(f"{url_base}/{k}".rstrip("/"))
+        users_key = _halide_users_key_from_image_url_field(k)
+        if users_key:
+            image_urls.append(f"{url_base}/{users_key}".rstrip("/"))
         elif k.startswith("/") or k.startswith("http://") or k.startswith("https://"):
-            # Local path reference or full public URL
-            image_urls.append(k)
+            image_urls.append(k.split("?", 1)[0])
 
     # Apply shot_offset shift for alignment calibration
     # Moves the first N frames to the end of the list.
     if r.shot_offset and r.shot_offset > 0 and len(image_urls) > 0:
         offset = r.shot_offset % len(image_urls)
         image_urls = image_urls[offset:] + image_urls[:offset]
+        image_rows = image_rows[offset:] + image_rows[:offset]
 
     total_frames = (r.max_frames if r.max_frames is not None else 36)
     actual_frames = len(image_urls)
@@ -100,7 +124,7 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         color=color,
         status=r.status.value,
         image_urls=image_urls,
-        shots=images,
+        shots=image_rows,
         drive_url=getattr(r, "drive_url", None),
         title=r.title,
         description=r.description,
@@ -245,7 +269,16 @@ def add_local_images(db: Session, roll_id: str, local_paths: list[str], user_id:
     return new_images
 
 
-def log_shot(db: Session, roll_id: str, aperture: float, shutter_speed: str, lat: float, lng: float, user_id: str):
+def log_shot(
+    db: Session,
+    roll_id: str,
+    aperture: float,
+    shutter_speed: str,
+    user_id: str,
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    notes: Optional[str] = None,
+):
     db_roll = get_roll(db, roll_id, user_id)
     if not db_roll:
         raise HTTPException(status_code=404, detail="Roll not found")
@@ -260,8 +293,9 @@ def log_shot(db: Session, roll_id: str, aperture: float, shutter_speed: str, lat
         image_url=None,  # This is a log-only entry
         aperture=aperture,
         shutter_speed=shutter_speed,
+        notes=notes,
         location_lat=lat,
-        location_lng=lng
+        location_lng=lng,
     )
     db.add(db_image)
     db.commit()

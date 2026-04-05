@@ -56,7 +56,11 @@ class PurchaseService {
   }
 
   Future<void> logIn(String userId) async {
-    await Purchases.logIn(userId);
+    try {
+      await Purchases.logIn(userId);
+    } catch (e) {
+      debugPrint('[PurchaseService] Error logging in: $e');
+    }
   }
 
   Future<void> logOut() async {

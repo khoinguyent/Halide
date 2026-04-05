@@ -199,7 +199,7 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
 
   Widget _buildSearchableStockPicker() {
     return Autocomplete<FilmStock>(
-      displayStringForOption: (stock) => '${stock.brand} ${stock.name}',
+      displayStringForOption: (stock) => '${stock.brand} ${stock.name} (${stock.format})',
       optionsBuilder: (textEditingValue) => _filmStockOptionsForQuery(textEditingValue.text),
       onSelected: (stock) => setState(() {
         _selectedStock = stock;
@@ -236,7 +236,7 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
                   final stock = options.elementAt(index);
                   return ListTile(
                     dense: true,
-                    title: Text('${stock.brand} ${stock.name}', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                    title: Text('${stock.brand} ${stock.name} (${stock.format})', style: const TextStyle(color: Colors.white, fontSize: 13)),
                     onTap: () => onSelected(stock),
                   );
                 },

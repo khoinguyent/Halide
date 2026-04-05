@@ -17,7 +17,6 @@ import '../providers/roll_provider.dart';
 import '../providers/rolls_provider.dart';
 import '../features/rolls/presentation/bloc/rolls_bloc.dart';
 import '../widgets/synced_image.dart';
-import '../widgets/exif_capture_modal.dart';
 import '../widgets/image_uploader_widget.dart';
 import '../widgets/full_screen_viewer.dart';
 import '../core/providers/notification_provider.dart';
@@ -25,14 +24,12 @@ import '../core/models/notification_model.dart';
 import '../services/api_service.dart';
 import '../services/upload_service.dart';
 import '../core/widgets/image_placeholder.dart';
+import '../services/gdrive_connection_guard.dart';
 import '../services/local_sync_service.dart';
-import '../widgets/synced_image.dart';
-import '../widgets/exif_capture_modal.dart';
 import '../models/shot.dart';
 import '../widgets/folder_tabs.dart';
 import '../providers/ui_state_provider.dart';
 import '../providers/dashboard_provider.dart';
-import '../providers/profile_provider.dart';
 
 class RollDetailView extends ConsumerStatefulWidget {
   final String rollId;
@@ -45,10 +42,6 @@ class RollDetailView extends ConsumerStatefulWidget {
 
 class _RollDetailViewState extends ConsumerState<RollDetailView> {
   Timer? _pollingTimer;
-  bool _showRollGuide = false;
-  int _rollGuideStep = 0; // 0=status, 1=shot log
-  bool _showLabGuide = false;
-  bool _guideChecked = false;
 
   @override
   void initState() {
@@ -56,30 +49,6 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.invalidate(rollDetailProvider(widget.rollId));
-      _checkGuides();
-    });
-  }
-
-  void _checkGuides() {
-    if (_guideChecked) return;
-    final profileAsync = ref.read(userProfileProvider);
-    profileAsync.whenData((profile) {
-      if (profile == null || _guideChecked) return;
-      _guideChecked = true;
-
-      final rollAsync = ref.read(rollDetailProvider(widget.rollId));
-      final roll = rollAsync.asData?.value;
-      if (roll == null) return;
-
-      if (!profile.hasSeenRollGuide && roll.status == RollStatus.shooting) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _showRollGuide = true);
-        });
-      } else if (!profile.hasSeenLabGuide && roll.status == RollStatus.lab) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _showLabGuide = true);
-        });
-      }
     });
   }
 
@@ -151,47 +120,8 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
            LocalSyncService().syncRoll(widget.rollId, roll.imageUrls);
         }
 
-        if (!_guideChecked) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _checkGuides());
-        }
-        
-        return _buildBodyWithGuides(context, roll);
+        return _buildBody(context, roll);
       },
-    );
-  }
-
-  Widget _buildBodyWithGuides(BuildContext context, Roll roll) {
-    final body = _buildBody(context, roll);
-    return Stack(
-      children: [
-        body,
-        if (_showRollGuide)
-          _RollGuideOverlay(
-            step: _rollGuideStep,
-            onNext: () {
-              if (_rollGuideStep == 0) {
-                setState(() => _rollGuideStep = 1);
-              } else {
-                setState(() => _showRollGuide = false);
-                ref.read(profileServiceProvider).markRollGuideSeen();
-                ref.invalidate(userProfileProvider);
-              }
-            },
-            onSkip: () {
-              setState(() => _showRollGuide = false);
-              ref.read(profileServiceProvider).markRollGuideSeen();
-              ref.invalidate(userProfileProvider);
-            },
-          ),
-        if (_showLabGuide)
-          _LabGuideOverlay(
-            onDismiss: () {
-              setState(() => _showLabGuide = false);
-              ref.read(profileServiceProvider).markLabGuideSeen();
-              ref.invalidate(userProfileProvider);
-            },
-          ),
-      ],
     );
   }
 
@@ -408,11 +338,21 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     VoidCallback? onEmptyStateTap,
     int offset = 0,
   }) {
-    final images = roll.imageUrls
-        .where((u) => u.trim().isNotEmpty)
-        .where((u) => u.startsWith('http') || u.startsWith('/'))
-        .toList(growable: false);
-    
+    // Keep URLs and Image row ids aligned (same index) for Pro rotate/replace.
+    final pairedUrls = <String>[];
+    final pairedIds = <String>[];
+    for (var i = 0; i < roll.imageUrls.length; i++) {
+      final u = roll.imageUrls[i];
+      if (u.trim().isEmpty) continue;
+      if (!u.startsWith('http') && !u.startsWith('/') && !u.startsWith('file://')) {
+        continue;
+      }
+      if (i >= roll.shots.length) break;
+      pairedUrls.add(u);
+      pairedIds.add(roll.shots[i].id);
+    }
+    final images = pairedUrls;
+
     if (images.isEmpty) {
       const crossAxisCount = 3;
       const gridPadding = 12.0;
@@ -483,6 +423,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
                 builder: (context) => FullScreenViewer(
                   rollId: roll.id,
                   imageUrls: images,
+                  imageIds: pairedIds,
                   initialIndex: index,
                   iso: roll.shotAtIso,
                   dateScanned: roll.createdAt,
@@ -505,6 +446,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
                     rollId: roll.id,
                     imageUrl: path,
                     fit: BoxFit.cover,
+                    preferThumbnail: false,
                   ),
                   if (offset > 0 || roll.shots.isNotEmpty)
                     _buildOverlayMetadata(index, offset, roll.shots),
@@ -741,6 +683,13 @@ class _ShotLogSection extends StatelessWidget {
                               TimeOfDay.fromDateTime(shot.createdAt!).format(context),
                               style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11),
                             ),
+                          if (shot.notes != null && shot.notes!.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              shot.notes!,
+                              style: TextStyle(color: Colors.white.withOpacity(0.42), fontSize: 11, height: 1.35),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1034,6 +983,12 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       return;
     }
 
+    final gdriveOk = await ensureGoogleDriveConnected(context, ref);
+    if (!gdriveOk) {
+      return;
+    }
+    dismissKeyboardGlobally();
+
     setState(() {
       _isFetching = true;
       _error = null;
@@ -1112,8 +1067,22 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
     }
   }
 
+  Future<void> _prefetchAfterSync() async {
+    try {
+      final roll = await ref.read(rollDetailProvider(widget.rollId).future);
+      await LocalSyncService().syncRollParallel(roll.id, roll.imageUrls);
+    } catch (e) {
+      debugPrint('[Drive] prefetch after sync: $e');
+    }
+  }
+
   Future<void> _syncImagesFromUrl() async {
     try {
+      final gdriveOk = await ensureGoogleDriveConnected(context, ref);
+      if (!gdriveOk) {
+        return;
+      }
+
       final url = _driveUrlController.text.trim();
       final resp = await _api.post(
         '/api/v1/storage/gdrive/sync_images_from_url',
@@ -1124,8 +1093,12 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       );
       if (!mounted) return;
       final data = resp.data;
+      ref.invalidate(rollDetailProvider(widget.rollId));
       if (data is Map && data['detail'] == 'Sync started in background') {
-        // No snackbar for background sync as per user request
+        widget.onUploadComplete();
+        Future.delayed(const Duration(seconds: 4), () {
+          if (mounted) _prefetchAfterSync();
+        });
       } else {
         final synced = (data is Map && data['synced_count'] != null)
             ? data['synced_count'].toString()
@@ -1134,14 +1107,13 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
           'SUCCESSFULLY IMPORTED $synced NEW PHOTOS!',
           type: NotificationType.success,
         );
+        widget.onUploadComplete();
+        await _prefetchAfterSync();
       }
-      widget.onUploadComplete();
     } on DioException catch (e) {
       if (!mounted) return;
-      final status = e.response?.statusCode;
       final body = e.response?.data;
-      final detail =
-          body is Map<String, dynamic> ? body['detail']?.toString() : body?.toString();
+      debugPrint('[Drive] sync error: ${e.response?.statusCode} $body');
       ref.read(notificationProvider.notifier).show(
         'SYNC FAILED. PLEASE VERIFY YOUR DRIVE LINK AND PERMISSIONS.',
         type: NotificationType.error,
@@ -1431,248 +1403,6 @@ class _AlignmentCalibrationSliderState extends State<_AlignmentCalibrationSlider
           ),
         ),
       ],
-    );
-  }
-}
-
-// ─── Roll Guide Overlay (first-roll: status + shot log) ────────────────────
-
-class _RollGuideOverlay extends StatelessWidget {
-  final int step; // 0 = status badge, 1 = shot log
-  final VoidCallback onNext;
-  final VoidCallback onSkip;
-
-  const _RollGuideOverlay({
-    required this.step,
-    required this.onNext,
-    required this.onSkip,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isStatus = step == 0;
-
-    final title = isStatus ? 'Roll Status' : 'Shot Log';
-    final description = isStatus
-        ? 'Tap the status badge to advance your roll through its lifecycle: Shooting → At Lab → Scanned → Archived.'
-        : 'Switch to the Shot Log tab to record technical data for each frame — aperture, shutter speed, and location.';
-    final icon = isStatus ? Icons.radio_button_checked : Icons.list_alt_rounded;
-
-    // Status badge: top-right area. Shot log tab: mid-top.
-    final spotlightY = isStatus ? 56.0 : 118.0;
-    final spotlightX = isStatus ? size.width - 80 : size.width * 0.75;
-
-    return GestureDetector(
-      onTap: onNext,
-      child: Stack(
-        children: [
-          CustomPaint(
-            size: size,
-            painter: _GuideSpotlightPainter(
-              center: Offset(spotlightX, spotlightY),
-              radius: isStatus ? 50 : 44,
-            ),
-          ),
-          Positioned(
-            top: spotlightY + (isStatus ? 70 : 60),
-            left: 28,
-            right: 28,
-            child: _GuideCard(
-              icon: icon,
-              title: title,
-              description: description,
-              stepLabel: '${step + 1}/2',
-              buttonLabel: isStatus ? 'Next' : 'Got it',
-              onAction: onNext,
-              onSkip: isStatus ? onSkip : null,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Lab Guide Overlay (At Lab: drive / manual) ────────────────────────────
-
-class _LabGuideOverlay extends StatelessWidget {
-  final VoidCallback onDismiss;
-
-  const _LabGuideOverlay({required this.onDismiss});
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final centerY = size.height * 0.45;
-
-    return GestureDetector(
-      onTap: onDismiss,
-      child: Stack(
-        children: [
-          CustomPaint(
-            size: size,
-            painter: _GuideSpotlightPainter(
-              center: Offset(size.width / 2, centerY),
-              radius: size.width * 0.4,
-            ),
-          ),
-          Positioned(
-            top: centerY + size.width * 0.4 + 16,
-            left: 28,
-            right: 28,
-            child: _GuideCard(
-              icon: Icons.cloud_download_outlined,
-              title: 'Import Your Scans',
-              description:
-                  'Your roll is at the lab! Once your scans are ready, paste a Google Drive link to auto-import, or add photos manually.',
-              buttonLabel: 'Got it',
-              onAction: onDismiss,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GuideSpotlightPainter extends CustomPainter {
-  final Offset center;
-  final double radius;
-
-  _GuideSpotlightPainter({required this.center, required this.radius});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black.withOpacity(0.75);
-    final path = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRRect(RRect.fromRectAndRadius(
-        Rect.fromCircle(center: center, radius: radius),
-        Radius.circular(radius * 0.4),
-      ))
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _GuideSpotlightPainter old) =>
-      old.center != center || old.radius != radius;
-}
-
-class _GuideCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-  final String? stepLabel;
-  final String buttonLabel;
-  final VoidCallback onAction;
-  final VoidCallback? onSkip;
-
-  const _GuideCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-    this.stepLabel,
-    required this.buttonLabel,
-    required this.onAction,
-    this.onSkip,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (stepLabel != null)
-              Align(
-                alignment: Alignment.topRight,
-                child: Text(
-                  stepLabel!,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.3),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            Icon(icon, color: Colors.orange, size: 32),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.65),
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                if (onSkip != null)
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: onSkip,
-                      child: Container(
-                        height: 44,
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Skip',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.4),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: onAction,
-                    child: Container(
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        buttonLabel,
-                        style: const TextStyle(
-                          color: Colors.orange,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

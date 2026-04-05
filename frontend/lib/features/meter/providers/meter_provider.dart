@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:async';
+import '../../../services/meter_debug_log.dart';
 import '../../../services/sensor_service.dart';
 import 'dart:math' as math;
 
@@ -13,6 +13,7 @@ class MeterState {
   final double evComp;
   final double evBase;
   final ExposureControl lastChanged;
+  final bool isAeStable;
 
   MeterState({
     this.lux = 0.0,
@@ -23,6 +24,7 @@ class MeterState {
     this.isLocked = false,
     this.evComp = 0.0,
     this.lastChanged = ExposureControl.aperture,
+    this.isAeStable = false,
   });
 
   double get ev => evBase + evComp;
@@ -36,6 +38,7 @@ class MeterState {
     bool? isLocked,
     double? evComp,
     ExposureControl? lastChanged,
+    bool? isAeStable,
   }) {
     return MeterState(
       lux: lux ?? this.lux,
@@ -46,6 +49,7 @@ class MeterState {
       isLocked: isLocked ?? this.isLocked,
       evComp: evComp ?? this.evComp,
       lastChanged: lastChanged ?? this.lastChanged,
+      isAeStable: isAeStable ?? this.isAeStable,
     );
   }
 }
@@ -54,32 +58,20 @@ enum ExposureControl { aperture, shutter }
 
 class MeterNotifier extends Notifier<MeterState> {
   final SensorService _sensorService = SensorService();
-  StreamSubscription<double>? _luxSub;
+
+  // ── EMA smoothing (prevent jumpiness) ──────────────────────────────────
+  double? _smoothedEv;
 
   @override
-  MeterState build() {
-    _luxSub ??= _sensorService.luxStream.listen((lux) {
-      final current = state;
-      if (!current.isLocked) {
-        final evBase = _sensorService.estimateEVFromLux(lux, iso: current.iso);
-        state = _recalculateFrom(
-          current.copyWith(lux: lux, evBase: evBase),
-        );
-      } else {
-        state = current.copyWith(lux: lux);
-      }
-    });
-    ref.onDispose(() {
-      _luxSub?.cancel();
-      _luxSub = null;
-    });
-    return MeterState();
-  }
+  MeterState build() => MeterState();
+
+  // ── User control updates ───────────────────────────────────────────────
 
   void updateAperture(double aperture) {
     if (state.isLocked) return;
-    final next = state.copyWith(aperture: aperture, lastChanged: ExposureControl.aperture);
-    state = _recalculateFrom(next);
+    state = _recalculateFrom(
+      state.copyWith(aperture: aperture, lastChanged: ExposureControl.aperture),
+    );
   }
 
   void updateISO(double iso) {
@@ -94,65 +86,126 @@ class MeterNotifier extends Notifier<MeterState> {
 
   void updateShutterSpeed(double shutterSpeed) {
     if (state.isLocked) return;
-    state = _recalculateFrom(state.copyWith(shutterSpeed: shutterSpeed, lastChanged: ExposureControl.shutter));
+    state = _recalculateFrom(
+      state.copyWith(shutterSpeed: shutterSpeed, lastChanged: ExposureControl.shutter),
+    );
   }
+
+  // ── Primary metering path: camera hardware metadata ────────────────────
+  //
+  //   1. Compute EV₁₀₀ from hardware auto-exposure (aperture, shutter, ISO).
+  //   2. Apply −2.0 calibration offset (spec §2B).
+  //   3. EMA-smooth — more aggressive when AE is still adjusting.
+  //   4. Derive Lux from corrected EV (display-only, spec §6).
+  //   5. Reciprocal exposure → film shutter speed.
+  //   6. Snap to standard stop at display step only.
+  //
+  //   No ambient Lux sensor — it measures INCIDENT light (ceiling),
+  //   not REFLECTED light (subject).  See spec §1: "We cannot rely on
+  //   raw Lux sensors (blocked on iOS)."
 
   void updateFromHardware({
     required double iso,
     required double shutter,
     required double aperture,
+    bool isAdjusting = false,
+    double targetOffset = 0.0,
+    String? nativeDeviceId,
   }) {
     if (state.isLocked) return;
 
-    final rawEv = _sensorService.calculateEV(aperture, shutter);
-    final ev100 = _sensorService.calculateEV100(aperture, shutter, iso);
-    final lux = _sensorService.calculateLuxFromEV100(ev100);
+    if (!_isValidHardwareSample(iso, shutter, aperture)) {
+      MeterDebugLog.log(
+        'SKIP invalid sample: ISO=$iso t=$shutter N=$aperture '
+        '(native needs same AVCaptureDevice as Flutter camera — check setActiveCaptureDevice)',
+      );
+      return;
+    }
 
-    debugPrint('[Meter] hw: f/$aperture  t=1/${(1/shutter).round()}  ISO=$iso'
-        '  rawEV=${rawEv.toStringAsFixed(2)}'
-        '  ev100(calibrated)=${ev100.toStringAsFixed(2)}'
-        '  lux=${lux.toStringAsFixed(0)}');
+    // AE stability: track for UI indicator, but NEVER block readings.
+    // Relax |targetOffset| — iPhone often reports >1.5 EV while still usable.
+    final isFrameStable = !isAdjusting && targetOffset.abs() <= 3.0;
+
+    // Phase A + B: raw EV₁₀₀ with −2.0 calibration (spec §2)
+    final ev100 = _sensorService.calculateEV100(aperture, shutter, iso);
+
+    // EMA smoothing (center-weighted average over time)
+    // Stable AE → fast response (α=0.35); adjusting → damped (α=0.10)
+    final alpha = isFrameStable ? 0.35 : 0.10;
+    _smoothedEv = _smoothedEv == null
+        ? ev100
+        : alpha * ev100 + (1 - alpha) * _smoothedEv!;
+
+    // Lux derived from corrected EV, not from sensor (spec §6)
+    final lux = _sensorService.calculateLuxFromEV100(_smoothedEv!);
+
+    final line =
+        'f/${aperture.toStringAsFixed(2)} t=${_fmtShutter(shutter)} ISO=${iso.toStringAsFixed(0)} '
+        'ev100=${ev100.toStringAsFixed(2)} smoothed=${_smoothedEv!.toStringAsFixed(2)} '
+        'stable=$isFrameStable adj=$isAdjusting tgtOff=${targetOffset.toStringAsFixed(2)} '
+        'lux≈${lux.toStringAsFixed(0)}'
+        '${nativeDeviceId != null ? ' uid=$nativeDeviceId' : ''}';
+    debugPrint('[Meter] hw: $line');
+    MeterDebugLog.log(line);
 
     state = _recalculateFrom(
-      state.copyWith(lux: lux, evBase: ev100),
+      state.copyWith(lux: lux, evBase: _smoothedEv!, isAeStable: isFrameStable),
     );
   }
 
-  void updateLuminance(double luminance) {
+  /// Rejects NaN/∞ and zero ISO/shutter/aperture — otherwise [calculateEV100] becomes 0 → bogus 8s at f/2.8.
+  static bool _isValidHardwareSample(double iso, double shutter, double aperture) {
+    if (!iso.isFinite || !shutter.isFinite || !aperture.isFinite) return false;
+    if (iso <= 0 || shutter <= 0 || aperture <= 0) return false;
+    if (shutter < 1e-9) return false;
+    return true;
+  }
+
+  /// Resets to Aperture Priority: compute shutter from the current scene EV
+  /// and the user-selected aperture.  Called when the user taps the meter circle.
+  void resetToAperturePriority() {
     if (state.isLocked) return;
-
-    final evBase = _sensorService.estimateEVFromLuminance(luminance);
-    final lux = _sensorService.calculateLuxFromEV100(evBase);
-
     state = _recalculateFrom(
-      state.copyWith(lux: lux, evBase: evBase),
+      state.copyWith(lastChanged: ExposureControl.aperture),
     );
   }
 
   void toggleLock() {
-    state = state.copyWith(isLocked: !state.isLocked);
+    if (!state.isLocked) {
+      state = state.copyWith(isLocked: true);
+    } else {
+      _smoothedEv = null;
+      state = state.copyWith(isLocked: false, isAeStable: false);
+    }
   }
 
+  // ── Reciprocal exposure (spec §4) ──────────────────────────────────────
+
   MeterState _recalculateFrom(MeterState current) {
-    final evAtUserIso = current.evBase
-        + (math.log(current.iso / 100.0) / math.ln2)
+    // EV_f = EV_final + log₂(ISO_film / 100) + evComp
+    final evAtFilmIso = current.evBase
+        + _log2(current.iso / 100.0)
         + current.evComp;
 
     if (current.lastChanged == ExposureControl.shutter) {
-      final a = _apertureFromShutterAndEv(current.shutterSpeed, evAtUserIso);
-      final snapped = SensorService.snapAperture(a);
-      return current.copyWith(aperture: snapped);
+      final rawAperture = _apertureFromShutterAndEv(current.shutterSpeed, evAtFilmIso);
+      return current.copyWith(aperture: SensorService.snapAperture(rawAperture));
     }
 
-    final rawShutter = _sensorService.calculateShutterSpeed(current.aperture, evAtUserIso);
-    final snappedShutter = SensorService.snapShutterSpeed(rawShutter);
-    return current.copyWith(shutterSpeed: snappedShutter);
+    // t = N² / 2^EV_f   (spec §4)
+    final rawShutter = _sensorService.calculateShutterSpeed(current.aperture, evAtFilmIso);
+    return current.copyWith(shutterSpeed: SensorService.snapShutterSpeed(rawShutter));
   }
 
   double _apertureFromShutterAndEv(double shutterSpeed, double ev) {
     final t = shutterSpeed <= 0 ? 1 / 100 : shutterSpeed;
     return math.sqrt(t * math.pow(2, ev));
   }
+
+  static double _log2(double x) => math.log(x) / math.ln2;
+
+  static String _fmtShutter(double s) =>
+      s >= 1 ? '${s.toStringAsFixed(1)}s' : '1/${(1 / s).round()}';
 }
 
 final meterProvider = NotifierProvider<MeterNotifier, MeterState>(MeterNotifier.new);

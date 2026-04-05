@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 from ...db.session import get_db
 from ...db.schemas.roll import RollCreate, RollOut, RollOutDashboard, RollStatusUpdate, RollMetaUpdate, RollDriveUrlUpdate
@@ -98,8 +98,9 @@ def add_local_images(
 class ShotCreate(BaseModel):
     aperture: float
     shutter_speed: str
-    lat: float
-    lng: float
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    notes: Optional[str] = None
 
 
 @router.post("/rolls/{id}/shots", response_model=ImageOut)
@@ -116,6 +117,7 @@ def log_shot(
         shutter_speed=shot.shutter_speed,
         lat=shot.lat,
         lng=shot.lng,
+        notes=shot.notes,
         user_id=current_user.id
     )
 

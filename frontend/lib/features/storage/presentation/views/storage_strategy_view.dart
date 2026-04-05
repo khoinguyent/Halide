@@ -72,9 +72,9 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
                 selectedIndex: _selectedTierIndex,
                 isFree: isFree,
                 onSelected: (index) {
-                  if (isFree && index > 0) {
+                  if (isFree && index > 1) {
                     ref.read(notificationProvider.notifier).show(
-                      'Free tier is limited to Local Storage. Upgrade to enable Cloud syncing.',
+                      'System Cloud requires Pro features. Professional sync is limited to individual cloud accounts.',
                       type: NotificationType.warning,
                     );
                     return;

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,14 +14,25 @@ import '../services/api_service.dart';
 import 'synced_image.dart';
 import 'status_selector.dart';
 import 'exif_capture_modal.dart';
-import '../services/roll_service.dart';
+import '../services/gdrive_connection_guard.dart';
+import '../services/local_sync_service.dart';
 import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
+import '../providers/guidance_pending_provider.dart';
 
 class RollCard extends ConsumerStatefulWidget {
   final Roll roll;
+  /// When set, enables Archive coach marks on the status badge.
+  final GlobalKey? guidanceStatusKey;
+  /// Link icon / cloud sync icon (top-right) for lab & scanned rolls without images.
+  final GlobalKey? guidanceLinkSyncKey;
 
-  const RollCard({Key? key, required this.roll}) : super(key: key);
+  const RollCard({
+    Key? key,
+    required this.roll,
+    this.guidanceStatusKey,
+    this.guidanceLinkSyncKey,
+  }) : super(key: key);
 
   @override
   ConsumerState<RollCard> createState() => _RollCardState();
@@ -36,9 +46,12 @@ class _RollCardState extends ConsumerState<RollCard> {
     debugPrint('Fetching from $driveUrl');
     if (!mounted) return;
 
+    final gdriveOk = await ensureGoogleDriveConnected(context, ref);
+    if (!gdriveOk) return;
+
     setState(() => _fetchingRollId = rollId);
     try {
-      final resp = await _api.post(
+      await _api.post(
         '/api/v1/storage/gdrive/sync_images_from_url',
         data: {
           'roll_id': rollId,
@@ -50,10 +63,19 @@ class _RollCardState extends ConsumerState<RollCard> {
       ref.invalidate(dashboardRollsProvider);
       ref.invalidate(rollDetailProvider(rollId));
 
-      final data = resp.data;
-      final synced = (data is Map && data['synced_count'] != null)
-          ? data['synced_count'].toString()
-          : null;
+      try {
+        final roll = await ref.read(rollDetailProvider(rollId).future);
+        final sync = LocalSyncService();
+        await sync.syncRollParallel(roll.id, roll.imageUrls);
+      } catch (e) {
+        debugPrint('[RollCard] prefetch after Drive sync: $e');
+      }
+
+      if (mounted) {
+        ref.invalidate(dashboardRollsProvider);
+        ref.invalidate(rollDetailProvider(rollId));
+      }
+
       // No snackbar for background sync as per user request
     } on DioException catch (e) {
       if (!mounted) return;
@@ -106,6 +128,7 @@ class _RollCardState extends ConsumerState<RollCard> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     GestureDetector(
+                      key: widget.guidanceStatusKey,
                       onTap: () => _showQuickStatusSheet(context, ref, roll),
                       child: _StatusBadge(status: roll.status),
                     ),
@@ -120,9 +143,10 @@ class _RollCardState extends ConsumerState<RollCard> {
                               fontSize: 12,
                             ),
                           ),
-                          if (showLinkFetchAction && !isFree) ...[
+                          if (showLinkFetchAction) ...[
                             const SizedBox(width: 10),
                             GestureDetector(
+                              key: widget.guidanceLinkSyncKey,
                               behavior: HitTestBehavior.opaque,
                               onTap: () async {
                                 if (_fetchingRollId == roll.id) return;
@@ -232,7 +256,10 @@ class _RollCardState extends ConsumerState<RollCard> {
           maxFrames: roll.maxFrames,
         );
       case RollStatus.lab:
-        return _LabContent(rollId: roll.id, maxFrames: roll.maxFrames);
+        return _LabContent(
+          rollId: roll.id,
+          maxFrames: roll.maxFrames,
+        );
       case RollStatus.scanned:
         return _ScannedContent(
           rollId: roll.id,
@@ -410,8 +437,15 @@ class _DriveUrlBottomSheetState extends ConsumerState<_DriveUrlBottomSheet> {
               onPressed: () async {
                 final url = _controller.text.trim();
                 if (url.isEmpty) return;
+                dismissKeyboardGlobally();
                 setState(() => _isSaving = true);
                 try {
+                  final gdriveOk = await ensureGoogleDriveConnected(context, ref);
+                  if (!gdriveOk) {
+                    if (mounted) setState(() => _isSaving = false);
+                    return;
+                  }
+                  dismissKeyboardGlobally();
                   await _api.patch(
                     '/api/v1/rolls/${widget.rollId}/drive-url',
                     data: {'drive_url': url},
@@ -419,6 +453,7 @@ class _DriveUrlBottomSheetState extends ConsumerState<_DriveUrlBottomSheet> {
                   ref.invalidate(dashboardRollsProvider);
                   ref.invalidate(rollDetailProvider(widget.rollId));
                   if (context.mounted) Navigator.of(context).pop();
+                  ref.read(syncGuidanceRollIdProvider.notifier).setPending(widget.rollId);
                   await widget.onSavedFetch?.call(url);
                 } catch (e) {
                   if (!context.mounted) return;
@@ -442,7 +477,11 @@ class _ShootingContent extends ConsumerWidget {
   final String rollId;
   final int maxFrames;
 
-  const _ShootingContent({Key? key, required this.rollId, required this.maxFrames}) : super(key: key);
+  const _ShootingContent({
+    Key? key,
+    required this.rollId,
+    required this.maxFrames,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -547,7 +586,11 @@ class _LabContent extends StatelessWidget {
   final String rollId;
   final int maxFrames;
 
-  const _LabContent({Key? key, required this.rollId, required this.maxFrames}) : super(key: key);
+  const _LabContent({
+    Key? key,
+    required this.rollId,
+    required this.maxFrames,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -642,6 +685,7 @@ class _ScannedContent extends StatelessWidget {
                       rollId: rollId,
                       imageUrl: urls[index],
                       fit: BoxFit.cover,
+                      preferThumbnail: false,
                     ),
                   );
                 },

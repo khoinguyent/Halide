@@ -25,3 +25,7 @@ flutter build ipa --release \
     --dart-define=REVENUE_CAT_APPLE_KEY=$REVENUE_CAT_APPLE_KEY \
     --dart-define=REVENUE_CAT_GOOGLE_KEY=$REVENUE_CAT_GOOGLE_KEY \
     --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID=$GOOGLE_DRIVE_SERVER_CLIENT_ID
+
+echo ""
+echo "IPA output:"
+ls -1 "$FRONTEND_DIR/build/ios/ipa/"*.ipa 2>/dev/null || echo "(no .ipa found under build/ios/ipa/)"

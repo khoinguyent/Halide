@@ -51,7 +51,7 @@ class StorageTierSelector extends StatelessWidget {
                 child: _TierSegment(
                   data: _tiers[index],
                   isSelected: selectedIndex == index,
-                  isLocked: isFree && index > 0,
+                  isLocked: isFree && index > 1,
                   onTap: onSelected == null ? null : () => onSelected(index),
                 ),
               ),

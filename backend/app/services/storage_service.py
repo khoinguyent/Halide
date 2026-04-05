@@ -74,6 +74,46 @@ class StorageService:
 
         return full_key
 
+    def replace_roll_image_at_key(self, storage_key: str, file_content: bytes, content_type: str = "image/jpeg") -> str:
+        """
+        Overwrite an existing roll image at the same S3/R2 key and regenerate its thumbnail.
+        `storage_key` is the object key (e.g. users/<uid>/rolls/<roll_id>/<id>.jpg).
+        """
+        if self._s3 is None:
+            raise RuntimeError("S3/R2 is not configured. Set S3_ENDPOINT and credentials in .env for uploads.")
+
+        self._s3.put_object(
+            Bucket=self.bucket_name,
+            Key=storage_key,
+            Body=file_content,
+            ContentType=content_type,
+        )
+
+        base_key = storage_key[:-4] if storage_key.endswith(".jpg") else storage_key
+        thumb_key = f"{base_key}_thumb.jpg"
+
+        try:
+            from PIL import Image as PILImage  # type: ignore
+
+            img = PILImage.open(io.BytesIO(file_content))
+            img = img.convert("RGB")
+            img.thumbnail((800, 800))
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=80)
+            buf.seek(0)
+            self._s3.put_object(
+                Bucket=self.bucket_name,
+                Key=thumb_key,
+                Body=buf.getvalue(),
+                ContentType="image/jpeg",
+            )
+        except ModuleNotFoundError:
+            pass
+        except Exception:
+            pass
+
+        return storage_key
+
     def upload_avatar(self, user_id: str, file_content: bytes, content_type: str = "image/jpeg"):
         """
         Uploads a user avatar to S3/R2 when configured.

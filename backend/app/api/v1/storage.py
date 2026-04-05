@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 import uuid
@@ -13,6 +13,7 @@ import re
 import json
 
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ...db.models.user import User
 from ...db.models.roll import Roll, RollStatusEnum
@@ -178,6 +179,82 @@ async def upload_roll_images(
     
     db.commit()
     return uploaded_images
+
+
+@router.put("/rolls/{roll_id}/images/{image_id}", response_model=ImageOut)
+async def replace_roll_image(
+    roll_id: str,
+    image_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Replace an existing roll frame in object storage (same key).
+    Used when Pro users rotate/edit an image so the cloud copy stays in sync.
+    """
+    try:
+        rid = uuid.UUID(roll_id)
+        iid = uuid.UUID(image_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid roll or image id")
+
+    roll = db.query(Roll).filter(Roll.id == rid).first()
+    if not roll or roll.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Roll not found")
+
+    row = db.query(Image).filter(Image.id == iid, Image.roll_id == rid).first()
+    if not row or not row.image_url:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    old_key = row.image_url
+    if not isinstance(old_key, str) or not old_key.startswith("users/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This image is not stored in Halide cloud storage and cannot be replaced here",
+        )
+
+    max_bytes = 15 * 1024 * 1024
+    file_size = 0
+    chunk = await file.read(1024 * 1024)
+    chunks: list[bytes] = []
+    while chunk:
+        file_size += len(chunk)
+        if file_size > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File exceeds the {max_bytes // (1024 * 1024)} MB limit.",
+            )
+        chunks.append(chunk)
+        chunk = await file.read(1024 * 1024)
+    file_content = b"".join(chunks)
+
+    old_size = 0
+    if storage_service.s3 is not None:
+        try:
+            head = storage_service.s3.head_object(
+                Bucket=storage_service.bucket_name,
+                Key=old_key,
+            )
+            old_size = int(head.get("ContentLength", 0) or 0)
+        except Exception:
+            old_size = 0
+
+    new_size = len(file_content)
+    projected = current_user.storage_used_bytes - old_size + new_size
+    if projected > current_user.total_storage_limit:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Storage limit would be exceeded after this edit.",
+        )
+
+    storage_service.replace_roll_image_at_key(old_key, file_content)
+    current_user.storage_used_bytes = max(0, projected)
+    db.add(current_user)
+    db.commit()
+    db.refresh(row)
+    return row
+
 
 from ...db.models.storage_credential import StorageCredential, StorageProviderEnum
 from ...db.schemas.storage_credential import StorageCredentialCreate, StorageCredentialOut
@@ -358,8 +435,9 @@ def get_storage_connections(
     for c in credentials:
         results.append(StorageCredentialOut.model_validate(c))
         
-    # Inject System Cloud for subscribers (Plus/Pro)
-    if current_user.subscription_tier in ["plus", "pro"]:
+    # Show System Cloud connection for all users if they have storage limits.
+    # Metadata/Thumbnails are always mirrored to System Cloud (Halide R2) for sync stability.
+    if True: 
         results.append(StorageCredentialOut(
             id=uuid.UUID("00000000-0000-0000-0000-000000000000"), # Virtual ID
             provider=StorageProviderEnum.system,
@@ -451,12 +529,6 @@ def list_gdrive_leaf_files(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Premium sync: requires Plus or Pro tier.
-    if current_user.subscription_tier not in ["plus", "pro"]:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Google Drive sync is a premium feature. Please upgrade to the Plus or Pro plan."
-        )
 
     # Pick the primary gdrive connection if available, else first connection.
     cred = (
@@ -581,6 +653,8 @@ def sync_gdrive_leaf_files(
     skipped_existing = 0
     total_candidates = 0
 
+    ingest_jobs: List[Tuple[int, str, dict]] = []
+
     for idx, f in enumerate(files):
         mime_type = (f.get("mimeType") or "").lower()
         name = (f.get("name") or "").lower()
@@ -612,19 +686,40 @@ def sync_gdrive_leaf_files(
             skipped_existing += 1
             continue
 
-        logger.info("GDrive sync: ingest file_id=%s name=%s mime=%s", file_id, name, mime_type)
+        ingest_jobs.append((idx, file_id, f))
 
+    # Parallel downloads from Google Drive; uploads to R2 remain sequential (DB + transfer_service).
+    downloaded = {}  # file_id -> (bytes, mime)
+
+    def _download_one(fid: str):
         try:
-            content, mime = download_file_bytes(credentials, file_id)
-        except HttpError as e:
-            logger.exception("Failed to download Drive file %s: %s", file_id, e)
-            continue
+            content, mime = download_file_bytes(credentials, fid)
+            return (fid, (content, mime))
+        except Exception as e:
+            return (fid, e)
 
-        logger.info("GDrive sync: downloaded bytes=%s for file_id=%s", len(content), file_id)
+    if ingest_jobs:
+        unique_ids = list({j[1] for j in ingest_jobs})
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(_download_one, fid): fid for fid in unique_ids}
+            for fut in as_completed(futures):
+                fid, payload = fut.result()
+                if isinstance(payload, Exception):
+                    logger.exception("Failed to download Drive file %s: %s", fid, payload)
+                else:
+                    downloaded[fid] = payload
+
+    for idx, file_id, f in sorted(ingest_jobs, key=lambda j: j[0]):
+        mime_type = (f.get("mimeType") or "").lower()
+        name = (f.get("name") or "").lower()
+        if file_id not in downloaded:
+            continue
+        content, mime = downloaded[file_id]
+        logger.info("GDrive sync: ingest file_id=%s name=%s mime=%s bytes=%s", file_id, name, mime_type, len(content))
 
         # Upload to our storage (full + thumbnail) via TransferService.
-        # This ensures Pro auto-backup and storage tracking logic is applied.
         from ...services.transfer_service import transfer_service
+
         full_key = transfer_service.route_transfer(
             db=db,
             user_id=str(current_user.id),
@@ -634,7 +729,6 @@ def sync_gdrive_leaf_files(
             strategy="PERSONAL_CLOUD",  # GDrive sync is personal cloud strategy
         )
 
-        # Match or create Image record by roll_id and frame_number
         existing_frame = (
             db.query(Image)
             .filter(Image.roll_id == roll.id, Image.frame_number == idx)
@@ -1047,12 +1141,6 @@ async def sync_images_from_url(
 
     If background_tasks is provided, this returns 202 immediately and runs in background.
     """
-    # Premium sync: requires Plus or Pro tier.
-    if current_user.subscription_tier not in ["plus", "pro"]:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Google Drive sync is a premium feature. Please upgrade to the Plus or Pro plan."
-        )
 
     if background_tasks:
         # Set status to syncing immediately so frontend sees it on re-fetch

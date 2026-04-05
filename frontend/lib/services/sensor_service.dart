@@ -1,91 +1,108 @@
-import 'dart:async';
 import 'dart:math' as math;
-import 'package:light_sensor/light_sensor.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reflected-light metering engine  (light_metering.md spec)
+//
+// Phase A:  EV₁₀₀ = log₂(N²/t) − log₂(ISO/100)
+// Phase B: optional EV calibration (was −2.0 for legacy Fuji XT-20 lab tests).
+//
+// Field testing vs Sekonic / other camera apps: a −2.0 EV shift made reciprocal
+// shutter ~2 stops **longer** than reference (e.g. 1/8 vs 1/30 at f/2.8 ISO 100).
+// Metadata EV already tracks scene brightness; use 0.0 so suggested shutter matches
+// external meters. Adjust here if you re-run a controlled Fuji reference test.
+// ─────────────────────────────────────────────────────────────────────────────
 
 class SensorService {
   static final SensorService _instance = SensorService._internal();
   factory SensorService() => _instance;
   SensorService._internal();
 
-  Stream<double>? _luxStream;
+  // ── Calibration ─────────────────────────────────────────────────────────
 
-  /// Returns a stream of Lux (illuminance) values.
-  Stream<double> get luxStream {
-    _luxStream ??= LightSensor.luxStream().asBroadcastStream().map((lux) => lux.toDouble());
-    return _luxStream!;
-  }
+  /// EV offset applied after Phase A (raw EV₁₀₀ from N, t, ISO).
+  /// Set to 0 so suggested film shutter matches phone camera meters / Sekonic in the field.
+  static const double calibrationOffset = 0.0;
 
-  /// Calibration offset applied to EV100 derived from hardware metadata.
-  ///
-  /// iPhone in video/stream mode (used by the Flutter camera plugin) sets its
-  /// auto-exposure for video quality: very low ISO (50–100) and very short
-  /// shutter speeds (1/2000–1/4000s) even in typical indoor scenes. When fed
-  /// into the standard EV formula this yields EV values ~6 stops higher than
-  /// what a professional reflected-light meter reports for the same scene.
-  /// Empirically validated against reference metering apps: indoor scenes that
-  /// should read EV 7–8 arrive as raw EV ≈ 13–14 from the iOS hardware.
-  /// A -6.0 offset normalises the output to match traditional photographic
-  /// metering (e.g. 1/30s at f/2.8 ISO 100 for a typical indoor room).
-  static const double calibrationOffset = -6.0;
+  // ── Standard photographic stop tables ──────────────────────────────────
 
-  /// Standard photographic shutter speeds in seconds (ascending).
+  /// Standard shutter speeds in seconds (ascending). Snap only at display time.
   static const List<double> standardShutterSpeeds = [
     1 / 4000, 1 / 2000, 1 / 1000, 1 / 500, 1 / 250, 1 / 125,
-    1 / 60, 1 / 30, 1 / 15, 1 / 8, 1 / 4, 1 / 2,
-    1, 2, 4, 8, 15, 30,
+    1 / 60,   1 / 30,   1 / 15,   1 / 8,   1 / 4,   1 / 2,
+    1,        2,        4,        8,        15,       30,
   ];
 
-  /// Standard photographic aperture stops.
+  /// Standard aperture f-stops (ascending f-number = less light).
   static const List<double> standardApertures = [
     1.0, 1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0,
   ];
 
-  /// Calculates Exposure Value (EV) from aperture (N) and shutter speed (t).
-  /// Formula: EV = log2(N² / t)
+  // ── Core EV calculations ────────────────────────────────────────────────
+
+  /// Raw EV at camera settings — NOT calibrated.
+  /// Formula: EV = log₂(N² / t)
   double calculateEV(double aperture, double shutterSpeed) {
     if (aperture <= 0 || shutterSpeed <= 0) return 0.0;
     return _log2(math.pow(aperture, 2) / shutterSpeed);
   }
 
-  /// Calculates EV100 from hardware auto-exposure settings with calibration.
-  /// Formula: EV100 = log2(N² / t) - log2(ISO / 100) + calibrationOffset
+  /// Calibrated EV₁₀₀ from live hardware auto-exposure metadata.
+  ///
+  /// Phase A (spec §2): EV_raw = log₂(N² / t) − log₂(ISO / 100)
+  /// Phase B: EV_final = EV_raw + calibrationOffset
   double calculateEV100(double aperture, double shutter, double iso) {
     if (aperture <= 0 || shutter <= 0 || iso <= 0) return 0.0;
-    final evAtSettings = _log2(math.pow(aperture, 2) / shutter);
-    final ev100 = evAtSettings - _log2(iso / 100.0);
-    return ev100 + calibrationOffset;
+    final evRaw = _log2(math.pow(aperture, 2) / shutter) - _log2(iso / 100.0);
+    return evRaw + calibrationOffset;
   }
 
-  /// Display-only Lux approximation derived from EV100.
-  /// Formula: Lux = 2.5 × 2^EV100
+  /// Convert EXIF BrightnessValue (Bv) to EV₁₀₀.
+  ///
+  /// APEX system at ISO 100: EV = Bv + Sv(100) = Bv + log₂(100/3.125) = Bv + 5
+  ///
+  /// Use as primary path when iOS returns kCGImagePropertyExifBrightnessValue.
+  /// Fall back to [calculateEV100] when Bv is unavailable.
+  double evFromBrightnessValue(double bv) {
+    // Sv at ISO 100 = log2(100 / 3.125) ≈ 5
+    const svAt100 = 5.0;
+    return bv + svAt100;
+  }
+
+  // ── Lux (display-only) ──────────────────────────────────────────────────
+
+  /// Display-only illuminance approximation from calibrated EV₁₀₀.
+  /// Formula: Lux = 2.5 × 2^EV₁₀₀   (light_metering.md §6)
   double calculateLuxFromEV100(double ev100) {
     return 2.5 * math.pow(2, ev100);
   }
 
-  /// Estimates EV from Lux using the incident light constant C = 250.
-  /// Formula: EV = log2(Lux × ISO / C)
+  /// Estimates EV from Lux reading (incident constant C = 250).
+  /// Formula: EV = log₂(Lux × ISO / 250)
+  ///
+  /// ⚠️  iPhone ambient Lux sensor measures INCIDENT light (ceiling/room),
+  /// not REFLECTED light from the subject.  Do NOT use for primary metering.
+  /// Kept only for Android fallback where an ambient sensor is the last resort.
   double estimateEVFromLux(double lux, {double iso = 100}) {
     final effectiveLux = lux <= 0 ? 0.1 : lux;
     return _log2(effectiveLux * iso / 250.0);
   }
 
-  /// Fallback: estimates EV from normalized luminance (0–1).
-  /// Use [calculateEV100] with hardware metadata for professional results.
-  double estimateEVFromLuminance(double luminance) {
-    final effectiveLuminance = luminance <= 0 ? 0.001 : luminance;
-    final luxEquivalent = effectiveLuminance * 40000.0;
-    return estimateEVFromLux(luxEquivalent, iso: 100);
-  }
+  // ── Reciprocal exposure ─────────────────────────────────────────────────
 
-  /// Reciprocal exposure: shutter speed for a given aperture and EV.
-  /// Formula: t = N² / 2^EV
+  /// Film shutter speed for a given film aperture at a given EV.
+  ///
+  /// Spec §4:
+  ///   EV_f = EV_final + log₂(ISO_film / 100)   [handled by caller]
+  ///   t_sug = N_film² / 2^EV_f
   double calculateShutterSpeed(double aperture, double ev) {
     if (aperture <= 0) return 0.0;
     return math.pow(aperture, 2) / math.pow(2, ev);
   }
 
+  // ── Snap logic (display step only — keep EV continuous until here) ──────
+
   /// Snaps a raw shutter speed to the nearest standard photographic stop.
-  /// Comparison is done in log₂ space so that each full stop has equal weight.
+  /// Uses log₂ space so every stop is equally weighted.
   static double snapShutterSpeed(double value) {
     if (!value.isFinite || value <= 0) return 1 / 125;
     final logVal = _log2(value);

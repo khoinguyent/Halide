@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
-import '../providers/profile_provider.dart';
 import '../models/user_profile.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 import '../services/local_avatar_storage.dart';
-import '../views/main_shell.dart';
 
 class ProfileView extends ConsumerStatefulWidget {
   const ProfileView({Key? key}) : super(key: key);
@@ -18,14 +16,11 @@ class ProfileView extends ConsumerStatefulWidget {
 }
 
 class _ProfileViewState extends ConsumerState<ProfileView> {
-  final GlobalKey _settingsKey = GlobalKey();
-
   @override
   Widget build(BuildContext context) {
     final authService = ref.watch(authServiceProvider);
     final firebaseUser = authService.currentUser;
     final profileAsync = ref.watch(userProfileProvider);
-    final showGuide = ref.watch(showSettingsGuideProvider);
 
     final displayName = profileAsync.value?.displayName ?? firebaseUser?.displayName ?? 'Film Enthusiast';
     final email = profileAsync.value?.email ?? firebaseUser?.email ?? '';
@@ -47,84 +42,71 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      child: Stack(
-        children: [
-          SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
-            child: Column(
-              children: [
-                _buildCenteredHeader(avatarUrl, displayName, email, bio, ref.watch(userPlanProvider)),
-                const SizedBox(height: 32),
-                GlassPanel(
-                  padding: EdgeInsets.zero,
-                  child: _ProfileOption(
-                    icon: Icons.star_rounded,
-                    label: 'Halide Premium',
-                    color: const Color(0xFFF97316),
-                    onTap: () => context.push('/paywall'),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                GlassPanel(
-                  padding: EdgeInsets.zero,
-                  child: Column(
-                    children: [
-                      _ProfileOption(
-                        icon: Icons.edit_outlined,
-                        label: 'Edit Profile',
-                        onTap: () => context.push('/profile/edit'),
-                      ),
-                      const _Divider(),
-                      _ProfileOption(
-                        key: _settingsKey,
-                        icon: Icons.settings_outlined,
-                        label: 'Settings',
-                        highlight: showGuide,
-                        onTap: () {
-                          if (showGuide) {
-                            ref.read(showSettingsGuideProvider.notifier).state = false;
-                          }
-                          context.go('/profile/settings');
-                        },
-                      ),
-                      const _Divider(),
-                      _ProfileOption(
-                        icon: Icons.help_outline,
-                        label: 'Support',
-                        onTap: () {},
-                      ),
-                      const _Divider(),
-                      _ProfileOption(
-                        icon: Icons.privacy_tip_outlined,
-                        label: 'Privacy Policy',
-                        onTap: () => context.go('/profile/privacy'),
-                      ),
-                      const _Divider(),
-                      _ProfileOption(
-                        icon: Icons.description_outlined,
-                        label: 'Terms & Conditions',
-                        onTap: () => context.go('/profile/terms'),
-                      ),
-                      const _Divider(),
-                      _ProfileOption(
-                        icon: Icons.logout,
-                        label: 'Sign Out',
-                        color: Colors.redAccent,
-                        onTap: () async {
-                          await authService.signOut();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 48),
-              ],
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
+        child: Column(
+          children: [
+            _buildCenteredHeader(avatarUrl, displayName, email, bio, ref.watch(userPlanProvider)),
+            const SizedBox(height: 32),
+            GlassPanel(
+              padding: EdgeInsets.zero,
+              child: _ProfileOption(
+                icon: Icons.star_rounded,
+                label: 'Halide Premium',
+                color: const Color(0xFFF97316),
+                onTap: () => context.push('/paywall'),
+              ),
             ),
-          ),
-          if (showGuide)
-            _SettingsGuideArrow(settingsKey: _settingsKey),
-        ],
+            const SizedBox(height: 20),
+            GlassPanel(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  _ProfileOption(
+                    icon: Icons.edit_outlined,
+                    label: 'Edit Profile',
+                    onTap: () => context.push('/profile/edit'),
+                  ),
+                  const _Divider(),
+                  _ProfileOption(
+                    icon: Icons.settings_outlined,
+                    label: 'Settings',
+                    onTap: () => context.go('/profile/settings'),
+                  ),
+                  const _Divider(),
+                  _ProfileOption(
+                    icon: Icons.help_outline,
+                    label: 'Support',
+                    onTap: () {},
+                  ),
+                  const _Divider(),
+                  _ProfileOption(
+                    icon: Icons.privacy_tip_outlined,
+                    label: 'Privacy Policy',
+                    onTap: () => context.go('/profile/privacy'),
+                  ),
+                  const _Divider(),
+                  _ProfileOption(
+                    icon: Icons.description_outlined,
+                    label: 'Terms & Conditions',
+                    onTap: () => context.go('/profile/terms'),
+                  ),
+                  const _Divider(),
+                  _ProfileOption(
+                    icon: Icons.logout,
+                    label: 'Sign Out',
+                    color: Colors.redAccent,
+                    onTap: () async {
+                      await authService.signOut();
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 48),
+          ],
+        ),
       ),
     );
   }
@@ -269,7 +251,6 @@ class _ProfileOption extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final Color color;
-  final bool highlight;
 
   const _ProfileOption({
     Key? key,
@@ -277,104 +258,23 @@ class _ProfileOption extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.color = Colors.white,
-    this.highlight = false,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: highlight
-          ? BoxDecoration(
-              color: const Color(0xFFF97316).withOpacity(0.12),
-              border: Border.all(color: const Color(0xFFF97316).withOpacity(0.5), width: 1.5),
-              borderRadius: BorderRadius.circular(12),
-            )
-          : null,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-        leading: Icon(icon, color: highlight ? const Color(0xFFF97316) : color.withOpacity(0.7), size: 24),
-        title: Text(
-          label, 
-          style: TextStyle(
-            color: highlight ? Colors.white : color,
-            fontSize: 16,
-            fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
-          )
-        ),
-        trailing: Icon(Icons.chevron_right, color: highlight ? const Color(0xFFF97316) : color.withOpacity(0.2), size: 20),
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _SettingsGuideArrow extends StatefulWidget {
-  final GlobalKey settingsKey;
-  const _SettingsGuideArrow({required this.settingsKey});
-
-  @override
-  State<_SettingsGuideArrow> createState() => _SettingsGuideArrowState();
-}
-
-class _SettingsGuideArrowState extends State<_SettingsGuideArrow>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  Offset? _arrowTarget;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _findTarget());
-  }
-
-  void _findTarget() {
-    final box = widget.settingsKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box != null) {
-      final pos = box.localToGlobal(Offset.zero);
-      setState(() {
-        _arrowTarget = Offset(pos.dx - 8, pos.dy + box.size.height / 2 - 12);
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_arrowTarget == null) return const SizedBox.shrink();
-    return Positioned(
-      left: _arrowTarget!.dx,
-      top: _arrowTarget!.dy,
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (_, child) => Transform.translate(
-          offset: Offset(-6 * _ctrl.value, 0),
-          child: child,
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.arrow_forward_rounded, color: Color(0xFFF97316), size: 24),
-            SizedBox(width: 4),
-            Text(
-              'Connect Google here',
-              style: TextStyle(
-                color: Color(0xFFF97316),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      leading: Icon(icon, color: color.withOpacity(0.7), size: 24),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
         ),
       ),
+      trailing: Icon(Icons.chevron_right, color: color.withOpacity(0.2), size: 20),
+      onTap: onTap,
     );
   }
 }

@@ -25,24 +25,44 @@ flutter clean
 flutter pub get
 ```
 
-### 3. Build IPA
+### 3. Staging flavor via `.env`
+In `frontend/.env`, set:
+
+```bash
+FLAVOR=staging
+```
+
+Also set `REVENUE_CAT_*` and `GOOGLE_DRIVE_SERVER_CLIENT_ID` as needed. The build script exports `.env` and passes `--dart-define=FLAVOR=...` so `AppConfig` uses the staging API (`https://stagging-api.smartconnector.io.vn`).
+
+### 4. Build IPA
 Use the provided build script which injects environment variables from `.env`.
 ```bash
+cd frontend
 chmod +x scripts/build_ipa.sh
 ./scripts/build_ipa.sh
 ```
-The output will be generated at `frontend/build/ios/ipa/Runner.ipa` (or similar).
+The output IPA is under `frontend/build/ios/ipa/` (often `Runner.ipa` or the archive product name — check the script output).
 
-### 4. Upload to TestFlight
-Run the following command to upload the generated IPA. Make sure the `.p8` file is located in `~/.private_keys/` or specify the path:
+### 5. Upload to TestFlight
+Run the following command to upload the generated IPA (adjust `--file` to the `.ipa` path printed by the build). Make sure the `.p8` file is available to the toolchain or use API key auth:
 
 ```bash
+cd frontend
 xcrun altool --upload-app --type ios \
-  --file build/ios/ipa/Halide.ipa \
+  --file build/ios/ipa/Runner.ipa \
   --apiKey 9PTQG9323C \
   --apiIssuer 8b3530de-316d-4584-8095-2a001c801243
 ```
-*Note: The IPA filename is `Halide.ipa` (not `Runner.ipa`).*
+
+If your exported IPA has a different name, use `ls build/ios/ipa/`.
+
+## Build History
+
+| Build | Version | Date | Delivery UUID |
+|-------|---------|------|---------------|
+| 31 | 1.0.0+31 | 2026-04-04 | 3a4da1bb-9322-4a52-87ed-d03000a6811e |
+| 30 | 1.0.0+30 | 2026-04-04 | 10ac5f61-ee2b-4303-b904-864584eb4440 |
+| 29 | 1.0.0+29 | 2026-04-04 | 17d5f4c6-988e-479a-8be7-715d87d50f6e |
 
 ## Troubleshooting
 

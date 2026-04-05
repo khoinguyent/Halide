@@ -114,21 +114,25 @@ class RollService {
     String rollId, {
     required double aperture,
     required String shutterSpeed,
-    required double lat,
-    required double lng,
+    double? lat,
+    double? lng,
+    String? notes,
   }) async {
+    final body = <String, dynamic>{
+      'aperture': aperture,
+      'shutter_speed': shutterSpeed,
+    };
+    if (lat != null) body['lat'] = lat;
+    if (lng != null) body['lng'] = lng;
+    if (notes != null && notes.isNotEmpty) body['notes'] = notes;
+
     final response = await http.post(
       Uri.parse('${AppConfig.apiUrl}/rolls/$rollId/shots'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({
-        'aperture': aperture,
-        'shutter_speed': shutterSpeed,
-        'lat': lat,
-        'lng': lng,
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode != 200 && response.statusCode != 201) {
