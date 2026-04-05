@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Access photos when you import or save film scans.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Halide saves film scans to your library when you choose Save to Photos.</string>
 </dict>
 </plist>

@@ -1,4 +1,5 @@
-import 'dart:async';
+import 'dart:async' show Timer, unawaited;
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 import '../config/app_config.dart';
 import '../core/models/notification_model.dart';
@@ -17,7 +19,10 @@ import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/roll_provider.dart';
 import '../providers/ui_state_provider.dart';
+import '../services/guidance_service.dart';
 import '../services/meter_debug_log.dart';
+import '../widgets/debug_log_sheet.dart';
+import '../widgets/guidance/lab_drive_sync_guidance.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 
@@ -32,6 +37,10 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
   bool _isCameraInitialized = false;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   Timer? _metadataTimer;
+
+  final GlobalKey _meterSpotKey = GlobalKey();
+  final GlobalKey _meterLogToRollKey = GlobalKey();
+  bool _meterIntroScheduled = false;
 
   @override
   void initState() {
@@ -53,11 +62,15 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
 
   void _checkCameraVisibility() {
     if (!mounted) return;
-    
-    final currentTabIndex = ref.read(homeTabIndexProvider);
-    final isTabActive = currentTabIndex == 2; // Meter tab index
+
+    // Prefer the shell’s index — [homeTabIndexProvider] can desync (e.g. first frame), which
+    // left the camera off and produced a blank meter tab for free users.
+    final shell = StatefulNavigationShell.maybeOf(context);
+    final isTabActive = shell != null
+        ? shell.currentIndex == 2
+        : ref.read(homeTabIndexProvider) == 2;
     final isAppResumed = _lifecycleState == AppLifecycleState.resumed;
-    
+
     final shouldRun = isTabActive && isAppResumed;
     
     if (shouldRun && !_isCameraInitialized && _controller == null) {
@@ -116,7 +129,20 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         await _controller!.setExposurePoint(const Offset(0.5, 0.5));
       } catch (_) {}
 
+      // iOS: first launch after granting permission sometimes leaves preview paused until resumed.
+      try {
+        await _controller!.resumePreview();
+      } catch (_) {}
+
       if (mounted) setState(() => _isCameraInitialized = true);
+
+      // Wait for CameraPreview to mount, then resume again — avoids black preview + stuck "Starting camera…"
+      // when the meter intro coach runs on first open.
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _resumeCameraPreviewIfNeeded();
+        _scheduleMeterIntroIfNeeded();
+      });
 
       // Poll hardware AE metadata via a timer rather than inside the image
       // stream callback.  Image-stream callbacks run on a background thread;
@@ -159,64 +185,99 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
     ref.read(meterProvider.notifier).toggleLock();
   }
 
-  /// Staging / debug: long-press **PRECISION METER** title. Copies raw ISO, shutter, f, EV lines for diagnosis.
+  void _scheduleMeterIntroIfNeeded() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      if (_meterIntroScheduled) return;
+      // Lock synchronously before any await — otherwise two callbacks can both pass the guard.
+      _meterIntroScheduled = true;
+
+      final plan = ref.read(userPlanProvider);
+      if (!plan.isPro) {
+        _meterIntroScheduled = false;
+        return;
+      }
+      if (await GuidanceService.instance.hasSeenMeterIntro) {
+        _meterIntroScheduled = false;
+        return;
+      }
+
+      await _resumeCameraPreviewIfNeeded();
+      if (!mounted) return;
+      // Extra beat so the preview texture is visible before coach overlays (they can pause iOS preview).
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      if (!mounted) return;
+      _showMeterIntroStep1();
+    });
+  }
+
+  /// Coach overlays can pause the camera preview on iOS; resume after each step.
+  Future<void> _resumeCameraPreviewIfNeeded() async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    try {
+      await c.resumePreview();
+    } catch (e) {
+      debugPrint('[MeterView] resumePreview: $e');
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _showMeterIntroStep1() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _resumeCameraPreviewIfNeeded();
+      if (!mounted) return;
+      final coach = buildSingleStepArchiveGuidance(
+        targetKey: _meterSpotKey,
+        identify: 'meter_spot_intro',
+        contentAlign: ContentAlign.bottom,
+        body:
+            'Tap the circle to spot-meter the center and return to aperture priority. '
+            'Tap f/ or SS to set exposure, EV or ISO for compensation, then LOCK to hold exposure while you compose.',
+        onCompleted: () {
+          unawaited(_resumeCameraPreviewIfNeeded());
+          Future<void>.delayed(const Duration(milliseconds: 200), () {
+            if (mounted) _showMeterIntroStep2();
+          });
+        },
+      );
+      coach.show(context: context);
+    });
+  }
+
+  void _showMeterIntroStep2() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _resumeCameraPreviewIfNeeded();
+      if (!mounted) return;
+      final coach = buildSingleStepArchiveGuidance(
+        targetKey: _meterLogToRollKey,
+        identify: 'meter_log_to_roll_intro',
+        contentAlign: ContentAlign.top,
+        paddingFocus: 6,
+        body:
+            'Tap LOG TO ROLL to save aperture, shutter, and meter details to a roll in Shooting. '
+            'Entries show in Shot Log with your archive EXIF logs.',
+        onCompleted: () {
+          unawaited(GuidanceService.instance.setMeterIntroSeen());
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await _resumeCameraPreviewIfNeeded();
+            if (mounted) _checkCameraVisibility();
+          });
+        },
+      );
+      coach.show(context: context);
+    });
+  }
+
+  /// Staging / debug: long-press **PRECISION METER** title — meter channel only (same data as before).
   void _showMeterDebugSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF1a1a1e),
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'METER DEBUG LOG',
-                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Copy and send for support. On Mac, open Xcode → Window → Devices → open console, '
-                'or run `flutter logs` / Console.app and filter HalideMeter or MeterDbg.',
-                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 320,
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    MeterDebugLog.text.isEmpty ? '(no samples yet — wait ~1s on meter tab)' : MeterDebugLog.text,
-                    style: const TextStyle(color: Color(0xFF86EFAC), fontSize: 11, fontFamily: 'Courier'),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      MeterDebugLog.clear();
-                      Navigator.pop(ctx);
-                      setState(() {});
-                    },
-                    child: const Text('CLEAR'),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: MeterDebugLog.text));
-                      if (ctx.mounted) Navigator.pop(ctx);
-                    },
-                    child: const Text('COPY ALL'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    showHalideDebugLogSheet(
+      context,
+      title: 'METER DEBUG LOG',
+      channelFilter: 'Meter',
+      emptyHint: '(no samples yet — wait ~1s on meter tab)',
     );
   }
 
@@ -481,6 +542,14 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkCameraVisibility();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Watch tab index to trigger camera start/stop
     ref.listen<int>(homeTabIndexProvider, (previous, next) {
@@ -491,7 +560,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
     final plan = ref.watch(userPlanProvider);
     final isPro = plan.isPro;
 
-    final showMeterDebug = kDebugMode || AppConfig.flavor == AppFlavor.staging;
+    final showMeterDebug = AppConfig.showInAppDiagnostics;
 
     return HalideScaffold(
       appBar: AppBar(
@@ -521,94 +590,40 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         elevation: 0,
       ),
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          // Camera Viewfinder (Background)
-          if (_isCameraInitialized)
-            Positioned.fill(
-              child: AspectRatio(
-                aspectRatio: _controller!.value.aspectRatio,
-                child: CameraPreview(_controller!),
-              ),
-            )
-          else
-            const Center(child: CircularProgressIndicator()),
-
-          if (!isPro)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withOpacity(0.85),
-                child: Center(
-                  child: GlassPanel(
-                    padding: const EdgeInsets.all(32),
+          // Camera / loading — always fill; non-positioned Center left the stack with ~no height on some layouts.
+          Positioned.fill(
+            child: _isCameraInitialized && _controller != null
+                ? ColoredBox(
+                    color: Colors.black,
+                    child: _MeterFullBleedPreview(controller: _controller!),
+                  )
+                : Container(
+                    color: const Color(0xFF141414),
+                    alignment: Alignment.center,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.orangeAccent.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.lock_person_rounded, size: 64, color: Colors.orangeAccent),
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'PRO FEATURE',
-                          style: TextStyle(
-                            color: Colors.orangeAccent,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 3,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Precision Light Metering is reserved for Halide Pro members.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white, 
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
+                        const CircularProgressIndicator(color: Colors.white24, strokeWidth: 2),
+                        const SizedBox(height: 16),
                         Text(
-                          'Unlock advanced spot metering, EV compensation, and manual exposure controls.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.6), 
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        ElevatedButton(
-                          onPressed: () => context.push('/paywall'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orangeAccent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'UPGRADE TO PRO', 
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1,
-                            )
-                          ),
+                          'Starting camera…',
+                          style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ),
-            )
+          ),
+
+          if (!isPro)
+            _MeterFreeOverlay(onUpgrade: () => context.push('/paywall'))
           else ...[
             // Spot Metering Target — tap to re-meter and return to Aperture Priority
             Align(
               alignment: const Alignment(0, -0.3),
               child: GestureDetector(
+                key: _meterSpotKey,
                 onTap: () {
                   HapticFeedback.lightImpact();
                   ref.read(meterProvider.notifier).resetToAperturePriority();
@@ -723,6 +738,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           TextButton(
+                            key: _meterLogToRollKey,
                             onPressed: _showLogReadingToRollSheet,
                             style: TextButton.styleFrom(
                               padding: EdgeInsets.zero,
@@ -1050,6 +1066,134 @@ class _MeterShootingRollTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Edge-to-edge preview. [Center] + [AspectRatio] letterboxes on portrait screens; this crops like a camera app.
+class _MeterFullBleedPreview extends StatelessWidget {
+  final CameraController controller;
+
+  const _MeterFullBleedPreview({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ar = controller.value.aspectRatio;
+        if (ar <= 0 || !ar.isFinite) {
+          return Center(
+            child: AspectRatio(
+              aspectRatio: 4 / 3,
+              child: CameraPreview(controller),
+            ),
+          );
+        }
+        return ClipRect(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: constraints.maxWidth,
+              height: constraints.maxWidth / ar,
+              child: CameraPreview(controller),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Blur + tint so the live preview stays visible but unclear; CTA opens paywall.
+class _MeterFreeOverlay extends StatelessWidget {
+  final VoidCallback onUpgrade;
+
+  const _MeterFreeOverlay({required this.onUpgrade});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(color: Colors.transparent),
+            ),
+            Container(color: Colors.black.withOpacity(0.4)),
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: GlassPanel(
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.orangeAccent.withOpacity(0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.lock_person_rounded, size: 56, color: Colors.orangeAccent),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'PRO FEATURE',
+                          style: TextStyle(
+                            color: Colors.orangeAccent,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Precision light metering is included with Halide Pro.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Upgrade to unlock spot metering, EV compensation, manual exposure, and logging to your rolls.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.65),
+                            fontSize: 14,
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        FilledButton(
+                          onPressed: onUpgrade,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.orangeAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text(
+                            'VIEW PLANS',
+                            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

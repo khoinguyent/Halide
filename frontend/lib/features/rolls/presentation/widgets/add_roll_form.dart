@@ -9,6 +9,7 @@ import 'package:frontend/features/rolls/presentation/bloc/rolls_bloc.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
 import 'package:frontend/core/providers/notification_provider.dart';
 import 'package:frontend/core/models/notification_model.dart';
+import 'package:frontend/providers/guidance_pending_provider.dart';
 
 class AddRollForm extends ConsumerStatefulWidget {
   final RollsRepository repository;
@@ -113,6 +114,10 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
     return BlocListener<RollsBloc, RollsState>(
       listener: (context, state) {
         if (state is RollActionSuccess) {
+          final id = state.createdRollId;
+          if (id != null) {
+            ref.read(newRollGuidanceRollIdProvider.notifier).setPending(id);
+          }
           widget.onRollAdded();
           ref.read(notificationProvider.notifier).show(
             'YOUR NEW ROLL IS READY TO SHOOT!',

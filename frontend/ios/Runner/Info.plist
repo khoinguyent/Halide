@@ -53,6 +53,8 @@
 	<string>To store EXIF of an image</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>to use photos in library to add to an app gallery</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Halide saves film scans to your library when you tap Save to Photos.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

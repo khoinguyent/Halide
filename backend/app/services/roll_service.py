@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
@@ -8,6 +8,7 @@ from ..db.models.film_stock import FilmStock
 from ..db.models.camera import UserCamera, Camera, UserLens, Lens
 from ..db.models.image import Image
 from ..db.schemas.roll import RollCreate, RollOutDashboard, RollMetaUpdate, RollDriveUrlUpdate
+from ..db.schemas.image import ImageOut
 from ..core.config import settings
 
 # Simple hex colors per brand for dashboard cards
@@ -68,8 +69,7 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         .order_by(Image.frame_number)
         .all()
     )
-    # Rows with a URL only — `image_urls` and `shots` must stay the same length and order
-    # so the gallery, overlays, and Pro rotate/replace use the same index (see Image.id).
+    # Gallery URLs: only rows with a stored image key/URL (scanned uploads).
     image_rows = [row for row in images if row.image_url]
     keys = [row.image_url for row in image_rows]
 
@@ -80,14 +80,11 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
 
     # Prefer public, no-auth URL (R2 dev) when configured.
     if getattr(settings, "R2_PUBLIC_BASE_URL", None):
-        # R2 public base usually does NOT include the bucket name.
-        # Our object keys are stored under `users/...`, so we must include the
-        # bucket segment between the public base and the object key.
+        # Cloudflare R2 public URLs (pub-*.r2.dev) bind the bucket to the hostname.
+        # Object keys in S3 are `users/...` — there is NO extra `/bucket/` path segment.
+        # Using `.../halide/users/...` requests a non-existent key and returns 404.
         public_base = settings.R2_PUBLIC_BASE_URL.rstrip("/")
-        if bucket and not public_base.endswith("/" + bucket):
-            url_base = f"{public_base}/{bucket}"
-        else:
-            url_base = public_base
+        url_base = public_base
     else:
         # If the endpoint already includes the bucket path (common for some R2 configs),
         # don't append bucket again.
@@ -117,6 +114,19 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
 
     total_frames = (r.max_frames if r.max_frames is not None else 36)
     actual_frames = len(image_urls)
+
+    # Shot log / EXIF: include log-only rows (meter + EXIF from app) where image_url is null.
+    # Order: same as gallery for URL rows (after rotation), then log-only rows by frame number.
+    log_rows = [
+        row
+        for row in images
+        if row.image_url is None or (isinstance(row.image_url, str) and not str(row.image_url).strip())
+    ]
+    log_rows_sorted = sorted(log_rows, key=lambda x: (x.frame_number is None, x.frame_number or 0))
+    shots_out: List[ImageOut] = [ImageOut.model_validate(r) for r in image_rows] + [
+        ImageOut.model_validate(r) for r in log_rows_sorted
+    ]
+
     return RollOutDashboard(
         id=str(r.id),
         brand=brand,
@@ -124,7 +134,7 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         color=color,
         status=r.status.value,
         image_urls=image_urls,
-        shots=image_rows,
+        shots=shots_out,
         drive_url=getattr(r, "drive_url", None),
         title=r.title,
         description=r.description,

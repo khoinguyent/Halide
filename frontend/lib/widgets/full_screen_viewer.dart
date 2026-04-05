@@ -1,7 +1,13 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gal/gal.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:frontend/config/app_config.dart';
 import 'package:frontend/core/models/notification_model.dart';
 import 'package:frontend/core/providers/notification_provider.dart';
 import 'package:frontend/models/film_stock.dart';
@@ -10,6 +16,9 @@ import 'package:frontend/models/user_profile.dart';
 import 'package:frontend/providers/auth_provider.dart';
 import 'package:frontend/providers/roll_provider.dart';
 import 'package:frontend/services/roll_image_edit_service.dart';
+import 'package:frontend/services/local_sync_service.dart';
+import 'package:frontend/widgets/debug_log_sheet.dart';
+import 'package:frontend/widgets/image_url_diagnostics_sheet.dart';
 
 import 'synced_image.dart';
 
@@ -96,42 +105,18 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
       return;
     }
 
-    var okCount = 0;
-    var failCount = 0;
     for (final e in _pendingProCloud.entries) {
       final p = e.value;
-      final ok = await _editService.replaceCloudImage(
+      await _editService.replaceCloudImage(
         rollId: widget.rollId,
         imageId: p.imageId,
         jpegFile: File(p.localPath),
       );
-      if (ok) {
-        okCount++;
-      } else {
-        failCount++;
-      }
     }
     _pendingProCloud.clear();
 
     if (!mounted) return;
     ref.invalidate(rollDetailProvider(widget.rollId));
-
-    if (okCount > 0 && failCount == 0) {
-      ref.read(notificationProvider.notifier).show(
-            'ROTATIONS SAVED TO CLOUD.',
-            type: NotificationType.success,
-          );
-    } else if (okCount > 0 && failCount > 0) {
-      ref.read(notificationProvider.notifier).show(
-            'SOME CLOUD UPDATES FAILED. OPEN THE ROLL AND TRY AGAIN.',
-            type: NotificationType.warning,
-          );
-    } else if (failCount > 0) {
-      ref.read(notificationProvider.notifier).show(
-            'CLOUD SYNC FAILED. EDITS ARE STILL ON THIS DEVICE.',
-            type: NotificationType.error,
-          );
-    }
   }
 
   Future<void> _exitViewer() async {
@@ -139,6 +124,173 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
     if (mounted) {
       Navigator.of(context).pop();
     }
+  }
+
+  Future<String?> _resolvedLocalFilePathForCurrent() async {
+    final url = widget.imageUrls[_currentIndex];
+    final id = _imageIdAt(_currentIndex);
+    final svc = LocalSyncService();
+    var path = await svc.resolveLocalPath(
+      rollId: widget.rollId,
+      imageUrl: url,
+      imageId: id,
+      preferThumbnail: false,
+    );
+    path ??= await svc.ensureLocalSync(widget.rollId, url, imageId: id);
+    if (path.startsWith('http')) return null;
+    if (path.startsWith('file://')) return Uri.parse(path).toFilePath();
+    if (path.startsWith('/')) return path;
+    return null;
+  }
+
+  /// Share / Photos need a readable file. The viewer can show [Image.network] while the cache
+  /// is still empty or failed; this mirrors R2 into a temp file when needed.
+  Future<String?> _ensureLocalOrTempFileForExport() async {
+    final url = widget.imageUrls[_currentIndex];
+    final id = _imageIdAt(_currentIndex);
+
+    final resolved = await _resolvedLocalFilePathForCurrent();
+    if (resolved != null && File(resolved).existsSync()) {
+      return resolved;
+    }
+
+    if (!url.startsWith('http')) {
+      return null;
+    }
+
+    final tmpDir = await getTemporaryDirectory();
+    final base = (id != null && id.isNotEmpty) ? 'halide_share_$id' : 'halide_share_${url.hashCode.abs()}';
+    var ext = p.extension(Uri.parse(url).path);
+    if (ext.isEmpty || ext.length > 6) ext = '.jpg';
+    final outPath = p.join(tmpDir.path, '$base$ext');
+
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 45),
+        receiveTimeout: const Duration(seconds: 120),
+        headers: const {'User-Agent': 'HalideFilm/1.0 (Flutter; iOS/Android)'},
+        followRedirects: true,
+        maxRedirects: 8,
+        validateStatus: (s) => s != null && s >= 200 && s < 400,
+      ),
+    );
+
+    try {
+      await dio.download(url, outPath);
+    } catch (e, st) {
+      debugPrint('[FullScreenViewer] export download failed: $e\n$st');
+      try {
+        final f = File(outPath);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+      return null;
+    }
+
+    final file = File(outPath);
+    if (!await file.exists() || !await isPlausibleImageCacheFile(file)) {
+      try {
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+      return null;
+    }
+    return outPath;
+  }
+
+  String _mimeTypeForPath(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
+  }
+
+  Future<void> _shareCurrentImage() async {
+    try {
+      final path = await _ensureLocalOrTempFileForExport();
+      if (path == null || !File(path).existsSync()) {
+        ref.read(notificationProvider.notifier).show(
+              'IMAGE NOT AVAILABLE OFFLINE YET. WAIT FOR DOWNLOAD OR CHECK CONNECTION.',
+              type: NotificationType.warning,
+            );
+        return;
+      }
+      final mime = _mimeTypeForPath(path);
+      final name = p.basename(path);
+      await Share.shareXFiles([
+        XFile(path, mimeType: mime, name: name),
+      ]);
+    } catch (e, st) {
+      debugPrint('[FullScreenViewer] share failed: $e\n$st');
+      ref.read(notificationProvider.notifier).show(
+            'COULDN\'T SHARE IMAGE.',
+            type: NotificationType.error,
+          );
+    }
+  }
+
+  Future<void> _saveCurrentToPhotos() async {
+    try {
+      var granted = await Gal.hasAccess(toAlbum: true);
+      if (!granted) {
+        granted = await Gal.requestAccess(toAlbum: true);
+      }
+      if (!granted) {
+        ref.read(notificationProvider.notifier).show(
+              'PHOTOS LIBRARY ACCESS DENIED. ENABLE IN SETTINGS.',
+              type: NotificationType.error,
+            );
+        return;
+      }
+      final path = await _ensureLocalOrTempFileForExport();
+      if (path == null || !File(path).existsSync()) {
+        ref.read(notificationProvider.notifier).show(
+              'IMAGE NOT AVAILABLE OFFLINE YET. WAIT FOR DOWNLOAD OR CHECK CONNECTION.',
+              type: NotificationType.warning,
+            );
+        return;
+      }
+      await Gal.putImage(path);
+      if (!mounted) return;
+      ref.read(notificationProvider.notifier).show(
+            'SAVED TO PHOTOS.',
+            type: NotificationType.success,
+          );
+    } on GalException catch (e, st) {
+      debugPrint('[FullScreenViewer] gal save: $e\n$st');
+      ref.read(notificationProvider.notifier).show(
+            'COULDN\'T SAVE TO PHOTOS.',
+            type: NotificationType.error,
+          );
+    } catch (e, st) {
+      debugPrint('[FullScreenViewer] save to photos failed: $e\n$st');
+      ref.read(notificationProvider.notifier).show(
+            'COULDN\'T SAVE TO PHOTOS.',
+            type: NotificationType.error,
+          );
+    }
+  }
+
+  void _showHalideDebugLogs() {
+    showHalideDebugLogSheet(
+      context,
+      title: 'HALIDE DEBUG LOG',
+      channelFilter: null,
+      emptyHint: '(no log lines yet — open rolls, meter, or sync images)',
+    );
+  }
+
+  Future<void> _showCurrentImageUrlDiagnostics() async {
+    final url = widget.imageUrls[_currentIndex];
+    final id = _imageIdAt(_currentIndex);
+    if (!mounted) return;
+    showImageUrlDiagnosticsSheet(
+      context,
+      rollId: widget.rollId,
+      imageUrl: url,
+      imageId: id,
+      preferThumbnail: false,
+      requestUrlUsed: url,
+    );
   }
 
   Future<void> _applyRotation(int quarterTurns) async {
@@ -157,33 +309,25 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
 
     setState(() => _rotating = true);
     try {
+      final imageId = _imageIdAt(_currentIndex);
       final path = await _editService.rotateQuarterTurnsAndSaveLocal(
         rollId: widget.rollId,
         imageUrl: url,
         quarterTurns: quarterTurns,
+        imageId: imageId,
       );
 
       final plan = ref.read(userPlanProvider);
       final isPro = plan == UserPlan.pro;
-      final imageId = _imageIdAt(_currentIndex);
-
       if (isPro && imageId != null) {
         _pendingProCloud[_currentIndex] = _PendingCloudRotation(
           localPath: path,
           imageId: imageId,
         );
-        ref.read(notificationProvider.notifier).show(
-              'ROTATION SAVED LOCALLY. CLOUD UPDATES WHEN YOU LEAVE.',
-              type: NotificationType.info,
-            );
-      } else {
-        ref.read(notificationProvider.notifier).show(
-              !isPro
-                  ? 'SAVED LOCALLY.'
-                  : 'SAVED LOCALLY. CLOUD NOT UPDATED (MISSING FRAME ID).',
-              type: NotificationType.success,
-            );
       }
+
+      // Same path as before — [Image.file] cache must be cleared or the bitmap stays stale.
+      PaintingBinding.instance.imageCache.evict(FileImage(File(path)));
 
       setState(() {
         _reloadToken++;
@@ -234,6 +378,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
                       key: ValueKey<String>('${widget.imageUrls[index]}_$_reloadToken'),
                       rollId: widget.rollId,
                       imageUrl: widget.imageUrls[index],
+                      imageId: _imageIdAt(index),
                       fit: BoxFit.contain,
                       preferThumbnail: false,
                     ),
@@ -265,6 +410,18 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
                           icon: const Icon(Icons.arrow_back, color: Colors.white),
                           onPressed: _rotating ? null : _exitViewer,
                         ),
+                        if (AppConfig.showInAppDiagnostics) ...[
+                          IconButton(
+                            tooltip: 'Debug logs (Sync, Meter, …)',
+                            onPressed: _rotating ? null : _showHalideDebugLogs,
+                            icon: const Icon(Icons.terminal, color: Color(0xFFFFA07A), size: 22),
+                          ),
+                          IconButton(
+                            tooltip: 'Image URL & cache',
+                            onPressed: _rotating ? null : _showCurrentImageUrlDiagnostics,
+                            icon: const Icon(Icons.link, color: Color(0xFFFFA07A), size: 22),
+                          ),
+                        ],
                         const Spacer(),
                         Text(
                           '${_currentIndex + 1} / ${widget.imageUrls.length}',
@@ -285,6 +442,16 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
                             ),
                           )
                         else ...[
+                          IconButton(
+                            tooltip: 'Share',
+                            onPressed: _shareCurrentImage,
+                            icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
+                          ),
+                          IconButton(
+                            tooltip: 'Save to Photos',
+                            onPressed: _saveCurrentToPhotos,
+                            icon: const Icon(Icons.download_rounded, color: Colors.white),
+                          ),
                           IconButton(
                             tooltip: '90° counter-clockwise',
                             onPressed: () => _applyRotation(-1),

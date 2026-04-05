@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../widgets/roll_card.dart';
 import '../providers/dashboard_provider.dart';
 import 'package:frontend/providers/rolls_provider.dart';
@@ -12,7 +13,8 @@ import '../core/widgets/glass_panel.dart';
 import '../models/roll_status.dart';
 import '../models/roll.dart';
 import '../services/guidance_service.dart';
-import '../providers/guidance_pending_provider.dart';
+import '../providers/guidance_pending_provider.dart'
+    show newRollGuidanceRollIdProvider, syncGuidanceRollIdProvider;
 import '../widgets/guidance/lab_drive_sync_guidance.dart';
 import '../widgets/guidance/guidance_tokens.dart';
 
@@ -23,11 +25,28 @@ class HomeView extends ConsumerStatefulWidget {
   ConsumerState<HomeView> createState() => _HomeViewState();
 }
 
+/// Fields that affect archive / new-roll guidance; must change when [Roll] data updates so guidance can reschedule.
+int _guidanceRollsSignature(List<Roll> rolls) {
+  return Object.hashAll(
+    rolls.map(
+      (r) => Object.hash(
+        r.id,
+        r.status,
+        r.imageUrls.length,
+        (r.driveUrl ?? '').trim(),
+      ),
+    ),
+  );
+}
+
 class _HomeViewState extends ConsumerState<HomeView> {
   RollStatus? _statusFilter;
 
   final GlobalKey _guidanceStatusKey = GlobalKey();
   final GlobalKey _guidanceLinkSyncKey = GlobalKey();
+  final GlobalKey _shootingIntroStatusKey = GlobalKey();
+  final GlobalKey _shootingIntroExifKey = GlobalKey();
+  final GlobalKey _shootingIntroViewLogsKey = GlobalKey();
   final ScrollController _archiveListScrollController = ScrollController();
 
   Object? _guidanceSignature;
@@ -36,6 +55,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
   bool _archiveGuidanceBusy = false;
   /// Which card receives coach keys (only one roll at a time).
   String? _guidanceTargetRollId;
+  /// New-roll shooting intro (status / EXIF / VIEW LOGS); exclusive of archive keys.
+  String? _newRollGuidanceTargetRollId;
   bool _highlightStatusKey = false;
   bool _highlightLinkSyncKey = false;
 
@@ -62,10 +83,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
     );
   }
 
-  static bool _showLinkFetchRow(Roll r) {
-    return (r.status == RollStatus.lab || r.status == RollStatus.scanned) && r.imageUrls.isEmpty;
-  }
-
   static bool _hasSavedDriveUrl(Roll r) => (r.driveUrl ?? '').trim().isNotEmpty;
 
   void _clearGuidanceHighlight() {
@@ -74,80 +91,226 @@ class _HomeViewState extends ConsumerState<HomeView> {
     _highlightLinkSyncKey = false;
   }
 
+  Future<void> _ensureKeyVisible(GlobalKey key) async {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.25,
+      );
+    }
+  }
+
+  void _finishNewRollShootingIntro(GuidanceService g) {
+    g.setNewRollShootingIntroSeen().then((_) {
+      if (!mounted) return;
+      ref.read(newRollGuidanceRollIdProvider.notifier).setPending(null);
+      setState(() {
+        _archiveGuidanceBusy = false;
+        _newRollGuidanceTargetRollId = null;
+        _guidanceEpoch++;
+      });
+    });
+  }
+
+  void _showShootingIntroStep2(GuidanceService g) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _ensureKeyVisible(_shootingIntroExifKey);
+      if (!mounted) return;
+      final coach = buildSingleStepArchiveGuidance(
+        targetKey: _shootingIntroExifKey,
+        identify: 'new_roll_exif_log',
+        contentAlign: ContentAlign.top,
+        body:
+            'Tap the camera icon to log aperture, shutter, and location from a photo’s EXIF, or enter them manually in the sheet. You can also log from the Light Meter tab.',
+        onCompleted: () => _showShootingIntroStep3(g),
+        beforeFocus: (_) async {
+          final c = _shootingIntroExifKey.currentContext;
+          if (c != null) {
+            await Scrollable.ensureVisible(
+              c,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeInOutCubic,
+              alignment: 0.35,
+            );
+          }
+        },
+      );
+      coach.show(context: context);
+    });
+  }
+
+  void _showShootingIntroStep3(GuidanceService g) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _ensureKeyVisible(_shootingIntroViewLogsKey);
+      if (!mounted) return;
+      final coach = buildSingleStepArchiveGuidance(
+        targetKey: _shootingIntroViewLogsKey,
+        identify: 'new_roll_view_shot_log',
+        contentAlign: ContentAlign.top,
+        body:
+            'Tap VIEW LOGS to open this roll, then use the Shot Log tab to review every frame’s technical data while you’re shooting.',
+        onCompleted: () => _finishNewRollShootingIntro(g),
+        beforeFocus: (_) async {
+          final c = _shootingIntroViewLogsKey.currentContext;
+          if (c != null) {
+            await Scrollable.ensureVisible(
+              c,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeInOutCubic,
+              alignment: 0.35,
+            );
+          }
+        },
+      );
+      coach.show(context: context);
+    });
+  }
+
+  Future<void> _scheduleNewRollShootingIntro(List<Roll> rolls, List<Roll> visibleRolls) async {
+    if (!mounted || _archiveGuidanceBusy) return;
+    final pending = ref.read(newRollGuidanceRollIdProvider);
+    if (pending == null) return;
+
+    final g = GuidanceService.instance;
+    if (await g.hasSeenNewRollShootingIntro) {
+      ref.read(newRollGuidanceRollIdProvider.notifier).setPending(null);
+      return;
+    }
+
+    Roll? match;
+    for (final r in visibleRolls) {
+      if (r.id == pending && r.status == RollStatus.shooting) {
+        match = r;
+        break;
+      }
+    }
+    if (match == null) return;
+
+    setState(() {
+      _archiveGuidanceBusy = true;
+      _newRollGuidanceTargetRollId = pending;
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    await _ensureKeyVisible(_shootingIntroStatusKey);
+    if (!mounted) return;
+
+    final coach = buildSingleStepArchiveGuidance(
+      targetKey: _shootingIntroStatusKey,
+      identify: 'new_roll_change_status',
+      body:
+          'Tap the status badge to change where you are in the workflow—e.g. move to At lab when the film is at the lab, then Scanned when you have files.',
+      onCompleted: () => _showShootingIntroStep2(g),
+      beforeFocus: (_) async {
+        final c = _shootingIntroStatusKey.currentContext;
+        if (c != null) {
+          await Scrollable.ensureVisible(
+            c,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeInOutCubic,
+            alignment: 0.15,
+          );
+        }
+      },
+    );
+    coach.show(context: context);
+  }
+
+  /// After saving a Drive URL: coach the cloud/sync control — only if [RollCard] actually shows it.
+  Future<void> _scheduleSyncAfterDriveUrlGuidance(List<Roll> visibleRolls) async {
+    final pendingSyncRollId = ref.read(syncGuidanceRollIdProvider);
+    if (pendingSyncRollId == null) return;
+
+    final g = GuidanceService.instance;
+    if (await g.hasSeenSyncAfterLinkGuidance) {
+      ref.read(syncGuidanceRollIdProvider.notifier).setPending(null);
+      return;
+    }
+
+    Roll? roll;
+    for (final r in visibleRolls) {
+      if (r.id == pendingSyncRollId) {
+        roll = r;
+        break;
+      }
+    }
+    if (roll == null) return;
+
+    final hasUrl = _hasSavedDriveUrl(roll);
+    final slotVisible = rollShowsLinkSyncControl(roll);
+
+    if (!slotVisible || !hasUrl) {
+      ref.read(syncGuidanceRollIdProvider.notifier).setPending(null);
+      return;
+    }
+
+    final matched = roll;
+    setState(() {
+      _archiveGuidanceBusy = true;
+      _guidanceTargetRollId = matched.id;
+      _highlightStatusKey = false;
+      _highlightLinkSyncKey = true;
+    });
+    ref.read(syncGuidanceRollIdProvider.notifier).setPending(null);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+    final ctx = _guidanceLinkSyncKey.currentContext;
+    if (ctx != null) {
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.22,
+      );
+    }
+    if (!mounted) return;
+    final coach = buildSingleStepArchiveGuidance(
+      targetKey: _guidanceLinkSyncKey,
+      identify: 'sync_after_link',
+      body:
+          'Your Drive link is saved. Tap the highlighted cloud icon to download scans from Google Drive (you can tap again later to refresh).',
+      onCompleted: () async {
+        await g.setSyncAfterLinkGuidanceSeen();
+        await g.setDriveUrlOnCardGuidanceSeen();
+        if (mounted) {
+          setState(() {
+            _archiveGuidanceBusy = false;
+            _clearGuidanceHighlight();
+            _guidanceEpoch++;
+          });
+        }
+      },
+      beforeFocus: (_) async {
+        final c = _guidanceLinkSyncKey.currentContext;
+        if (c != null) {
+          await Scrollable.ensureVisible(
+            c,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeInOutCubic,
+            alignment: 0.25,
+          );
+        }
+      },
+    );
+    coach.show(context: context);
+  }
+
   Future<void> _scheduleArchiveGuidance(List<Roll> rolls, List<Roll> visibleRolls) async {
     if (!mounted || _archiveGuidanceBusy) return;
     if (rolls.isEmpty || visibleRolls.isEmpty) return;
 
     final g = GuidanceService.instance;
-    final pendingSyncRollId = ref.read(syncGuidanceRollIdProvider);
 
-    // —— Priority 1: after saving Drive URL in the sheet ————————————————
-    if (pendingSyncRollId != null) {
-      final seenSync = await g.hasSeenSyncAfterLinkGuidance;
-      if (seenSync) {
-        ref.read(syncGuidanceRollIdProvider.notifier).setPending(null);
-      } else {
-        Roll? roll;
-        for (final r in visibleRolls) {
-          if (r.id == pendingSyncRollId) {
-            roll = r;
-            break;
-          }
-        }
-        if (roll != null && _showLinkFetchRow(roll)) {
-          final matched = roll;
-          setState(() {
-            _archiveGuidanceBusy = true;
-            _guidanceTargetRollId = matched.id;
-            _highlightStatusKey = false;
-            _highlightLinkSyncKey = true;
-          });
-          ref.read(syncGuidanceRollIdProvider.notifier).setPending(null);
-          await Future<void>.delayed(const Duration(milliseconds: 100));
-          if (!mounted) return;
-          final ctx = _guidanceLinkSyncKey.currentContext;
-          if (ctx != null) {
-            await Scrollable.ensureVisible(
-              ctx,
-              duration: const Duration(milliseconds: 380),
-              curve: Curves.easeInOutCubic,
-              alignment: 0.22,
-            );
-          }
-          if (!mounted) return;
-          final coach = buildSingleStepArchiveGuidance(
-            targetKey: _guidanceLinkSyncKey,
-            identify: 'sync_after_link',
-            body:
-                'Your Drive link is saved. Tap the highlighted cloud icon to download scans from Google Drive (you can tap again later to refresh).',
-            onCompleted: () async {
-              await g.setSyncAfterLinkGuidanceSeen();
-              await g.setDriveUrlOnCardGuidanceSeen();
-              if (mounted) {
-                setState(() {
-                  _archiveGuidanceBusy = false;
-                  _clearGuidanceHighlight();
-                  _guidanceEpoch++;
-                });
-              }
-            },
-            beforeFocus: (_) async {
-              final c = _guidanceLinkSyncKey.currentContext;
-              if (c != null) {
-                await Scrollable.ensureVisible(
-                  c,
-                  duration: const Duration(milliseconds: 320),
-                  curve: Curves.easeInOutCubic,
-                  alignment: 0.25,
-                );
-              }
-            },
-          );
-          coach.show(context: context);
-          return;
-        }
-        ref.read(syncGuidanceRollIdProvider.notifier).setPending(null);
-      }
+    // —— Priority 1: after saving Drive URL (only when top-right link/sync slot + saved URL) ——
+    if (ref.read(syncGuidanceRollIdProvider) != null) {
+      await _scheduleSyncAfterDriveUrlGuidance(visibleRolls);
+      if (_archiveGuidanceBusy) return;
+      if (ref.read(syncGuidanceRollIdProvider) != null) return;
     }
 
     // —— Priority 2: first time any roll is At Lab ————————————————————————
@@ -218,7 +381,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     if (!seenDrive) {
       Roll? linkRowRoll;
       for (final r in visibleRolls) {
-        if (_showLinkFetchRow(r)) {
+        if (rollShowsLinkSyncControl(r)) {
           linkRowRoll = r;
           break;
         }
@@ -279,20 +442,25 @@ class _HomeViewState extends ConsumerState<HomeView> {
   }
 
   void _enqueueGuidance(List<Roll> rolls, List<Roll> visibleRolls) {
-    final pending = ref.read(syncGuidanceRollIdProvider);
+    final pendingSync = ref.read(syncGuidanceRollIdProvider);
+    final pendingNewRoll = ref.read(newRollGuidanceRollIdProvider);
     final sig = Object.hash(
       rolls.length,
-      Object.hashAll(rolls.map((r) => r.id)),
+      _guidanceRollsSignature(rolls),
       visibleRolls.length,
-      Object.hashAll(visibleRolls.map((r) => r.id)),
-      pending ?? '',
+      _guidanceRollsSignature(visibleRolls),
+      pendingSync ?? '',
+      pendingNewRoll ?? '',
+      _newRollGuidanceTargetRollId ?? '',
       _guidanceEpoch,
     );
     if (_guidanceSignature == sig) return;
     _guidanceSignature = sig;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduleArchiveGuidance(rolls, visibleRolls);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _scheduleNewRollShootingIntro(rolls, visibleRolls);
+      if (!mounted) return;
+      await _scheduleArchiveGuidance(rolls, visibleRolls);
     });
   }
 
@@ -354,6 +522,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                 ...List.generate(filtered.length, (index) {
                   final roll = filtered[index];
                   final isTarget = roll.id == _guidanceTargetRollId;
+                  final isNewRollIntro = roll.id == _newRollGuidanceTargetRollId;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 20.0),
                     child: GestureDetector(
@@ -365,8 +534,13 @@ class _HomeViewState extends ConsumerState<HomeView> {
                       },
                       child: RollCard(
                         roll: roll,
-                        guidanceStatusKey: isTarget && _highlightStatusKey ? _guidanceStatusKey : null,
-                        guidanceLinkSyncKey: isTarget && _highlightLinkSyncKey ? _guidanceLinkSyncKey : null,
+                        guidanceStatusKey: isNewRollIntro
+                            ? _shootingIntroStatusKey
+                            : (isTarget && _highlightStatusKey ? _guidanceStatusKey : null),
+                        guidanceLinkSyncKey:
+                            isNewRollIntro ? null : (isTarget && _highlightLinkSyncKey ? _guidanceLinkSyncKey : null),
+                        guidanceExifKey: isNewRollIntro ? _shootingIntroExifKey : null,
+                        guidanceViewLogsKey: isNewRollIntro ? _shootingIntroViewLogsKey : null,
                       ),
                     ),
                   );

@@ -10,3 +10,14 @@ class SyncGuidanceRollIdNotifier extends Notifier<String?> {
 
 final syncGuidanceRollIdProvider =
     NotifierProvider<SyncGuidanceRollIdNotifier, String?>(SyncGuidanceRollIdNotifier.new);
+
+/// After creating a roll, highlight that card for shooting workflow intro.
+class NewRollGuidanceRollIdNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void setPending(String? rollId) => state = rollId;
+}
+
+final newRollGuidanceRollIdProvider =
+    NotifierProvider<NewRollGuidanceRollIdNotifier, String?>(NewRollGuidanceRollIdNotifier.new);

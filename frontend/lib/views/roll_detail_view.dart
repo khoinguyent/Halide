@@ -27,6 +27,7 @@ import '../core/widgets/image_placeholder.dart';
 import '../services/gdrive_connection_guard.dart';
 import '../services/local_sync_service.dart';
 import '../models/shot.dart';
+import '../models/roll_gallery.dart';
 import '../widgets/folder_tabs.dart';
 import '../providers/ui_state_provider.dart';
 import '../providers/dashboard_provider.dart';
@@ -116,8 +117,15 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
         }
 
         final plan = ref.read(userPlanProvider);
-        if (plan != UserPlan.free && roll.imageUrls.isNotEmpty) {
-           LocalSyncService().syncRoll(widget.rollId, roll.imageUrls);
+        if (plan != UserPlan.free) {
+          final (pairedUrls, pairedIds, _) = RollGalleryPairs.triple(roll);
+          if (pairedUrls.isNotEmpty) {
+            LocalSyncService().syncRoll(
+              widget.rollId,
+              pairedUrls,
+              imageIds: pairedIds,
+            );
+          }
         }
 
         return _buildBody(context, roll);
@@ -338,19 +346,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     VoidCallback? onEmptyStateTap,
     int offset = 0,
   }) {
-    // Keep URLs and Image row ids aligned (same index) for Pro rotate/replace.
-    final pairedUrls = <String>[];
-    final pairedIds = <String>[];
-    for (var i = 0; i < roll.imageUrls.length; i++) {
-      final u = roll.imageUrls[i];
-      if (u.trim().isEmpty) continue;
-      if (!u.startsWith('http') && !u.startsWith('/') && !u.startsWith('file://')) {
-        continue;
-      }
-      if (i >= roll.shots.length) break;
-      pairedUrls.add(u);
-      pairedIds.add(roll.shots[i].id);
-    }
+    final (pairedUrls, pairedIds, shotsAligned) = RollGalleryPairs.triple(roll);
     final images = pairedUrls;
 
     if (images.isEmpty) {
@@ -429,7 +425,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
                   dateScanned: roll.createdAt,
                   filmStock: FilmStock(id: roll.filmStockId, brand: roll.brand, name: roll.name, iso: roll.shotAtIso ?? 400, format: '135', colorType: 'Color'),
                   camera: Camera(id: roll.userCameraId, brand: roll.brand, model: roll.cameraName ?? 'Unknown', nickname: roll.nickname ?? ''),
-                  shots: roll.shots.map((s) => s.toJson()).toList(),
+                  shots: shotsAligned.map((s) => s.toJson()).toList(),
                   shotOffset: roll.shotOffset,
                 ),
               ),
@@ -445,11 +441,12 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
                   SyncedImage(
                     rollId: roll.id,
                     imageUrl: path,
+                    imageId: index < pairedIds.length ? pairedIds[index] : null,
                     fit: BoxFit.cover,
                     preferThumbnail: false,
                   ),
-                  if (offset > 0 || roll.shots.isNotEmpty)
-                    _buildOverlayMetadata(index, offset, roll.shots),
+                  if (offset > 0 || shotsAligned.isNotEmpty)
+                    _buildOverlayMetadata(index, offset, shotsAligned),
                 ],
               ),
             ),
@@ -459,12 +456,12 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     );
   }
 
-  Widget _buildOverlayMetadata(int imageIndex, int offset, List<Shot> shots) {
+  Widget _buildOverlayMetadata(int imageIndex, int offset, List<Shot> galleryShots) {
     final shotIndex = imageIndex;
-    if (shotIndex < 0 || shotIndex >= shots.length) {
+    if (shotIndex < 0 || shotIndex >= galleryShots.length) {
       return const SizedBox.shrink();
     }
-    final shot = shots[shotIndex];
+    final shot = galleryShots[shotIndex];
 
     return Positioned(
       bottom: 0,
@@ -1070,7 +1067,9 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
   Future<void> _prefetchAfterSync() async {
     try {
       final roll = await ref.read(rollDetailProvider(widget.rollId).future);
-      await LocalSyncService().syncRollParallel(roll.id, roll.imageUrls);
+      final (urls, ids, _) = RollGalleryPairs.triple(roll);
+      if (urls.isEmpty) return;
+      await LocalSyncService().syncRollParallel(roll.id, urls, imageIds: ids);
     } catch (e) {
       debugPrint('[Drive] prefetch after sync: $e');
     }

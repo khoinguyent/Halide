@@ -18,12 +18,16 @@ class RollImageEditService {
   final LocalSyncService _local;
 
   /// [quarterTurns]: 1 = 90° CW, -1 = 90° CCW, 2 = 180°, etc.
+  ///
+  /// Output path matches [LocalSyncService.ensureLocalSync] / [resolveLocalPath] so the viewer
+  /// reloads the same file (indexed by [imageId] when set).
   Future<String> rotateQuarterTurnsAndSaveLocal({
     required String rollId,
     required String imageUrl,
     int quarterTurns = 1,
+    String? imageId,
   }) async {
-    final bytes = await _loadImageBytes(rollId, imageUrl);
+    final bytes = await _loadImageBytes(rollId, imageUrl, imageId: imageId);
     final decoded = _decodeRaster(bytes);
     if (decoded == null) {
       throw StateError(
@@ -34,13 +38,21 @@ class RollImageEditService {
     final outBytes = img.encodeJpg(rotated, quality: 92);
 
     final docDir = await getApplicationDocumentsDirectory();
-    var fileName = p.basename(Uri.parse(imageUrl).path);
-    if (fileName.isEmpty) {
-      fileName = 'frame_${rollId}_${imageUrl.hashCode.abs()}.jpg';
-    }
     final outDir = Directory(p.join(docDir.path, 'scans', rollId));
     if (!await outDir.exists()) await outDir.create(recursive: true);
-    final outPath = p.join(outDir.path, fileName);
+
+    late final String localFileName;
+    if (imageId != null && imageId.isNotEmpty) {
+      final ext = extensionFromImageUrl(imageUrl);
+      localFileName = '$imageId$ext';
+    } else {
+      var base = p.basename(Uri.parse(imageUrl).path);
+      if (base.isEmpty) {
+        base = 'frame_${rollId}_${imageUrl.hashCode.abs()}.jpg';
+      }
+      localFileName = base;
+    }
+    final outPath = p.join(outDir.path, localFileName);
     await File(outPath).writeAsBytes(outBytes, flush: true);
     return outPath;
   }
@@ -49,8 +61,14 @@ class RollImageEditService {
   Future<String> rotate90ClockwiseAndSaveLocal({
     required String rollId,
     required String imageUrl,
+    String? imageId,
   }) =>
-      rotateQuarterTurnsAndSaveLocal(rollId: rollId, imageUrl: imageUrl, quarterTurns: 1);
+      rotateQuarterTurnsAndSaveLocal(
+        rollId: rollId,
+        imageUrl: imageUrl,
+        quarterTurns: 1,
+        imageId: imageId,
+      );
 
   /// JPEG / PNG / GIF / WebP / BMP — not HEIC (decodeImage often suffices; explicit fallbacks for edge cases).
   img.Image? _decodeRaster(Uint8List bytes) {
@@ -61,8 +79,12 @@ class RollImageEditService {
         img.decodeWebP(bytes);
   }
 
-  Future<Uint8List> _loadImageBytes(String rollId, String imageUrl) async {
-    final synced = await _local.ensureLocalSync(rollId, imageUrl);
+  Future<Uint8List> _loadImageBytes(
+    String rollId,
+    String imageUrl, {
+    String? imageId,
+  }) async {
+    final synced = await _local.ensureLocalSync(rollId, imageUrl, imageId: imageId);
     if (synced.startsWith('http')) {
       final r = await http.get(Uri.parse(synced));
       if (r.statusCode != 200) {

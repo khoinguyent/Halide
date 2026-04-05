@@ -1,13 +1,20 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/app_config.dart';
+
 /// Persists one-time Archive guidance for lab status, Drive link on the card, and sync after link.
+///
+/// Keys are scoped by [AppFlavor] so switching between dev / staging / prod backends does not
+/// reuse "already seen" state from another environment on the same install.
 class GuidanceService {
   GuidanceService._();
   static final GuidanceService instance = GuidanceService._();
 
-  static const String _kAtLabGuidance = 'guidance_seen_at_lab_badge';
-  static const String _kDriveUrlOnCardGuidance = 'guidance_seen_drive_url_on_card';
-  static const String _kSyncAfterLinkGuidance = 'guidance_seen_sync_after_link';
+  String get _kAtLabGuidance => 'guidance_${AppConfig.flavor.name}_seen_at_lab_badge';
+  String get _kDriveUrlOnCardGuidance => 'guidance_${AppConfig.flavor.name}_seen_drive_url_on_card';
+  String get _kSyncAfterLinkGuidance => 'guidance_${AppConfig.flavor.name}_seen_sync_after_link';
+  String get _kNewRollShootingIntro => 'guidance_${AppConfig.flavor.name}_seen_new_roll_shooting_intro';
+  String get _kMeterIntro => 'guidance_${AppConfig.flavor.name}_seen_meter_intro';
 
   Future<bool> _read(String key) async {
     final p = await SharedPreferences.getInstance();
@@ -30,4 +37,14 @@ class GuidanceService {
   Future<bool> get hasSeenSyncAfterLinkGuidance async => _read(_kSyncAfterLinkGuidance);
 
   Future<void> setSyncAfterLinkGuidanceSeen() async => _write(_kSyncAfterLinkGuidance);
+
+  /// Three-step Archive intro after creating a roll: status, EXIF log, shot log.
+  Future<bool> get hasSeenNewRollShootingIntro async => _read(_kNewRollShootingIntro);
+
+  Future<void> setNewRollShootingIntroSeen() async => _write(_kNewRollShootingIntro);
+
+  /// Short Precision Meter tab intro (Pro).
+  Future<bool> get hasSeenMeterIntro async => _read(_kMeterIntro);
+
+  Future<void> setMeterIntroSeen() async => _write(_kMeterIntro);
 }

@@ -49,7 +49,7 @@ Run the following command to upload the generated IPA (adjust `--file` to the `.
 ```bash
 cd frontend
 xcrun altool --upload-app --type ios \
-  --file build/ios/ipa/Runner.ipa \
+  --file build/ios/ipa/Halide.ipa \
   --apiKey 9PTQG9323C \
   --apiIssuer 8b3530de-316d-4584-8095-2a001c801243
 ```
@@ -60,6 +60,9 @@ If your exported IPA has a different name, use `ls build/ios/ipa/`.
 
 | Build | Version | Date | Delivery UUID |
 |-------|---------|------|---------------|
+| 41 | 1.0.0+41 | 2026-04-05 | f37b24c3-3bde-48b3-9095-aca82a7cdccd |
+| 40 | 1.0.0+40 | 2026-04-05 | c20fe1f5-b3de-4fed-9b29-9fdf3d4715e4 |
+| 39 | 1.0.0+39 | 2026-04-05 | 6493e6cc-1c5b-47cd-be35-90603bfea0a6 |
 | 31 | 1.0.0+31 | 2026-04-04 | 3a4da1bb-9322-4a52-87ed-d03000a6811e |
 | 30 | 1.0.0+30 | 2026-04-04 | 10ac5f61-ee2b-4303-b904-864584eb4440 |
 | 29 | 1.0.0+29 | 2026-04-04 | 17d5f4c6-988e-479a-8be7-715d87d50f6e |

@@ -14,6 +14,13 @@ class AppConfig {
     return AppFlavor.dev;
   }
 
+  /// In-app diagnostics: debug logs, image URL inspector, etc.
+  /// Enabled for **dev** & **staging** flavors and for **debug** builds; **off** for release **prod**.
+  static bool get showInAppDiagnostics {
+    if (kDebugMode) return true;
+    return flavor != AppFlavor.prod;
+  }
+
   static const String _prodUrl = 'https://api.smartconnector.io.vn';
   static const String _stagingUrl = 'https://stagging-api.smartconnector.io.vn';
   static const String _devUrl = 'http://localhost:8000';

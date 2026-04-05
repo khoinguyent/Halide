@@ -43,7 +43,12 @@ class RollsError extends RollsState {
   final String message;
   RollsError(this.message);
 }
-class RollActionSuccess extends RollsState {}
+class RollActionSuccess extends RollsState {
+  /// Set when a roll was just created (for first-run UI such as shooting intro).
+  final String? createdRollId;
+
+  RollActionSuccess({this.createdRollId});
+}
 
 // BLoC
 class RollsBloc extends Bloc<RollsEvent, RollsState> {
@@ -72,7 +77,7 @@ class RollsBloc extends Bloc<RollsEvent, RollsState> {
 
     on<AddRollEvent>((event, emit) async {
       try {
-        await repository.createRoll(
+        final created = await repository.createRoll(
           filmStockId: event.filmStockId,
           userCameraId: event.userCameraId,
           title: event.title,
@@ -81,7 +86,7 @@ class RollsBloc extends Bloc<RollsEvent, RollsState> {
           expiredYear: event.expiredYear,
           maxFrames: event.maxFrames,
         );
-        emit(RollActionSuccess());
+        emit(RollActionSuccess(createdRollId: created.id));
         add(RefreshRolls());
       } catch (e) {
         emit(RollsError(e.toString()));

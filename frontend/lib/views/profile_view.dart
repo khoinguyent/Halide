@@ -2,11 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../config/app_config.dart';
 import '../providers/auth_provider.dart';
 import '../models/user_profile.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 import '../services/local_avatar_storage.dart';
+import '../widgets/debug_log_sheet.dart';
 
 class ProfileView extends ConsumerStatefulWidget {
   const ProfileView({Key? key}) : super(key: key);
@@ -16,6 +18,22 @@ class ProfileView extends ConsumerStatefulWidget {
 }
 
 class _ProfileViewState extends ConsumerState<ProfileView> {
+  /// Dev / staging / debug builds: long-press **PROFILE** for full in-app log (meter + sync + …).
+  Widget _debugLogTitleGesture({required Widget child}) {
+    if (!AppConfig.showInAppDiagnostics) return child;
+    return GestureDetector(
+      onLongPress: () {
+        showHalideDebugLogSheet(
+          context,
+          title: 'HALIDE DEBUG LOG',
+          channelFilter: null,
+          emptyHint: '(no log lines yet — use meter tab or open rolls with images)',
+        );
+      },
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authService = ref.watch(authServiceProvider);
@@ -29,13 +47,15 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
 
     return HalideScaffold(
       appBar: AppBar(
-        title: const Text(
-          'PROFILE',
-          style: TextStyle(
-            letterSpacing: 4,
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-            color: Colors.white,
+        title: _debugLogTitleGesture(
+          child: const Text(
+            'PROFILE',
+            style: TextStyle(
+              letterSpacing: 4,
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              color: Colors.white,
+            ),
           ),
         ),
         centerTitle: true,

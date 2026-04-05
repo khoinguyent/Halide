@@ -83,7 +83,7 @@ class TransferService:
         db.commit()
 
         # Store object keys (users/...) in Image.image_url. Public URLs are built in roll_service
-        # using current R2_PUBLIC_BASE_URL + bucket, avoiding malformed full URLs (e.g. missing /bucket/).
+        # Public gallery URLs are built in roll_service: R2_PUBLIC_BASE_URL + object key (no /bucket/ in path).
         return s3_key
 
     def _handle_personal_cloud(self, db: Session, user_id: str, roll_id: str, image_id: str, file_content: bytes):

@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/roll.dart';
+import '../models/roll_gallery.dart';
 import '../models/roll_status.dart';
 import '../core/widgets/glass_panel.dart';
 import '../core/widgets/halide_dialog.dart';
@@ -20,18 +21,34 @@ import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
 import '../providers/guidance_pending_provider.dart';
 
+/// Whether this roll’s card shows the link/sync control (top-right next to the date).
+/// Keep in sync with [RollCard] layout — [HomeView] uses this to decide when Drive/sync coach marks apply.
+bool rollShowsLinkSyncControl(Roll roll) {
+  final st = roll.status;
+  final statusOk = st == RollStatus.lab ||
+      st == RollStatus.scanned ||
+      st == RollStatus.syncing;
+  return statusOk && roll.imageUrls.isEmpty;
+}
+
 class RollCard extends ConsumerStatefulWidget {
   final Roll roll;
   /// When set, enables Archive coach marks on the status badge.
   final GlobalKey? guidanceStatusKey;
   /// Link icon / cloud sync icon (top-right) for lab & scanned rolls without images.
   final GlobalKey? guidanceLinkSyncKey;
+  /// Shooting roll: EXIF / manual shot log (camera icon).
+  final GlobalKey? guidanceExifKey;
+  /// Shooting roll: opens roll detail for Shot Log tab.
+  final GlobalKey? guidanceViewLogsKey;
 
   const RollCard({
     Key? key,
     required this.roll,
     this.guidanceStatusKey,
     this.guidanceLinkSyncKey,
+    this.guidanceExifKey,
+    this.guidanceViewLogsKey,
   }) : super(key: key);
 
   @override
@@ -65,8 +82,10 @@ class _RollCardState extends ConsumerState<RollCard> {
 
       try {
         final roll = await ref.read(rollDetailProvider(rollId).future);
+        final (urls, ids, _) = RollGalleryPairs.triple(roll);
+        if (urls.isEmpty) return;
         final sync = LocalSyncService();
-        await sync.syncRollParallel(roll.id, roll.imageUrls);
+        await sync.syncRollParallel(roll.id, urls, imageIds: ids);
       } catch (e) {
         debugPrint('[RollCard] prefetch after Drive sync: $e');
       }
@@ -102,9 +121,7 @@ class _RollCardState extends ConsumerState<RollCard> {
   Widget build(BuildContext context) {
     final roll = widget.roll;
 
-    final showLinkFetchAction =
-        (roll.status == RollStatus.lab || roll.status == RollStatus.scanned) &&
-            roll.imageUrls.isEmpty;
+    final showLinkFetchAction = rollShowsLinkSyncControl(roll);
     final plan = ref.watch(userPlanProvider);
     final isFree = plan == UserPlan.free;
 
@@ -247,6 +264,17 @@ class _RollCardState extends ConsumerState<RollCard> {
     );
   }
 
+  Widget _buildScannedOrSyncingContent(Roll roll) {
+    final (urls, ids, _) = RollGalleryPairs.triple(roll);
+    return _ScannedContent(
+      rollId: roll.id,
+      imageUrls: urls,
+      imageIds: ids,
+      actualFrames: urls.length,
+      totalFrames: roll.maxFrames,
+    );
+  }
+
   Widget _buildStateContent() {
     final roll = widget.roll;
     switch (roll.status) {
@@ -254,6 +282,8 @@ class _RollCardState extends ConsumerState<RollCard> {
         return _ShootingContent(
           rollId: roll.id,
           maxFrames: roll.maxFrames,
+          guidanceExifKey: widget.guidanceExifKey,
+          guidanceViewLogsKey: widget.guidanceViewLogsKey,
         );
       case RollStatus.lab:
         return _LabContent(
@@ -261,19 +291,9 @@ class _RollCardState extends ConsumerState<RollCard> {
           maxFrames: roll.maxFrames,
         );
       case RollStatus.scanned:
-        return _ScannedContent(
-          rollId: roll.id,
-          imageUrls: roll.imageUrls,
-          actualFrames: roll.imageUrls.length,
-          totalFrames: roll.maxFrames,
-        );
+        return _buildScannedOrSyncingContent(roll);
       case RollStatus.syncing:
-        return _ScannedContent(
-          rollId: roll.id,
-          imageUrls: roll.imageUrls,
-          actualFrames: roll.imageUrls.length,
-          totalFrames: roll.maxFrames,
-        );
+        return _buildScannedOrSyncingContent(roll);
       case RollStatus.archived:
         return const SizedBox.shrink();
       default:
@@ -476,11 +496,15 @@ class _DriveUrlBottomSheetState extends ConsumerState<_DriveUrlBottomSheet> {
 class _ShootingContent extends ConsumerWidget {
   final String rollId;
   final int maxFrames;
+  final GlobalKey? guidanceExifKey;
+  final GlobalKey? guidanceViewLogsKey;
 
   const _ShootingContent({
     Key? key,
     required this.rollId,
     required this.maxFrames,
+    this.guidanceExifKey,
+    this.guidanceViewLogsKey,
   }) : super(key: key);
 
   @override
@@ -502,6 +526,7 @@ class _ShootingContent extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               TextButton(
+                key: guidanceViewLogsKey,
                 onPressed: () => context.push('/roll/$rollId'),
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
@@ -519,6 +544,7 @@ class _ShootingContent extends ConsumerWidget {
                 ),
               ),
               IconButton(
+                key: guidanceExifKey,
                 onPressed: () {
                   showModalBottomSheet(
                     context: context,
@@ -633,6 +659,7 @@ class _LabContent extends StatelessWidget {
 class _ScannedContent extends StatelessWidget {
   final String rollId;
   final List<String> imageUrls;
+  final List<String> imageIds;
   final int actualFrames;
   final int totalFrames;
 
@@ -640,16 +667,16 @@ class _ScannedContent extends StatelessWidget {
     Key? key,
     required this.rollId,
     required this.imageUrls,
+    required this.imageIds,
     required this.actualFrames,
     required this.totalFrames,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final urls = imageUrls
-        .where((u) => u.trim().isNotEmpty)
-        .where((u) => u.startsWith('http') || u.startsWith('/'))
-        .toList(growable: false);
+    // [imageUrls] / [imageIds] are already paired from [RollGalleryPairs.triple]; do not re-filter
+    // or indices drift from DB image ids.
+    final urls = imageUrls;
     final effectiveActualFrames = urls.length;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -673,6 +700,7 @@ class _ScannedContent extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: urls.length,
                 itemBuilder: (context, index) {
+                  final imageId = index < imageIds.length ? imageIds[index] : null;
                   return Container(
                     margin: const EdgeInsets.only(right: 8),
                     width: 140,
@@ -684,6 +712,7 @@ class _ScannedContent extends StatelessWidget {
                     child: SyncedImage(
                       rollId: rollId,
                       imageUrl: urls[index],
+                      imageId: imageId,
                       fit: BoxFit.cover,
                       preferThumbnail: false,
                     ),

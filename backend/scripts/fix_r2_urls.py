@@ -1,3 +1,9 @@
+"""
+Legacy one-off: assumed public URLs needed /{bucket}/ before users/...
+
+R2 pub-*.r2.dev URLs do NOT include the bucket as a path segment (see roll_service).
+Do not run this against current deployments unless you know you need the inverse fix.
+"""
 import os
 import sys
 

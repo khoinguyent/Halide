@@ -1,28 +1,16 @@
-import 'package:flutter/foundation.dart';
+import 'halide_debug_log.dart';
 
-/// Ring buffer of metering debug lines for on-device diagnosis.
-/// View in Xcode console (debugPrint) or copy from the in-app debug sheet (staging/debug).
+/// Meter-specific API; storage is shared with [HalideDebugLog] under channel `Meter`.
 class MeterDebugLog {
   MeterDebugLog._();
 
-  static final List<String> _lines = <String>[];
-  static const int maxLines = 120;
+  static const String _ch = 'Meter';
 
-  static void clear() {
-    _lines.clear();
-  }
+  static void clear() => HalideDebugLog.clearChannel(_ch);
 
-  static void log(String message) {
-    final ts = DateTime.now().toIso8601String();
-    final line = '$ts  $message';
-    _lines.add(line);
-    while (_lines.length > maxLines) {
-      _lines.removeAt(0);
-    }
-    debugPrint('[MeterDbg] $line');
-  }
+  static void log(String message) => HalideDebugLog.log(_ch, message);
 
-  static String get text => _lines.join('\n');
+  static String get text => HalideDebugLog.textForChannel(_ch);
 
-  static int get lineCount => _lines.length;
+  static int get lineCount => HalideDebugLog.countForChannel(_ch);
 }
