@@ -1,7 +1,13 @@
+import uuid as uuid_lib
+from typing import List, Optional
+
 from sqlalchemy.orm import Session, joinedload
 from uuid import UUID
 from ..db.models.camera import UserCamera, UserLens, Camera, Lens
+from ..db.models.user import User
 from ..db.schemas.camera import UserCameraCreate, UserLensCreate, UserCameraUpdate, UserLensUpdate
+from .storage_service import storage_service
+from .roll_service import public_http_url_for_storage_key
 
 def get_user_cameras(db: Session, user_id: str, skip: int = 0, limit: int = 100):
     return db.query(UserCamera).options(
@@ -97,3 +103,52 @@ def update_user_lens(db: Session, user_lens_id: UUID, user_id: str, update: User
 
 def get_user_lenses(db: Session, user_id: str, skip: int = 0, limit: int = 100):
     return db.query(UserLens).options(joinedload(UserLens.lens)).filter(UserLens.user_id == user_id).offset(skip).limit(limit).all()
+
+
+def upload_gear_photos(
+    db: Session,
+    user_camera_id: UUID,
+    user_id: str,
+    files_content: List[bytes],
+) -> Optional[UserCamera]:
+    """
+    Upload each image to R2 under users/{uid}/gear/{camera_id}/..., append **HTTPS** URLs to
+    user_cameras.image_urls (device-local paths are not durable across reinstalls).
+    """
+    row = db.query(UserCamera).filter(UserCamera.id == user_camera_id, UserCamera.user_id == user_id).first()
+    if not row:
+        return None
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return None
+
+    max_bytes = 15 * 1024 * 1024
+    existing_urls = list(row.image_urls or []) if isinstance(row.image_urls, list) else []
+
+    for file_content in files_content:
+        if len(file_content) > max_bytes:
+            continue
+        if user.storage_used_bytes + len(file_content) > user.total_storage_limit:
+            break
+
+        image_id = str(uuid_lib.uuid4())
+        key = storage_service.upload_gear_image(
+            user_id,
+            str(user_camera_id),
+            image_id,
+            file_content,
+        )
+        public_url = public_http_url_for_storage_key(key)
+        existing_urls.append(public_url)
+        user.storage_used_bytes += len(file_content)
+        db.add(user)
+
+    row.image_urls = existing_urls
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return db.query(UserCamera).options(
+        joinedload(UserCamera.camera),
+        joinedload(UserCamera.lenses).joinedload(UserLens.lens),
+    ).filter(UserCamera.id == user_camera_id).first()

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -58,6 +58,55 @@ def update_user_camera(
     current_user: User = Depends(get_current_user)
 ):
     row = gear_service.update_user_camera(db, user_camera_id, current_user.id, body)
+    if not row:
+        raise HTTPException(status_code=404, detail="User camera not found")
+    return row
+
+
+@router.post("/user_cameras/{user_camera_id}/images", response_model=UserCameraOut)
+async def upload_user_camera_images(
+    user_camera_id: UUID,
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Upload gear photos to object storage and append **public HTTPS URLs** to `image_urls`.
+    Clients must not persist device-local paths — they break after reinstall.
+    """
+    if not files:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No files uploaded")
+
+    if current_user.storage_used_bytes >= current_user.total_storage_limit:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Storage limit reached. Please upgrade your plan.",
+        )
+
+    max_bytes = 15 * 1024 * 1024
+    blobs: list[bytes] = []
+    for file in files:
+        chunk = await file.read(1024 * 1024)
+        chunks: list[bytes] = []
+        total = 0
+        while chunk:
+            total += len(chunk)
+            if total > max_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"File {file.filename} exceeds the 15 MB limit.",
+                )
+            chunks.append(chunk)
+            chunk = await file.read(1024 * 1024)
+        content = b"".join(chunks)
+        if current_user.storage_used_bytes + len(content) > current_user.total_storage_limit:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Upload would exceed your storage limit.",
+            )
+        blobs.append(content)
+
+    row = gear_service.upload_gear_photos(db, user_camera_id, current_user.id, blobs)
     if not row:
         raise HTTPException(status_code=404, detail="User camera not found")
     return row

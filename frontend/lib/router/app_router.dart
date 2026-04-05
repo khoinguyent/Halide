@@ -16,7 +16,6 @@ import '../views/roll_detail_view.dart';
 import '../views/legal/privacy_policy_view.dart';
 import '../views/legal/terms_conditions_view.dart';
 import '../views/settings_view.dart';
-import '../providers/auth_provider.dart';
 import '../features/storage/presentation/views/storage_account_list_view.dart';
 import '../features/storage/presentation/views/storage_strategy_view.dart';
 import '../views/edit_profile_view.dart';
@@ -226,6 +225,21 @@ class _ShellArchiveRefreshState extends ConsumerState<_ShellArchiveRefresh> {
       });
     }
     _previousIndex = index;
+
+    // Single source of truth for which bottom tab is active (e.g. Meter camera on/off).
+    // `context.go(...)` does not always go through [HalideScaffold] tap handlers, so
+    // [homeTabIndexProvider] can stay stale while the shell index changes — leaving the
+    // light meter camera running off-tab. Sync shell → provider after layout.
+    final tabFromProvider = ref.read(homeTabIndexProvider);
+    if (tabFromProvider != index) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (ref.read(homeTabIndexProvider) != index) {
+          ref.read(homeTabIndexProvider.notifier).setIndex(index);
+        }
+      });
+    }
+
     return widget.child;
   }
 }

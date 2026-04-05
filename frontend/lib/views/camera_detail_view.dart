@@ -13,7 +13,6 @@ import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
 import '../providers/gear_provider.dart';
 import '../providers/auth_provider.dart';
-import '../services/upload_service.dart';
 import '../core/utils/notifications.dart';
 
 class CameraDetailView extends ConsumerWidget {
@@ -644,7 +643,7 @@ class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
 
 // ─── Gear Images Edit Sheet ────────────────────────────────────────────────────
 
-class _GearImagesEditSheet extends StatefulWidget {
+class _GearImagesEditSheet extends ConsumerStatefulWidget {
   final String cameraId;
   final List<String> initialUrls;
   final UserPlan plan;
@@ -658,10 +657,10 @@ class _GearImagesEditSheet extends StatefulWidget {
   });
 
   @override
-  State<_GearImagesEditSheet> createState() => _GearImagesEditSheetState();
+  ConsumerState<_GearImagesEditSheet> createState() => _GearImagesEditSheetState();
 }
 
-class _GearImagesEditSheetState extends State<_GearImagesEditSheet> {
+class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
   late List<String> _urls;
   final List<XFile> _pendingAdds = [];
   final ImagePicker _picker = ImagePicker();
@@ -701,31 +700,38 @@ class _GearImagesEditSheetState extends State<_GearImagesEditSheet> {
       widget.onSave(_urls);
       return;
     }
-    
+
     setState(() => _isUploading = true);
-    
-    final newPaths = <String>[];
-    
-    if (widget.plan == UserPlan.free) {
-      // Free Tier: Keep files locally, skip upload service
-      for (final xFile in _pendingAdds) {
-        newPaths.add(xFile.path);
+    try {
+      final user = ref.read(authServiceProvider).currentUser;
+      final token = await user?.getIdToken();
+      if (token == null) {
+        if (mounted) {
+          ref.read(notificationProvider.notifier).show(
+                'SIGN IN TO SAVE GEAR PHOTOS.',
+                type: NotificationType.error,
+              );
+        }
+        return;
       }
-    } else {
-      // Paid Upgrade: Upload to Cloud
-      final uploadService = UploadService();
-      for (final xFile in _pendingAdds) {
-        final ok = await uploadService.uploadRollImage(
-          rollId: 'gear_${widget.cameraId}',
-          imageFile: File(xFile.path),
-        );
-        if (ok) newPaths.add(xFile.path);
+      final files = _pendingAdds.map((x) => File(x.path)).toList();
+      final updated = await ref.read(gearServiceProvider).uploadGearImages(token, widget.cameraId, files);
+      final raw = updated['image_urls'];
+      final fromServer = raw is List ? raw.map((e) => e.toString()).toList() : <String>[];
+      if (!mounted) return;
+      widget.onSave(fromServer);
+      ref.invalidate(userGearProvider);
+    } catch (e, st) {
+      debugPrint('[GearImagesEditSheet] upload failed: $e\n$st');
+      if (mounted) {
+        ref.read(notificationProvider.notifier).show(
+              'UPLOAD FAILED. CHECK CONNECTION OR STORAGE.',
+              type: NotificationType.error,
+            );
       }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
     }
-    
-    setState(() => _isUploading = false);
-    if (!mounted) return;
-    widget.onSave([..._urls, ...newPaths]);
   }
 
   @override

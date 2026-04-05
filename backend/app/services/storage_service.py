@@ -74,6 +74,54 @@ class StorageService:
 
         return full_key
 
+    def upload_gear_image(
+        self,
+        user_id: str,
+        user_camera_id: str,
+        image_id: str,
+        file_content: bytes,
+        content_type: str = "image/jpeg",
+    ) -> str:
+        """
+        Upload a user gear photo to S3/R2.
+        Key format: users/{uid}/gear/{user_camera_id}/{image_id}.jpg
+        """
+        if self._s3 is None:
+            raise RuntimeError("S3/R2 is not configured. Set S3_ENDPOINT and credentials in .env for uploads.")
+
+        base_key = f"users/{user_id}/gear/{user_camera_id}/{image_id}"
+        full_key = f"{base_key}.jpg"
+        thumb_key = f"{base_key}_thumb.jpg"
+
+        self._s3.put_object(
+            Bucket=self.bucket_name,
+            Key=full_key,
+            Body=file_content,
+            ContentType=content_type,
+        )
+
+        try:
+            from PIL import Image as PILImage  # type: ignore
+
+            img = PILImage.open(io.BytesIO(file_content))
+            img = img.convert("RGB")
+            img.thumbnail((800, 800))
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=80)
+            buf.seek(0)
+            self._s3.put_object(
+                Bucket=self.bucket_name,
+                Key=thumb_key,
+                Body=buf.getvalue(),
+                ContentType="image/jpeg",
+            )
+        except ModuleNotFoundError:
+            pass
+        except Exception:
+            pass
+
+        return full_key
+
     def replace_roll_image_at_key(self, storage_key: str, file_content: bytes, content_type: str = "image/jpeg") -> str:
         """
         Overwrite an existing roll image at the same S3/R2 key and regenerate its thumbnail.

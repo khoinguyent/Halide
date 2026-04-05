@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../config/app_config.dart';
 
 class GearService {
@@ -51,6 +54,34 @@ class GearService {
     } else {
       throw Exception('Failed to add lens: ${response.body}');
     }
+  }
+
+  /// POST multipart `files` — uploads to R2 and returns updated camera JSON with **https** `image_urls`.
+  Future<Map<String, dynamic>> uploadGearImages(
+    String token,
+    String userCameraId,
+    List<File> imageFiles,
+  ) async {
+    final uri = Uri.parse('${AppConfig.apiUrl}/user_cameras/$userCameraId/images');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $token';
+    for (final f in imageFiles) {
+      final name = f.path.split(RegExp(r'[\\/]')).last;
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'files',
+          f.path,
+          filename: name.isEmpty ? 'photo.jpg' : name,
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+    }
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Gear image upload failed: ${response.statusCode} ${response.body}');
   }
 
   /// Update user camera (e.g. image_urls, primary_image_index, gear_nickname).

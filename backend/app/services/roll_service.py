@@ -23,6 +23,32 @@ def get_roll(db: Session, roll_id: str, user_id: str):
     return db.query(Roll).filter(Roll.id == roll_id, Roll.user_id == user_id).first()
 
 
+def public_http_url_for_storage_key(k: str) -> str:
+    """
+    Build a browser-fetchable URL for an object key (users/...) or return legacy full URLs / paths as-is.
+    Used for gear uploads and anywhere we store R2 keys and need to expose HTTPS URLs to clients.
+    """
+    if not isinstance(k, str) or not k.strip():
+        return k
+    base_url = (settings.S3_ENDPOINT or "").rstrip("/")
+    bucket = (settings.S3_BUCKET_NAME or "").strip()
+
+    if getattr(settings, "R2_PUBLIC_BASE_URL", None):
+        url_base = settings.R2_PUBLIC_BASE_URL.rstrip("/")
+    else:
+        if bucket and base_url.endswith("/" + bucket):
+            url_base = base_url.rstrip("/")
+        else:
+            url_base = (f"{base_url}/{bucket}").rstrip("/") if bucket else base_url.rstrip("/")
+
+    users_key = _halide_users_key_from_image_url_field(k)
+    if users_key:
+        return f"{url_base}/{users_key}".rstrip("/")
+    if k.startswith("/") or k.startswith("http://") or k.startswith("https://"):
+        return k.split("?", 1)[0]
+    return k
+
+
 def _halide_users_key_from_image_url_field(raw: Optional[str]) -> Optional[str]:
     """
     DB may store either an object key (users/...) or a legacy full public URL.

@@ -35,6 +35,12 @@ class MeterView extends ConsumerStatefulWidget {
 class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserver {
   CameraController? _controller;
   bool _isCameraInitialized = false;
+  /// True while [CameraController.dispose] is running — blocks starting a new camera until done.
+  /// Without this, switching away from the meter tab nulled [_controller] before dispose finished,
+  /// so [_checkCameraVisibility] could start a second [_setupCamera] and leave the UI stuck loading.
+  bool _disposingCamera = false;
+  /// Prevents overlapping [_setupCamera] calls from rapid tab / lifecycle notifications.
+  bool _setupInProgress = false;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   Timer? _metadataTimer;
 
@@ -60,25 +66,44 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
     _checkCameraVisibility();
   }
 
+  /// While the **system camera permission sheet** (or similar) is up, iOS often reports
+  /// [AppLifecycleState.inactive], not [AppLifecycleState.resumed]. Treating only `resumed` as
+  /// foreground used to set `shouldRun == false`, dispose the camera mid-`initialize()`, and leave
+  /// the meter stuck on "Starting camera…" after the user tapped Allow.
+  bool _lifecycleAllowsCamera() {
+    switch (_lifecycleState) {
+      case AppLifecycleState.resumed:
+      case AppLifecycleState.inactive:
+        return true;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        return false;
+    }
+  }
+
   void _checkCameraVisibility() {
     if (!mounted) return;
 
-    // Prefer the shell’s index — [homeTabIndexProvider] can desync (e.g. first frame), which
-    // left the camera off and produced a blank meter tab for free users.
+    // Prefer live shell index (authoritative). [homeTabIndexProvider] is kept in sync from
+    // [_ShellArchiveRefresh] but can lag a frame; shell.maybeOf is null in some subtree cases.
     final shell = StatefulNavigationShell.maybeOf(context);
     final isTabActive = shell != null
         ? shell.currentIndex == 2
         : ref.read(homeTabIndexProvider) == 2;
-    final isAppResumed = _lifecycleState == AppLifecycleState.resumed;
 
-    final shouldRun = isTabActive && isAppResumed;
-    
-    if (shouldRun && !_isCameraInitialized && _controller == null) {
-      debugPrint('[MeterView] Starting camera - Tab Active & App Resumed');
+    final shouldRun = isTabActive && _lifecycleAllowsCamera();
+
+    if (shouldRun &&
+        !_isCameraInitialized &&
+        _controller == null &&
+        !_disposingCamera &&
+        !_setupInProgress) {
+      debugPrint('[MeterView] Starting camera (tab active, lifecycle=$_lifecycleState)');
       _setupCamera();
-    } else if (!shouldRun && _controller != null) {
-      debugPrint('[MeterView] Stopping camera - Visibility lost');
-      _disposeCamera();
+    } else if (!shouldRun && (_controller != null || _setupInProgress)) {
+      debugPrint('[MeterView] Stopping camera (tab=$isTabActive lifecycle=$_lifecycleState)');
+      unawaited(_disposeCamera());
     }
   }
 
@@ -86,34 +111,70 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
     _metadataTimer?.cancel();
     _metadataTimer = null;
     final controller = _controller;
+    if (controller == null && !_setupInProgress) return;
+
+    _disposingCamera = true;
     _controller = null;
     if (mounted) setState(() => _isCameraInitialized = false);
-    if (controller != null) await controller.dispose();
+
+    if (controller != null) {
+      try {
+        if (controller.value.isInitialized) {
+          await controller.pausePreview();
+        }
+      } catch (_) {}
+      try {
+        await controller.dispose();
+      } catch (e) {
+        debugPrint('[MeterView] dispose camera: $e');
+      }
+    }
+
+    _disposingCamera = false;
+    _setupInProgress = false;
+    if (mounted) _checkCameraVisibility();
   }
 
   static const _metadataChannel = MethodChannel('com.halide/camera_metadata');
 
   Future<void> _setupCamera() async {
-    final cameras = await availableCameras();
-    if (cameras.isEmpty) return;
+    if (_disposingCamera || _setupInProgress) return;
+    _setupInProgress = true;
 
-    _controller = CameraController(
+    final cameras = await availableCameras();
+    if (!mounted) {
+      _setupInProgress = false;
+      return;
+    }
+    if (cameras.isEmpty) {
+      _setupInProgress = false;
+      return;
+    }
+    if (_disposingCamera) {
+      _setupInProgress = false;
+      return;
+    }
+
+    final c = CameraController(
       cameras[0],
       ResolutionPreset.medium,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.bgra8888,
     );
+    _controller = c;
 
     try {
-      await _controller!.initialize();
+      await c.initialize();
+      // [inactive] during permission / disposed mid-flight — do not finish or setState.
+      if (!mounted || _controller != c) return;
 
       // Bind iOS native metadata to the **same** AVCaptureDevice as the Flutter preview.
       // Without this, DiscoverySession returns a different device → ISO/shutter often 0 → EV 0 → wrong 8s.
       try {
         await _metadataChannel.invokeMethod('setActiveCaptureDevice', {
-          'deviceId': _controller!.description.name,
+          'deviceId': c.description.name,
         });
-        MeterDebugLog.log('setActiveCaptureDevice: ${_controller!.description.name}');
+        MeterDebugLog.log('setActiveCaptureDevice: ${c.description.name}');
       } catch (e) {
         MeterDebugLog.log('setActiveCaptureDevice failed: $e');
       }
@@ -125,16 +186,17 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         MeterDebugLog.log('setupMeteringPoint: $e');
       }
       try {
-        await _controller!.setExposureMode(ExposureMode.auto);
-        await _controller!.setExposurePoint(const Offset(0.5, 0.5));
+        await c.setExposureMode(ExposureMode.auto);
+        await c.setExposurePoint(const Offset(0.5, 0.5));
       } catch (_) {}
 
       // iOS: first launch after granting permission sometimes leaves preview paused until resumed.
       try {
-        await _controller!.resumePreview();
+        await c.resumePreview();
       } catch (_) {}
 
-      if (mounted) setState(() => _isCameraInitialized = true);
+      if (!mounted || _controller != c) return;
+      setState(() => _isCameraInitialized = true);
 
       // Wait for CameraPreview to mount, then resume again — avoids black preview + stuck "Starting camera…"
       // when the meter intro coach runs on first open.
@@ -152,6 +214,21 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
       _startMetadataPolling();
     } catch (e) {
       debugPrint('[MeterView] Camera initialization error: $e');
+      if (_controller == c) {
+        _controller = null;
+        try {
+          await c.dispose();
+        } catch (_) {}
+        if (mounted) setState(() => _isCameraInitialized = false);
+      }
+    } finally {
+      _setupInProgress = false;
+      if (mounted &&
+          _controller == null &&
+          !_isCameraInitialized &&
+          !_disposingCamera) {
+        _checkCameraVisibility();
+      }
     }
   }
 
@@ -551,7 +628,8 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
-    // Watch tab index to trigger camera start/stop
+    // Rebuild when the selected tab changes, and re-run visibility (shell sync / go() paths).
+    ref.watch(homeTabIndexProvider);
     ref.listen<int>(homeTabIndexProvider, (previous, next) {
       _checkCameraVisibility();
     });

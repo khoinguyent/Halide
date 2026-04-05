@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -27,6 +28,43 @@ class _PendingCloudRotation {
   final String imageId;
 
   _PendingCloudRotation({required this.localPath, required this.imageId});
+}
+
+/// Runs after the viewer pops — do not use [WidgetRef] here; use [container] only.
+Future<void> _uploadPendingRotationsInBackground(
+  ProviderContainer container,
+  String rollId,
+  Map<int, _PendingCloudRotation> pending,
+) async {
+  if (pending.isEmpty) return;
+  final edit = RollImageEditService();
+  var failures = 0;
+  for (final e in pending.entries) {
+    final p = e.value;
+    try {
+      final ok = await edit.replaceCloudImage(
+        rollId: rollId,
+        imageId: p.imageId,
+        jpegFile: File(p.localPath),
+      );
+      if (!ok) failures++;
+    } catch (e, st) {
+      debugPrint('[FullScreenViewer] background cloud replace: $e\n$st');
+      failures++;
+    }
+  }
+  try {
+    container.invalidate(rollDetailProvider(rollId));
+  } catch (_) {}
+  if (failures > 0) {
+    try {
+      container.read(notificationProvider.notifier).show(
+            'WE COULDN\'T UPLOAD YOUR ROTATED PHOTOS TO THE CLOUD. '
+            'THEY\'RE STILL SAVED ON THIS PHONE — OPEN THE ROLL AND TRY AGAIN.',
+            type: NotificationType.error,
+          );
+    } catch (_) {}
+  }
 }
 
 class FullScreenViewer extends ConsumerStatefulWidget {
@@ -97,34 +135,23 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
     return id;
   }
 
-  Future<void> _flushPendingToCloud() async {
-    if (_pendingProCloud.isEmpty) return;
-    final plan = ref.read(userPlanProvider);
-    if (plan != UserPlan.pro) {
-      _pendingProCloud.clear();
-      return;
-    }
-
-    for (final e in _pendingProCloud.entries) {
-      final p = e.value;
-      await _editService.replaceCloudImage(
-        rollId: widget.rollId,
-        imageId: p.imageId,
-        jpegFile: File(p.localPath),
-      );
-    }
+  /// Pops immediately; Pro rotation uploads to R2 run in the background. Errors-only toast.
+  void _popWithAsyncCloudFlush([Object? result]) {
+    final container = ProviderScope.containerOf(context);
+    final rollId = widget.rollId;
+    final pending = ref.read(userPlanProvider) == UserPlan.pro && _pendingProCloud.isNotEmpty
+        ? Map<int, _PendingCloudRotation>.from(_pendingProCloud)
+        : <int, _PendingCloudRotation>{};
     _pendingProCloud.clear();
 
-    if (!mounted) return;
-    ref.invalidate(rollDetailProvider(widget.rollId));
-  }
+    Navigator.of(context).pop(result);
 
-  Future<void> _exitViewer() async {
-    await _flushPendingToCloud();
-    if (mounted) {
-      Navigator.of(context).pop();
+    if (pending.isNotEmpty) {
+      unawaited(_uploadPendingRotationsInBackground(container, rollId, pending));
     }
   }
+
+  void _exitViewer() => _popWithAsyncCloudFlush();
 
   Future<String?> _resolvedLocalFilePathForCurrent() async {
     final url = widget.imageUrls[_currentIndex];
@@ -350,12 +377,9 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
 
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) async {
+      onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
-        await _flushPendingToCloud();
-        if (context.mounted) {
-          Navigator.of(context).pop(result);
-        }
+        _popWithAsyncCloudFlush(result);
       },
       child: Scaffold(
         backgroundColor: Colors.black,

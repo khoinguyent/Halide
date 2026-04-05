@@ -1,9 +1,11 @@
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-// Note: Ideally there would be a GearUploadService, using generic for now
-import '../services/upload_service.dart';
+
+import '../providers/auth_provider.dart';
 import '../providers/gear_provider.dart';
 import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
@@ -31,7 +33,6 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
   final List<XFile> _selectedImages = [];
   final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
-  int _uploadedCount = 0;
 
   Future<void> _pickImages() async {
     final remainingSlots = widget.maxImages - (widget.currentImageCount + _selectedImages.length);
@@ -70,43 +71,45 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
   Future<void> _uploadImages() async {
     if (_selectedImages.isEmpty) return;
 
-    setState(() {
-      _isUploading = true;
-      _uploadedCount = 0;
-    });
+    setState(() => _isUploading = true);
 
-    final service = UploadService();
-    final List<String> succeededPaths = [];
-
-    for (final xFile in List.from(_selectedImages)) {
-      final file = File(xFile.path);
-      // Re-using uploadRollImage for MVP, in a real app this would be a gear specific endpoint
-      final success = await service.uploadRollImage(
-        rollId: 'gear_${widget.cameraId}',
-        imageFile: file,
-      );
-      if (success) {
-        succeededPaths.add(xFile.path); // use local path as stand-in for URL
-        setState(() => _uploadedCount++);
+    final user = ref.read(authServiceProvider).currentUser;
+    final token = await user?.getIdToken();
+    if (token == null) {
+      if (mounted) {
+        setState(() => _isUploading = false);
+        ref.read(notificationProvider.notifier).show(
+              'SIGN IN TO UPLOAD GEAR PHOTOS.',
+              type: NotificationType.error,
+            );
       }
+      return;
     }
 
-    // Update the Gear's state with the new image URLs
-    if (succeededPaths.isNotEmpty) {
-      ref.read(userGearProvider.notifier).addCameraImages(widget.cameraId, succeededPaths);
-    }
-
-    setState(() {
-      _isUploading = false;
-      _selectedImages.clear();
-      _uploadedCount = 0;
-    });
-
-    if (mounted) {
+    final files = _selectedImages.map((x) => File(x.path)).toList();
+    try {
+      await ref.read(gearServiceProvider).uploadGearImages(token, widget.cameraId, files);
+      if (!mounted) return;
+      ref.invalidate(userGearProvider);
       ref.read(notificationProvider.notifier).show(
-        'SUCCESSFULLY UPLOADED ${succeededPaths.length} IMAGE(S)!',
-        type: NotificationType.success,
-      );
+            'SUCCESSFULLY UPLOADED ${files.length} IMAGE(S)!',
+            type: NotificationType.success,
+          );
+    } catch (e, st) {
+      debugPrint('[GearImageUploader] upload failed: $e\n$st');
+      if (mounted) {
+        ref.read(notificationProvider.notifier).show(
+              'UPLOAD FAILED. CHECK CONNECTION OR STORAGE.',
+              type: NotificationType.error,
+            );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+          _selectedImages.clear();
+        });
+      }
     }
   }
 
@@ -201,13 +204,12 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
           const SizedBox(height: 12),
           if (_isUploading) ...[
             LinearProgressIndicator(
-              value: total > 0 ? _uploadedCount / total : null,
               borderRadius: BorderRadius.circular(4),
               backgroundColor: widget.darkMode ? Colors.white.withOpacity(0.2) : null,
               valueColor: widget.darkMode ? const AlwaysStoppedAnimation<Color>(Colors.white) : null,
             ),
             const SizedBox(height: 8),
-            Text('Uploading $_uploadedCount / $total...', style: TextStyle(color: fgMuted, fontSize: 13)),
+            Text('Uploading…', style: TextStyle(color: fgMuted, fontSize: 13)),
             const SizedBox(height: 12),
           ],
           Row(
