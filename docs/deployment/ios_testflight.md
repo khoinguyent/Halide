@@ -60,6 +60,8 @@ If your exported IPA has a different name, use `ls build/ios/ipa/`.
 
 | Build | Version | Date | Delivery UUID |
 |-------|---------|------|---------------|
+| 48 | 1.0.0+48 | 2026-04-06 | 683ecfe0-5857-4628-8b70-74192462368c |
+| 47 | 1.0.0+47 | 2026-04-05 | d8164b6c-5619-4aac-a06a-a2992045a2da |
 | 41 | 1.0.0+41 | 2026-04-05 | f37b24c3-3bde-48b3-9095-aca82a7cdccd |
 | 40 | 1.0.0+40 | 2026-04-05 | c20fe1f5-b3de-4fed-9b29-9fdf3d4715e4 |
 | 39 | 1.0.0+39 | 2026-04-05 | 6493e6cc-1c5b-47cd-be35-90603bfea0a6 |

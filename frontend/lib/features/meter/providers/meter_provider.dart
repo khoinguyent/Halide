@@ -209,3 +209,4 @@ class MeterNotifier extends Notifier<MeterState> {
 }
 
 final meterProvider = NotifierProvider<MeterNotifier, MeterState>(MeterNotifier.new);
+ 

@@ -1150,7 +1150,31 @@ class _MeterShootingRollTile extends StatelessWidget {
   }
 }
 
-/// Edge-to-edge preview. [Center] + [AspectRatio] letterboxes on portrait screens; this crops like a camera app.
+/// Same aspect math as [CameraPreview]: portrait uses [1 / aspectRatio] so the preview
+/// is not squeezed when we size the [FittedBox] child (raw sensor AR was stretching the image).
+DeviceOrientation _meterApplicableOrientation(CameraController c) {
+  final v = c.value;
+  if (v.isRecordingVideo) {
+    return v.recordingOrientation!;
+  }
+  return v.previewPauseOrientation ??
+      v.lockedCaptureOrientation ??
+      v.deviceOrientation;
+}
+
+bool _meterPreviewIsLandscape(CameraController c) {
+  final o = _meterApplicableOrientation(c);
+  return o == DeviceOrientation.landscapeLeft || o == DeviceOrientation.landscapeRight;
+}
+
+double _meterDisplayAspectRatio(CameraController c) {
+  final ar = c.value.aspectRatio;
+  if (ar <= 0 || !ar.isFinite) return 3 / 4;
+  return _meterPreviewIsLandscape(c) ? ar : 1.0 / ar;
+}
+
+/// Edge-to-edge preview: [FittedBox] + [BoxFit.cover] crops like the system camera; sizing
+/// matches [CameraPreview]'s internal portrait/landscape aspect ratio.
 class _MeterFullBleedPreview extends StatelessWidget {
   final CameraController controller;
 
@@ -1160,14 +1184,9 @@ class _MeterFullBleedPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final ar = controller.value.aspectRatio;
-        if (ar <= 0 || !ar.isFinite) {
-          return Center(
-            child: AspectRatio(
-              aspectRatio: 4 / 3,
-              child: CameraPreview(controller),
-            ),
-          );
+        final displayAr = _meterDisplayAspectRatio(controller);
+        if (displayAr <= 0 || !displayAr.isFinite) {
+          return Center(child: CameraPreview(controller));
         }
         return ClipRect(
           child: FittedBox(
@@ -1175,7 +1194,7 @@ class _MeterFullBleedPreview extends StatelessWidget {
             alignment: Alignment.center,
             child: SizedBox(
               width: constraints.maxWidth,
-              height: constraints.maxWidth / ar,
+              height: constraints.maxWidth / displayAr,
               child: CameraPreview(controller),
             ),
           ),

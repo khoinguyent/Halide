@@ -509,7 +509,21 @@ class _HomeViewState extends ConsumerState<HomeView> {
           _enqueueGuidance(rolls, filtered);
 
           if (filtered.isEmpty) {
-            return _buildEmptyOrNoMatch(rolls.isEmpty || _statusFilter == null);
+            final emptyBody = _buildEmptyOrNoMatch(rolls.isEmpty || _statusFilter == null);
+            // Keep status filter chips visible when rolls exist but none match the filter.
+            if (rolls.isNotEmpty) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: _buildStatusFilter(),
+                  ),
+                  Expanded(child: emptyBody),
+                ],
+              );
+            }
+            return emptyBody;
           }
           return RefreshIndicator(
             onRefresh: () async => ref.refresh(dashboardRollsProvider),
