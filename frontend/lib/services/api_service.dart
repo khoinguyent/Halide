@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -29,6 +31,20 @@ class ApiService {
 
   Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
     return _dio.get(path, queryParameters: queryParameters);
+  }
+
+  /// Binary body (e.g. Google Drive file bytes for free-tier on-device import).
+  Future<Uint8List> getBytes(String path) async {
+    final r = await _dio.get<List<int>>(
+      path,
+      options: Options(
+        responseType: ResponseType.bytes,
+        receiveTimeout: const Duration(seconds: 180),
+      ),
+    );
+    final list = r.data;
+    if (list == null) return Uint8List(0);
+    return Uint8List.fromList(list);
   }
 
   Future<Response> post(String path, {dynamic data}) async {

@@ -1,91 +1,94 @@
 import 'package:flutter/material.dart';
-import '../../core/widgets/halide_scaffold.dart';
-import '../../core/widgets/glass_panel.dart';
+
+import 'legal_document_view.dart';
 
 class TermsConditionsView extends StatelessWidget {
   const TermsConditionsView({super.key});
 
+  static const _lastUpdated = 'April 6, 2026';
+
+  static final List<({String title, String body})> _sections = [
+    (
+      title: '1. Agreement',
+      body:
+          'These Terms of Service (“Terms”) govern your access to and use of the Halide mobile application and related services (collectively, the “Service”). By creating an account or using the Service, you agree to these Terms. If you do not agree, do not use the Service.\n\n'
+          'We may update these Terms from time to time. We will indicate the “Last updated” date at the bottom of this screen. Continued use after changes constitutes acceptance of the revised Terms, except where applicable law requires additional consent.',
+    ),
+    (
+      title: '2. The Service',
+      body:
+          'Halide helps you manage analog film photography workflows, including gear and roll tracking, exposure-related tools, optional cloud sync of your content, and integrations you enable (such as linked cloud storage). Features may differ by platform or subscription tier.\n\n'
+          'We may add, change, or discontinue features with reasonable notice where practicable. The Service is provided for personal, non-commercial use unless we agree otherwise in writing.',
+    ),
+    (
+      title: '3. Accounts & eligibility',
+      body:
+          'You must provide accurate registration information and keep your credentials secure. You are responsible for activity under your account. You must be old enough to enter a binding contract where you live (and at least the age required by your app store). Notify us promptly if you suspect unauthorized access.',
+    ),
+    (
+      title: '4. Acceptable use',
+      body:
+          'You agree not to misuse the Service. Without limitation, you must not: violate law or third-party rights; attempt to probe, scan, or test vulnerabilities; interfere with or overload the Service; use automated means to scrape or bulk-collect data without permission; reverse engineer except as allowed by law; upload malware; impersonate others; or use the Service to harass or harm others.\n\n'
+          'We may suspend or terminate access for violations or risk to the Service or other users.',
+    ),
+    (
+      title: '5. Your content',
+      body:
+          'You retain ownership of content you submit (for example roll metadata, images, and notes). To operate the Service, you grant Halide a worldwide, non-exclusive license to host, process, transmit, display, and back up your content solely to provide and improve the Service for you, including security and abuse prevention.\n\n'
+          'You represent that you have the rights needed to upload your content and that it does not infringe others’ rights. Exposure and metering tools are informational; you remain responsible for creative and technical decisions in the field.',
+    ),
+    (
+      title: '6. Subscriptions & purchases',
+      body:
+          'Paid features may be offered through in-app purchases processed by Apple App Store, Google Play, or other platforms. Pricing, renewal, cancellation, and refunds are governed by the applicable store’s policies and your payment provider. Subscription status may be validated through our billing partner (for example RevenueCat).\n\n'
+          'If a payment fails or a subscription ends, access to paid features may change in line with your account status.',
+    ),
+    (
+      title: '7. Third-party services',
+      body:
+          'The Service may rely on or link to third parties (including authentication, analytics, cloud infrastructure, storage providers, and optional integrations such as Google Drive). Their use is subject to their respective terms and privacy policies. We are not responsible for third-party services we do not control.',
+    ),
+    (
+      title: '8. Disclaimers',
+      body:
+          'THE SERVICE IS PROVIDED “AS IS” AND “AS AVAILABLE” WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT, TO THE MAXIMUM EXTENT PERMITTED BY LAW.\n\n'
+          'We do not guarantee uninterrupted or error-free operation. Tools that rely on device sensors or estimates (such as light metering) are approximate and depend on conditions and hardware; they are not a substitute for professional judgment or dedicated hardware where required.',
+    ),
+    (
+      title: '9. Limitation of liability',
+      body:
+          'TO THE MAXIMUM EXTENT PERMITTED BY LAW, HALIDE AND ITS AFFILIATES, DIRECTORS, EMPLOYEES, AND SUPPLIERS WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, DATA, OR GOODWILL, ARISING OUT OF OR RELATED TO THE SERVICE OR THESE TERMS.\n\n'
+          'OUR TOTAL LIABILITY FOR ANY CLAIM ARISING OUT OF THE SERVICE OR THESE TERMS IS LIMITED TO THE GREATER OF (A) THE AMOUNTS YOU PAID US FOR THE SERVICE IN THE TWELVE (12) MONTHS BEFORE THE CLAIM OR (B) FIFTY U.S. DOLLARS (US\$50), EXCEPT WHERE PROHIBITED BY LAW.',
+    ),
+    (
+      title: '10. Indemnity',
+      body:
+          'You will defend and indemnify Halide and its affiliates against third-party claims and costs (including reasonable attorneys’ fees) arising from your content, your use of the Service, or your violation of these Terms or applicable law, except to the extent caused by our willful misconduct.',
+    ),
+    (
+      title: '11. Termination',
+      body:
+          'You may stop using the Service at any time. We may suspend or terminate access if you breach these Terms, if we must comply with law, or to protect the Service or users. Provisions that by their nature should survive (including ownership, disclaimers, limitations, and indemnity) will survive termination.',
+    ),
+    (
+      title: '12. Governing law & disputes',
+      body:
+          'Unless mandatory local law requires otherwise, these Terms are governed by the laws applicable in your primary place of residence’s jurisdiction for consumer contracts, without regard to conflict-of-law rules. Courts in that jurisdiction may have exclusive jurisdiction over disputes, unless you have mandatory rights elsewhere.',
+    ),
+    (
+      title: '13. Contact',
+      body:
+          'Questions about these Terms: use the contact or support channel provided in the app or on our website, if listed.',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return HalideScaffold(
-      appBar: AppBar(
-        title: const Text(
-          'TERMS & CONDITIONS',
-          style: TextStyle(
-            letterSpacing: 2,
-            fontWeight: FontWeight.w300,
-            fontSize: 20,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: GlassPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-               Text(
-                'TERMS OF SERVICE',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'By accessing or using the Halide application, you agree to be bound by these Terms of Service. If you disagree with any part of the terms, you may not access the service.',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 16,
-                  height: 1.6,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '1. Use of Service',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Our service is provided "as is" and is intended for personal use to track film photography assets. Any misuse or automated scraping of the service is strictly prohibited.',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 15,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '2. User Content',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'You retain all rights to any images or data you upload to the service. By bringing content to our service, you grant us the license to use, store, and display that content solely for the purpose of providing the service to you.',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 15,
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return LegalDocumentView(
+      appBarTitle: 'TERMS & CONDITIONS',
+      documentLabel: 'TERMS OF SERVICE',
+      sections: _sections,
+      lastUpdated: _lastUpdated,
     );
   }
 }

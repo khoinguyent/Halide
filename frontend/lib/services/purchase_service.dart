@@ -2,23 +2,29 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../config/app_config.dart';
+import '../config/env_loader.dart';
 
 class PurchaseService {
   static final PurchaseService _instance = PurchaseService._internal();
   factory PurchaseService() => _instance;
   PurchaseService._internal();
 
-  // RevenueCat Keys - Best passed via --dart-define during build
-  // TestFlight/Prod: Use the Public SDK Key (appl_...)
-  static const _apiKeyApple = String.fromEnvironment(
-    'REVENUE_CAT_APPLE_KEY', 
-    defaultValue: 'test_wyzkattJBBUIIymeWTHhZNZUwke',
-  );
-  
-  static const _apiKeyGoogle = String.fromEnvironment(
-    'REVENUE_CAT_GOOGLE_KEY',
-    defaultValue: 'test_wyzkattJBBUIIymeWTHhZNZUwke',
-  );
+  // RevenueCat: `frontend/.env` first, then --dart-define; last resort test key.
+  static String get _apiKeyApple => halideEnvString(
+        'REVENUE_CAT_APPLE_KEY',
+        fromDefine: const String.fromEnvironment(
+          'REVENUE_CAT_APPLE_KEY',
+          defaultValue: 'test_wyzkattJBBUIIymeWTHhZNZUwke',
+        ),
+      );
+
+  static String get _apiKeyGoogle => halideEnvString(
+        'REVENUE_CAT_GOOGLE_KEY',
+        fromDefine: const String.fromEnvironment(
+          'REVENUE_CAT_GOOGLE_KEY',
+          defaultValue: 'test_wyzkattJBBUIIymeWTHhZNZUwke',
+        ),
+      );
 
   Future<void> init() async {
     await Purchases.setLogLevel(kDebugMode ? LogLevel.debug : LogLevel.error);
@@ -27,7 +33,7 @@ class PurchaseService {
     if (Platform.isAndroid) {
       if (_apiKeyGoogle.startsWith('test_')) {
         debugPrint('[PurchaseService] WARNING: Using TEST key for Android');
-      }
+            }
       configuration = PurchasesConfiguration(_apiKeyGoogle);
     } else if (Platform.isIOS) {
       if (_apiKeyApple.startsWith('test_')) {

@@ -23,12 +23,17 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: Optional[str] = None
 
     # Cloud Storage (R2/S3)
+    # S3 API origin only, e.g. https://<account_id>.r2.cloudflarestorage.com — do NOT append /bucket here;
+    # use S3_BUCKET_NAME separately (appending /halide here duplicates the bucket in presigned URLs).
     S3_ENDPOINT: str
-    # If set, image URLs will be generated using this public (no-auth) R2 dev URL.
-    # Example: https://pub-xxxxxxxxxxxx.r2.dev
-    # When present, we will NOT append the bucket name again; we will just
-    # append the stored object key.
+    # If set, Plus/Pro gallery URLs use this public origin + object key (users/.../file.jpg).
+    # Some setups need a path prefix equal to the bucket name, e.g.
+    #   https://pub-xxx.r2.dev/halide/users/...
+    # Either set R2_PUBLIC_BASE_URL=https://pub-xxx.r2.dev/halide  OR
+    # set R2_PUBLIC_BASE_URL=https://pub-xxx.r2.dev and R2_PUBLIC_APPEND_BUCKET_PATH=true.
+    # Do not use both /halide in the URL and the flag, or you get /halide/halide/...
     R2_PUBLIC_BASE_URL: Optional[str] = None
+    R2_PUBLIC_APPEND_BUCKET_PATH: bool = False
     S3_ACCESS_KEY: str
     S3_SECRET_KEY: str
     S3_BUCKET_NAME: str

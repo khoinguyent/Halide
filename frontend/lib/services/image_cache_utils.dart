@@ -28,9 +28,18 @@ Future<bool> isPlausibleImageCacheFile(File file) async {
   }
 }
 
+/// True for time-limited S3/R2 GET URLs; [_thumb.jpg] substitution would break the signature.
+bool isLikelyS3PresignedUrl(String url) {
+  final lower = url.toLowerCase();
+  return lower.contains('x-amz-credential=') ||
+      lower.contains('x-amz-signature=') ||
+      lower.contains('x-amz-algorithm=');
+}
+
 /// Maps a full-resolution object URL to the companion thumbnail URL (R2 convention).
 String thumbUrlForFullImageUrl(String fullUrl) {
   if (!fullUrl.startsWith('http')) return fullUrl;
+  if (isLikelyS3PresignedUrl(fullUrl)) return fullUrl;
   final lower = fullUrl.toLowerCase();
   if (lower.endsWith('.jpg')) {
     return fullUrl.replaceFirst(RegExp(r'\.jpg$', caseSensitive: false), '_thumb.jpg');

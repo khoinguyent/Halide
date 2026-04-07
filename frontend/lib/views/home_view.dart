@@ -242,7 +242,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     if (roll == null) return;
 
     final hasUrl = _hasSavedDriveUrl(roll);
-    final slotVisible = rollShowsLinkSyncControl(roll);
+    final slotVisible = rollShowsLinkSyncControl(roll, ref);
 
     if (!slotVisible || !hasUrl) {
       ref.read(syncGuidanceRollIdProvider.notifier).setPending(null);
@@ -381,7 +381,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     if (!seenDrive) {
       Roll? linkRowRoll;
       for (final r in visibleRolls) {
-        if (rollShowsLinkSyncControl(r)) {
+        if (rollShowsLinkSyncControl(r, ref)) {
           linkRowRoll = r;
           break;
         }

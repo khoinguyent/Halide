@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'api_service.dart';
 import 'package:dio/dio.dart';
+import '../config/env_loader.dart';
 
 /// Handles connecting cloud storage providers (e.g. Google Drive) via OAuth
 /// and registering the connection with the backend.
@@ -11,7 +12,11 @@ class StorageConnectionService {
   final ApiService _api = ApiService();
 
   static String? get _googleDriveServerClientId {
-    const id = String.fromEnvironment('GOOGLE_DRIVE_SERVER_CLIENT_ID', defaultValue: '');
+    final id = halideEnvString(
+      'GOOGLE_DRIVE_SERVER_CLIENT_ID',
+      fromDefine:
+          const String.fromEnvironment('GOOGLE_DRIVE_SERVER_CLIENT_ID', defaultValue: ''),
+    );
     return id.isEmpty ? null : id;
   }
 
@@ -26,8 +31,8 @@ class StorageConnectionService {
       
       if (clientId == null || clientId.isEmpty) {
         throw StorageConnectionException(
-          'Missing GOOGLE_DRIVE_SERVER_CLIENT_ID environment variable. '
-          'Please check your --dart-define flag.'
+          'Missing GOOGLE_DRIVE_SERVER_CLIENT_ID. Add it to frontend/.env '
+          '(see .env.example) or pass --dart-define=GOOGLE_DRIVE_SERVER_CLIENT_ID=....',
         );
       }
 

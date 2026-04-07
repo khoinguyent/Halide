@@ -16,4 +16,6 @@
 - Do not put business logic into routers or GraphQL resolvers.
 - Always update `docs/specs/backend_api.md` when adding/changing endpoints.
 - Keep filenames and import paths consistent with `docs/specs/backend_structure.md`.
-- Run the server from `backend/` using: `uvicorn app.main:app --reload`
+- Run the server from `backend/` using **the project venv** so Google Drive deps resolve:
+  - `./run_dev.sh` or `.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+  - Avoid starting `uvicorn` with Xcode’s bundled Python (missing `google-auth-oauthlib` and mismatched env).

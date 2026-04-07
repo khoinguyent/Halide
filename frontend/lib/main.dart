@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'config/app_config.dart';
+import 'config/env_loader.dart';
 import 'firebase_options.dart';
 import 'router/app_router.dart';
 import 'services/purchase_service.dart';
@@ -12,6 +13,7 @@ import 'providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await loadHalideEnv();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

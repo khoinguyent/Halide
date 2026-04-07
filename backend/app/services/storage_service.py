@@ -1,3 +1,6 @@
+from typing import Optional
+from urllib.parse import urlparse, urlunparse
+
 import boto3
 from botocore.client import Config
 from ..core.config import settings
@@ -8,14 +11,31 @@ def _is_s3_configured() -> bool:
     url = (settings.S3_ENDPOINT or "").strip()
     return bool(url and "<" not in url and "your-" not in url.lower())
 
+
+def _s3_api_endpoint_for_boto(raw_endpoint: str) -> str:
+    """
+    R2/S3 API base must be origin only: https://<accountid>.r2.cloudflarestorage.com
+    If `.env` mistakenly appends /{bucket} to S3_ENDPOINT, boto3 path-style URLs become
+    .../bucket/bucket/key (duplicate bucket segment). Strip any path so Bucket= is the only bucket.
+    """
+    raw = (raw_endpoint or "").strip()
+    if not raw:
+        return raw
+    parsed = urlparse(raw)
+    if not parsed.scheme or not parsed.netloc:
+        return raw.rstrip("/")
+    return urlunparse((parsed.scheme, parsed.netloc, "", "", "", "")).rstrip("/")
+
+
 class StorageService:
     def __init__(self):
         self._s3 = None
         self.bucket_name = settings.S3_BUCKET_NAME
         if _is_s3_configured():
+            api_origin = _s3_api_endpoint_for_boto(settings.S3_ENDPOINT)
             self._s3 = boto3.client(
                 's3',
-                endpoint_url=settings.S3_ENDPOINT,
+                endpoint_url=api_origin,
                 aws_access_key_id=settings.S3_ACCESS_KEY,
                 aws_secret_access_key=settings.S3_SECRET_KEY,
                 config=Config(signature_version='s3v4'),
@@ -121,6 +141,22 @@ class StorageService:
             pass
 
         return full_key
+
+    def presigned_get_object_url(self, key: str, expires_in: int = 43200) -> Optional[str]:
+        """
+        Time-limited HTTPS URL on the S3-compatible API host (e.g. *.r2.cloudflarestorage.com).
+        Used only when R2_PUBLIC_BASE_URL is not set (private bucket). Not interchangeable with pub.r2.dev.
+        """
+        if self._s3 is None:
+            return None
+        try:
+            return self._s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket_name, "Key": key},
+                ExpiresIn=expires_in,
+            )
+        except Exception:
+            return None
 
     def replace_roll_image_at_key(self, storage_key: str, file_content: bytes, content_type: str = "image/jpeg") -> str:
         """

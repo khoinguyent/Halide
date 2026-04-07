@@ -14,6 +14,8 @@ import '../models/camera.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/roll_provider.dart';
+import '../services/public_drive_lab_import_service.dart';
+import '../services/authenticated_drive_folder_import_service.dart';
 import '../providers/rolls_provider.dart';
 import '../features/rolls/presentation/bloc/rolls_bloc.dart';
 import '../widgets/synced_image.dart';
@@ -118,14 +120,20 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
 
         final plan = ref.read(userPlanProvider);
         if (plan != UserPlan.free) {
-          final (pairedUrls, pairedIds, _) = RollGalleryPairs.triple(roll);
-          if (pairedUrls.isNotEmpty) {
-            LocalSyncService().syncRoll(
-              widget.rollId,
-              pairedUrls,
-              imageIds: pairedIds,
-            );
-          }
+          ref.read(rollGalleryPairsProvider(roll.id).future).then((triple) {
+            final httpUrls = <String>[];
+            final httpIds = <String>[];
+            for (var i = 0; i < triple.$1.length; i++) {
+              final u = triple.$1[i];
+              if (u.startsWith('http')) {
+                httpUrls.add(u);
+                httpIds.add(triple.$2[i]);
+              }
+            }
+            if (httpUrls.isNotEmpty) {
+              LocalSyncService().syncRoll(widget.rollId, httpUrls, imageIds: httpIds);
+            }
+          });
         }
 
         return _buildBody(context, roll);
@@ -134,6 +142,12 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
   }
 
   Widget _buildBody(BuildContext context, Roll roll) {
+    final galleryAsync = ref.watch(rollGalleryPairsProvider(roll.id));
+    final triple = switch (galleryAsync) {
+      AsyncData(:final value) => value,
+      _ => RollGalleryPairs.tripleServerOnly(roll),
+    };
+
     final isScanned = roll.status == RollStatus.scanned;
     final isArchived = roll.status == RollStatus.archived;
     final isShooting = roll.status == RollStatus.shooting;
@@ -171,7 +185,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
             onTabSelected: (index) {
               ref.read(rollTabStateProvider.notifier).setTab(widget.rollId, index);
             },
-            photoCount: roll.imageUrls.length,
+            photoCount: triple.$1.length,
             shotCount: roll.shots.length,
           ),
           Expanded(
@@ -182,12 +196,12 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
                 SingleChildScrollView(
                   key: const PageStorageKey('photos_tab'),
                   child: isScanned
-                      ? _buildScannedBody(context, roll)
+                      ? _buildScannedBody(context, roll, triple)
                       : isArchived
-                          ? _buildGalleryGrid(context, roll, shrinkWrap: true, offset: roll.shotOffset)
+                          ? _buildGalleryGrid(context, roll, triple, shrinkWrap: true, offset: roll.shotOffset)
                           : isShooting
                               ? _buildShootingMetaEditor(context, roll)
-                              : _buildLabImportBody(context, roll),
+                              : _buildLabImportBody(context, roll, triple),
                 ),
                 // Tab 1: Shot Log
                 SingleChildScrollView(
@@ -207,6 +221,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
                         shotOffset: offset,
                       );
                       ref.invalidate(rollDetailProvider(roll.id));
+                      ref.invalidate(rollGalleryPairsProvider(roll.id));
                       ref.invalidate(dashboardRollsProvider);
                     },
                   ),
@@ -219,14 +234,11 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     );
   }
 
-  Widget _buildScannedBody(BuildContext context, Roll roll) {
-    final hasDisplayableImages = roll.imageUrls
-        .where((u) => u.trim().isNotEmpty)
-        .where((u) => u.startsWith('http') || u.startsWith('/'))
-        .isNotEmpty;
+  Widget _buildScannedBody(BuildContext context, Roll roll, RollGalleryTriple triple) {
+    final hasDisplayableImages = triple.$1.isNotEmpty;
 
     if (hasDisplayableImages) {
-      return _buildGalleryGrid(context, roll, shrinkWrap: true, offset: roll.shotOffset);
+      return _buildGalleryGrid(context, roll, triple, shrinkWrap: true, offset: roll.shotOffset);
     }
 
     Future<void> _handleImagesAddition() async {
@@ -246,6 +258,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
         try {
           await rollService.addLocalImagesToRoll(token, widget.rollId, paths);
           ref.invalidate(rollDetailProvider(widget.rollId));
+          ref.invalidate(rollGalleryPairsProvider(widget.rollId));
           if (mounted) {
             ref.read(notificationProvider.notifier).show(
               'ADDED LOCAL IMAGE REFERENCES (FREE TIER).',
@@ -273,6 +286,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
         }
         if (successCount > 0) {
           ref.invalidate(rollDetailProvider(widget.rollId));
+          ref.invalidate(rollGalleryPairsProvider(widget.rollId));
           if (mounted) {
             ref.read(notificationProvider.notifier).show(
               'SUCCESSFULLY UPLOADED $successCount IMAGE(S)!',
@@ -291,6 +305,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
           child: _buildGalleryGrid(
             context,
             roll,
+            triple,
             shrinkWrap: true,
             emptyStateTopLeft: true,
             onEmptyStateTap: () => _handleImagesAddition(),
@@ -300,7 +315,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     );
   }
 
-  Widget _buildLabImportBody(BuildContext context, Roll roll) {
+  Widget _buildLabImportBody(BuildContext context, Roll roll, RollGalleryTriple triple) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -312,12 +327,13 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
               rollId: widget.rollId,
               onUploadComplete: () {
                 ref.refresh(rollDetailProvider(widget.rollId));
+                ref.invalidate(rollGalleryPairsProvider(widget.rollId));
                 ref.invalidate(dashboardRollsProvider);
               },
             ),
           ),
         ),
-        if (roll.imageUrls.isNotEmpty) ...[
+        if (triple.$1.isNotEmpty) ...[
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -332,7 +348,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
             ),
           ),
           const SizedBox(height: 12),
-          _buildGalleryGrid(context, roll, shrinkWrap: true, offset: roll.shotOffset),
+          _buildGalleryGrid(context, roll, triple, shrinkWrap: true, offset: roll.shotOffset),
         ],
       ],
     );
@@ -340,13 +356,14 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
 
   Widget _buildGalleryGrid(
     BuildContext context,
-    Roll roll, {
+    Roll roll,
+    RollGalleryTriple triple, {
     bool shrinkWrap = false,
     bool emptyStateTopLeft = false,
     VoidCallback? onEmptyStateTap,
     int offset = 0,
   }) {
-    final (pairedUrls, pairedIds, shotsAligned) = RollGalleryPairs.triple(roll);
+    final (pairedUrls, pairedIds, shotsAligned) = triple;
     final images = pairedUrls;
 
     if (images.isEmpty) {
@@ -967,6 +984,32 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
     super.dispose();
   }
 
+  Future<void> _markRollScannedIfPossible() async {
+    final user = ref.read(userProvider);
+    final token = await user?.getIdToken();
+    if (token == null) return;
+    try {
+      await ref.read(rollServiceProvider).updateRollStatus(token, widget.rollId, 'scanned');
+    } catch (e) {
+      debugPrint('[LabImport] could not set roll scanned: $e');
+    }
+  }
+
+  Future<void> _afterLocalLabImport(int count) async {
+    await _markRollScannedIfPossible();
+    ref.invalidate(rollDetailProvider(widget.rollId));
+    ref.invalidate(rollGalleryPairsProvider(widget.rollId));
+    ref.invalidate(rollHasLocalLabScansProvider(widget.rollId));
+    ref.invalidate(dashboardRollsProvider);
+    widget.onUploadComplete();
+    if (mounted) {
+      ref.read(notificationProvider.notifier).show(
+        'SAVED $count PHOTO(S) ON THIS DEVICE.',
+        type: NotificationType.success,
+      );
+    }
+  }
+
   Future<void> _fetchLeafFiles() async {
     final url = _driveUrlController.text.trim();
     if (url.isEmpty) {
@@ -980,11 +1023,44 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       return;
     }
 
+    dismissKeyboardGlobally();
+
+    // Public ZIP or single image file: save under app documents (no Google account).
+    if (!_isDriveFolderUrl(url)) {
+      setState(() {
+        _isFetching = true;
+        _error = null;
+        _leafFiles = const [];
+      });
+      try {
+        final count = await PublicDriveLabImportService.importPublicFileOrZipToLocal(
+          rollId: widget.rollId,
+          driveUrlOrId: url,
+        );
+        if (!mounted) return;
+        if (count > 0) {
+          await _afterLocalLabImport(count);
+          return;
+        }
+      } catch (e) {
+        debugPrint('[LabImport] local import failed, trying cloud sync: $e');
+        if (mounted) {
+          ref.read(notificationProvider.notifier).show(
+            'TRYING CLOUD SYNC…',
+            type: NotificationType.info,
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isFetching = false);
+        }
+      }
+    }
+
     final gdriveOk = await ensureGoogleDriveConnected(context, ref);
     if (!gdriveOk) {
       return;
     }
-    dismissKeyboardGlobally();
 
     setState(() {
       _isFetching = true;
@@ -992,7 +1068,32 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       _leafFiles = const [];
     });
 
-    // ZIP URLs cannot be pre-listed at leaf level reliably, so we directly sync.
+    if (_isDriveFolderUrl(url) && ref.read(userPlanProvider) == UserPlan.free) {
+      try {
+        final count = await AuthenticatedDriveFolderImportService.importFolder(
+          api: _api,
+          rollId: widget.rollId,
+          folderUrl: url,
+        );
+        if (!mounted) return;
+        await _afterLocalLabImport(count);
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _error = e.toString());
+        ref.read(notificationProvider.notifier).show(
+              'COULDN\'T IMPORT FOLDER ON DEVICE. CHECK DRIVE ACCESS.',
+              type: NotificationType.error,
+            );
+        return;
+      } finally {
+        if (mounted) {
+          setState(() => _isFetching = false);
+        }
+      }
+    }
+
+    // ZIP URLs cannot be pre-listed at leaf level reliably, so we directly sync (Plus/Pro cloud only).
     if (_isDriveZipUrl(url) && !_isDriveFolderUrl(url)) {
       try {
         if (!mounted) return;
@@ -1001,10 +1102,14 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
           type: NotificationType.info,
         );
         await _syncImagesFromUrl();
-        return;
       } catch (_) {
         // Error handling happens inside _syncImagesFromUrl().
+      } finally {
+        if (mounted) {
+          setState(() => _isFetching = false);
+        }
       }
+      return;
     }
 
     try {
@@ -1067,7 +1172,15 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
   Future<void> _prefetchAfterSync() async {
     try {
       final roll = await ref.read(rollDetailProvider(widget.rollId).future);
-      final (urls, ids, _) = RollGalleryPairs.triple(roll);
+      final triple = await RollGalleryPairs.tripleAsync(roll);
+      final urls = <String>[];
+      final ids = <String>[];
+      for (var i = 0; i < triple.$1.length; i++) {
+        if (triple.$1[i].startsWith('http')) {
+          urls.add(triple.$1[i]);
+          ids.add(triple.$2[i]);
+        }
+      }
       if (urls.isEmpty) return;
       await LocalSyncService().syncRollParallel(roll.id, urls, imageIds: ids);
     } catch (e) {
@@ -1093,6 +1206,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       if (!mounted) return;
       final data = resp.data;
       ref.invalidate(rollDetailProvider(widget.rollId));
+      ref.invalidate(rollGalleryPairsProvider(widget.rollId));
       if (data is Map && data['detail'] == 'Sync started in background') {
         widget.onUploadComplete();
         Future.delayed(const Duration(seconds: 4), () {

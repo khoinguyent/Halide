@@ -1,12 +1,18 @@
 import 'package:flutter/foundation.dart';
 
+import 'env_loader.dart';
+
 enum AppFlavor { dev, staging, prod }
 
 /// App configuration.
-/// Defaults to production domain in Release mode, and localhost in Debug mode.
-/// Can be overridden with --dart-define=BASE_URL=... or --dart-define=FLAVOR=...
+/// Loads [FLAVOR] from bundled `frontend/.env` first, then `--dart-define=FLAVOR=...`.
 class AppConfig {
-  static const String _flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
+  static String get _flavor {
+    return halideEnvString(
+      'FLAVOR',
+      fromDefine: const String.fromEnvironment('FLAVOR', defaultValue: 'dev'),
+    );
+  }
 
   static AppFlavor get flavor {
     if (_flavor == 'prod') return AppFlavor.prod;
@@ -25,11 +31,13 @@ class AppConfig {
   static const String _stagingUrl = 'https://stagging-api.smartconnector.io.vn';
   static const String _devUrl = 'http://localhost:8000';
 
-  static const String baseUrl = _flavor == 'prod' ? _prodUrl
-                             : _flavor == 'staging' ? _stagingUrl
-                             : _devUrl;
+  static String get baseUrl => _flavor == 'prod'
+      ? _prodUrl
+      : _flavor == 'staging'
+          ? _stagingUrl
+          : _devUrl;
 
-  static const String apiUrl = '$baseUrl/api/v1';
-  static const String authUrl = baseUrl;
-  static const String graphqlUrl = '$baseUrl/graphql';
+  static String get apiUrl => '$baseUrl/api/v1';
+  static String get authUrl => baseUrl;
+  static String get graphqlUrl => '$baseUrl/graphql';
 }

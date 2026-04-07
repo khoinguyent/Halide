@@ -7,9 +7,11 @@ from ..db.models.roll import Roll, RollStatusEnum
 from ..db.models.film_stock import FilmStock
 from ..db.models.camera import UserCamera, Camera, UserLens, Lens
 from ..db.models.image import Image
+from ..db.models.user import User
 from ..db.schemas.roll import RollCreate, RollOutDashboard, RollMetaUpdate, RollDriveUrlUpdate
 from ..db.schemas.image import ImageOut
 from ..core.config import settings
+from .storage_service import storage_service
 
 # Simple hex colors per brand for dashboard cards
 _FILM_COLOR = {
@@ -23,6 +25,29 @@ def get_roll(db: Session, roll_id: str, user_id: str):
     return db.query(Roll).filter(Roll.id == roll_id, Roll.user_id == user_id).first()
 
 
+def _gallery_public_url_base() -> Optional[str]:
+    """
+    Public (unauthenticated) origin for building Plus/Pro roll image URLs when R2_PUBLIC_BASE_URL is set.
+    Optionally appends /{S3_BUCKET_NAME} once for path-style public access.
+    """
+    raw = getattr(settings, "R2_PUBLIC_BASE_URL", None)
+    if not raw or not str(raw).strip():
+        return None
+    base = str(raw).rstrip("/")
+    bucket = (settings.S3_BUCKET_NAME or "").strip()
+    if getattr(settings, "R2_PUBLIC_APPEND_BUCKET_PATH", False) and bucket:
+        suffix = "/" + bucket
+        if not base.endswith(suffix):
+            base = f"{base}{suffix}"
+    return base
+
+
+def _tier_uses_public_object_urls(subscription_tier: Optional[str]) -> bool:
+    """Plus/Pro may use unauthenticated R2 public URLs when the bucket allows it."""
+    t = (subscription_tier or "free").lower()
+    return t in ("plus", "pro")
+
+
 def public_http_url_for_storage_key(k: str) -> str:
     """
     Build a browser-fetchable URL for an object key (users/...) or return legacy full URLs / paths as-is.
@@ -33,8 +58,9 @@ def public_http_url_for_storage_key(k: str) -> str:
     base_url = (settings.S3_ENDPOINT or "").rstrip("/")
     bucket = (settings.S3_BUCKET_NAME or "").strip()
 
-    if getattr(settings, "R2_PUBLIC_BASE_URL", None):
-        url_base = settings.R2_PUBLIC_BASE_URL.rstrip("/")
+    public_gallery = _gallery_public_url_base()
+    if public_gallery is not None:
+        url_base = public_gallery
     else:
         if bucket and base_url.endswith("/" + bucket):
             url_base = base_url.rstrip("/")
@@ -71,6 +97,9 @@ def _halide_users_key_from_image_url_field(raw: Optional[str]) -> Optional[str]:
 
 def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
     """Build RollOutDashboard for a single Roll."""
+    owner = db.query(User).filter(User.id == r.user_id).first()
+    owner_tier = owner.subscription_tier if owner else None
+
     film = db.query(FilmStock).filter(FilmStock.id == r.film_stock_id).first()
     brand = film.brand if film else ""
     name = film.name if film else ""
@@ -104,13 +133,9 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
     base_url = (settings.S3_ENDPOINT or "").rstrip("/")
     bucket = (settings.S3_BUCKET_NAME or "").strip()
 
-    # Prefer public, no-auth URL (R2 dev) when configured.
-    if getattr(settings, "R2_PUBLIC_BASE_URL", None):
-        # Cloudflare R2 public URLs (pub-*.r2.dev) bind the bucket to the hostname.
-        # Object keys in S3 are `users/...` — there is NO extra `/bucket/` path segment.
-        # Using `.../halide/users/...` requests a non-existent key and returns 404.
-        public_base = settings.R2_PUBLIC_BASE_URL.rstrip("/")
-        url_base = public_base
+    public_gallery = _gallery_public_url_base()
+    if public_gallery is not None:
+        url_base = public_gallery
     else:
         # If the endpoint already includes the bucket path (common for some R2 configs),
         # don't append bucket again.
@@ -121,13 +146,26 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
 
     # `k` may be an object key (users/...) or a legacy full URL from older uploads.
     # Rebuild from users/... + current public base so bucket/host always match R2 (see fix_r2_urls.py).
+    gallery_public_opt = _gallery_public_url_base()
     image_urls = []
     for k in keys:
         if not isinstance(k, str):
             continue
         users_key = _halide_users_key_from_image_url_field(k)
         if users_key:
-            image_urls.append(f"{url_base}/{users_key}".rstrip("/"))
+            # When R2_PUBLIC_BASE_URL is set, use unsigned pub-* URLs for every tier (matches staging).
+            # Presigned URLs always use the S3 API hostname (cloudflarestorage.com), not pub.r2.dev,
+            # and cannot be trivially swapped without invalidating the signature.
+            if gallery_public_opt is not None:
+                image_urls.append(f"{url_base}/{users_key}".rstrip("/"))
+            elif _tier_uses_public_object_urls(owner_tier):
+                image_urls.append(f"{url_base}/{users_key}".rstrip("/"))
+            else:
+                signed = storage_service.presigned_get_object_url(users_key)
+                if signed:
+                    image_urls.append(signed)
+                else:
+                    image_urls.append(f"{url_base}/{users_key}".rstrip("/"))
         elif k.startswith("/") or k.startswith("http://") or k.startswith("https://"):
             image_urls.append(k.split("?", 1)[0])
 

@@ -17,18 +17,27 @@ import 'status_selector.dart';
 import 'exif_capture_modal.dart';
 import '../services/gdrive_connection_guard.dart';
 import '../services/local_sync_service.dart';
+import '../services/public_drive_lab_import_service.dart';
+import '../services/authenticated_drive_folder_import_service.dart';
 import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
 import '../providers/guidance_pending_provider.dart';
 
 /// Whether this roll’s card shows the link/sync control (top-right next to the date).
 /// Keep in sync with [RollCard] layout — [HomeView] uses this to decide when Drive/sync coach marks apply.
-bool rollShowsLinkSyncControl(Roll roll) {
+bool rollShowsLinkSyncControl(Roll roll, WidgetRef ref) {
   final st = roll.status;
   final statusOk = st == RollStatus.lab ||
       st == RollStatus.scanned ||
       st == RollStatus.syncing;
-  return statusOk && roll.imageUrls.isEmpty;
+  if (!statusOk) return false;
+  if (roll.imageUrls.isNotEmpty) return false;
+  final localAsync = ref.watch(rollHasLocalLabScansProvider(roll.id));
+  final hasLocal = switch (localAsync) {
+    AsyncData(:final value) => value,
+    _ => false,
+  };
+  return !hasLocal;
 }
 
 class RollCard extends ConsumerStatefulWidget {
@@ -63,29 +72,126 @@ class _RollCardState extends ConsumerState<RollCard> {
     debugPrint('Fetching from $driveUrl');
     if (!mounted) return;
 
+    final trimmed = driveUrl.trim();
+    if (!PublicDriveLabImportService.isDriveFolderUrl(trimmed)) {
+      setState(() => _fetchingRollId = rollId);
+      try {
+        final count = await PublicDriveLabImportService.importPublicFileOrZipToLocal(
+          rollId: rollId,
+          driveUrlOrId: trimmed,
+        );
+        if (count > 0) {
+          final user = ref.read(userProvider);
+          final token = await user?.getIdToken();
+          if (token != null) {
+            try {
+              await ref.read(rollServiceProvider).updateRollStatus(token, rollId, 'scanned');
+            } catch (e) {
+              debugPrint('[RollCard] mark scanned: $e');
+            }
+          }
+          ref.invalidate(rollDetailProvider(rollId));
+          ref.invalidate(rollGalleryPairsProvider(rollId));
+          ref.invalidate(rollHasLocalLabScansProvider(rollId));
+          ref.invalidate(dashboardRollsProvider);
+          if (mounted) {
+            ref.read(notificationProvider.notifier).show(
+                  'SAVED $count PHOTO(S) ON THIS DEVICE.',
+                  type: NotificationType.success,
+                );
+          }
+          return;
+        }
+      } catch (e) {
+        debugPrint('[RollCard] local lab import failed, will try cloud: $e');
+      } finally {
+        if (mounted) setState(() => _fetchingRollId = null);
+      }
+    }
+
     final gdriveOk = await ensureGoogleDriveConnected(context, ref);
     if (!gdriveOk) return;
 
+    if (PublicDriveLabImportService.isDriveFolderUrl(trimmed) &&
+        ref.read(userPlanProvider) == UserPlan.free) {
+      setState(() => _fetchingRollId = rollId);
+      try {
+        final count = await AuthenticatedDriveFolderImportService.importFolder(
+          api: _api,
+          rollId: rollId,
+          folderUrl: trimmed,
+        );
+        if (count > 0) {
+          final user = ref.read(userProvider);
+          final token = await user?.getIdToken();
+          if (token != null) {
+            try {
+              await ref.read(rollServiceProvider).updateRollStatus(token, rollId, 'scanned');
+            } catch (e) {
+              debugPrint('[RollCard] mark scanned: $e');
+            }
+          }
+          ref.invalidate(rollDetailProvider(rollId));
+          ref.invalidate(rollGalleryPairsProvider(rollId));
+          ref.invalidate(rollHasLocalLabScansProvider(rollId));
+          ref.invalidate(dashboardRollsProvider);
+          if (mounted) {
+            ref.read(notificationProvider.notifier).show(
+                  'SAVED $count PHOTO(S) ON THIS DEVICE.',
+                  type: NotificationType.success,
+                );
+          }
+        }
+      } catch (e) {
+        debugPrint('[RollCard] free folder import failed: $e');
+        if (mounted) {
+          ref.read(notificationProvider.notifier).show(
+                'COULDN\'T DOWNLOAD FOLDER. CHECK DRIVE ACCESS AND TRY AGAIN.',
+                type: NotificationType.error,
+              );
+        }
+      } finally {
+        if (mounted) setState(() => _fetchingRollId = null);
+      }
+      return;
+    }
+
     setState(() => _fetchingRollId = rollId);
     try {
-      await _api.post(
+      final resp = await _api.post(
         '/api/v1/storage/gdrive/sync_images_from_url',
         data: {
           'roll_id': rollId,
           'gdrive_url_or_id': driveUrl,
         },
       );
+      final detail = resp.data is Map ? resp.data['detail']?.toString() : null;
+      if (detail != null && detail.toLowerCase().contains('background')) {
+        debugPrint(
+          '[RollCard] Drive folder sync runs on the server; thumbnails appear after ingest finishes (pull to refresh or wait ~5–30s).',
+        );
+      }
 
       if (!mounted) return;
       ref.invalidate(dashboardRollsProvider);
       ref.invalidate(rollDetailProvider(rollId));
+      ref.invalidate(rollGalleryPairsProvider(rollId));
+      ref.invalidate(rollHasLocalLabScansProvider(rollId));
 
       try {
         final roll = await ref.read(rollDetailProvider(rollId).future);
-        final (urls, ids, _) = RollGalleryPairs.triple(roll);
-        if (urls.isEmpty) return;
-        final sync = LocalSyncService();
-        await sync.syncRollParallel(roll.id, urls, imageIds: ids);
+        final triple = await RollGalleryPairs.tripleAsync(roll);
+        final urls = <String>[];
+        final ids = <String>[];
+        for (var i = 0; i < triple.$1.length; i++) {
+          if (triple.$1[i].startsWith('http')) {
+            urls.add(triple.$1[i]);
+            ids.add(triple.$2[i]);
+          }
+        }
+        if (urls.isNotEmpty) {
+          await LocalSyncService().syncRollParallel(roll.id, urls, imageIds: ids);
+        }
       } catch (e) {
         debugPrint('[RollCard] prefetch after Drive sync: $e');
       }
@@ -121,9 +227,8 @@ class _RollCardState extends ConsumerState<RollCard> {
   Widget build(BuildContext context) {
     final roll = widget.roll;
 
-    final showLinkFetchAction = rollShowsLinkSyncControl(roll);
-    final plan = ref.watch(userPlanProvider);
-    final isFree = plan == UserPlan.free;
+    final showLinkFetchAction = rollShowsLinkSyncControl(roll, ref);
+    ref.watch(userPlanProvider);
 
     final driveUrl = (roll.driveUrl ?? '').trim();
     final hasDriveUrl = driveUrl.isNotEmpty;
@@ -265,13 +370,29 @@ class _RollCardState extends ConsumerState<RollCard> {
   }
 
   Widget _buildScannedOrSyncingContent(Roll roll) {
-    final (urls, ids, _) = RollGalleryPairs.triple(roll);
-    return _ScannedContent(
-      rollId: roll.id,
-      imageUrls: urls,
-      imageIds: ids,
-      actualFrames: urls.length,
-      totalFrames: roll.maxFrames,
+    final async = ref.watch(rollGalleryPairsProvider(roll.id));
+    return async.when(
+      loading: () => _ScannedContent(
+        rollId: roll.id,
+        imageUrls: const [],
+        imageIds: const [],
+        actualFrames: 0,
+        totalFrames: roll.maxFrames,
+      ),
+      error: (_, __) => _ScannedContent(
+        rollId: roll.id,
+        imageUrls: const [],
+        imageIds: const [],
+        actualFrames: 0,
+        totalFrames: roll.maxFrames,
+      ),
+      data: (triple) => _ScannedContent(
+        rollId: roll.id,
+        imageUrls: triple.$1,
+        imageIds: triple.$2,
+        actualFrames: triple.$1.length,
+        totalFrames: roll.maxFrames,
+      ),
     );
   }
 
@@ -674,7 +795,7 @@ class _ScannedContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // [imageUrls] / [imageIds] are already paired from [RollGalleryPairs.triple]; do not re-filter
+    // [imageUrls] / [imageIds] are already paired from [RollGalleryPairs.tripleAsync]; do not re-filter
     // or indices drift from DB image ids.
     final urls = imageUrls;
     final effectiveActualFrames = urls.length;

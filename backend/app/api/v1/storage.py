@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
+from fastapi.responses import Response
 from typing import List, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
@@ -41,6 +42,12 @@ from googleapiclient.errors import HttpError
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _tier_uses_cloud_drive_r2_sync(tier: Optional[str]) -> bool:
+    """Plus/Pro: server downloads Drive and persists to R2. Free: on-device import only."""
+    return (tier or "free").lower() in ("plus", "pro")
+
 
 @router.get("/storage/providers", response_model=List[StorageProviderMetadata])
 async def get_storage_providers():
@@ -338,6 +345,24 @@ def _list_leaf_files_with_drive_retry(
         return files, credentials
 
 
+def _finalize_roll_after_drive_ingest(db: Session, roll: Roll) -> None:
+    """
+    Set roll to scanned only when at least one gallery row exists with a non-empty storage key.
+    Avoids marking scanned (and confusing the app) when every upload failed or quota blocked ingest.
+    """
+    n = (
+        db.query(Image)
+        .filter(
+            Image.roll_id == roll.id,
+            Image.image_url.isnot(None),
+        )
+        .filter(Image.image_url != "")
+        .count()
+    )
+    roll.status = RollStatusEnum.scanned if n > 0 else RollStatusEnum.lab
+    db.add(roll)
+
+
 @router.post("/connect", response_model=StorageCredentialOut)
 def connect_storage(
     data: StorageCredentialCreate,
@@ -585,9 +610,147 @@ def list_gdrive_leaf_files(
     return files
 
 
+def _ordered_image_file_ids_from_leaf_list(files: List[dict]) -> List[str]:
+    """Image leaf file IDs in the same order/filter as sync_gdrive_leaf_files."""
+    out: List[str] = []
+    for f in files:
+        mime_type = (f.get("mimeType") or "").lower()
+        name = (f.get("name") or "").lower()
+        fid = f.get("id")
+        if not fid:
+            continue
+        if not (
+            mime_type.startswith("image/")
+            or name.endswith(".jpg")
+            or name.endswith(".jpeg")
+            or name.endswith(".png")
+        ):
+            continue
+        out.append(str(fid))
+    return out
+
+
 class GDriveSyncRequest(BaseModel):
     roll_id: str
     folder_url_or_id: str
+
+
+class GDriveFreeFolderManifestOut(BaseModel):
+    file_ids: List[str]
+
+
+@router.post("/storage/gdrive/free_folder_manifest", response_model=GDriveFreeFolderManifestOut)
+def free_folder_manifest(
+    payload: GDriveSyncRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Free tier: ordered image file IDs in a Drive folder for client-side download.
+    Does not write to R2 or create Image rows.
+    """
+    if _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
+        raise HTTPException(
+            status_code=400,
+            detail="Plus/Pro should use cloud sync.",
+        )
+    roll = (
+        db.query(Roll)
+        .filter(Roll.id == payload.roll_id, Roll.user_id == current_user.id)
+        .first()
+    )
+    if not roll:
+        raise HTTPException(status_code=404, detail="Roll not found")
+
+    cred = (
+        db.query(StorageCredential)
+        .filter(
+            StorageCredential.user_id == current_user.id,
+            StorageCredential.provider == StorageProviderEnum.gdrive,
+        )
+        .order_by(StorageCredential.is_primary.desc())
+        .first()
+    )
+    if not cred:
+        raise HTTPException(status_code=400, detail="Google Drive is not connected for this user")
+
+    if not is_gdrive_oauth_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Google Drive OAuth is not configured on this server (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in backend/.env).",
+        )
+
+    tokens_json = decrypt_credential(cred.encrypted_auth_data)
+    if not tokens_json:
+        raise HTTPException(status_code=400, detail="Failed to decrypt Google Drive credentials")
+
+    try:
+        tokens = json.loads(tokens_json)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Google Drive credentials payload")
+
+    try:
+        folder_id = extract_drive_folder_id(payload.folder_url_or_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        files, _ = _list_leaf_files_with_drive_retry(db, cred, tokens, folder_id)
+    except RefreshError as e:
+        _raise_gdrive_refresh_http_exception(tokens, e)
+
+    return GDriveFreeFolderManifestOut(file_ids=_ordered_image_file_ids_from_leaf_list(files))
+
+
+@router.get("/storage/gdrive/free_file/{file_id}")
+def download_gdrive_file_for_free_local_sync(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Free tier: return one Google Drive file's bytes. No R2. Authenticated users only.
+    """
+    if _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
+        raise HTTPException(
+            status_code=400,
+            detail="Plus/Pro should use cloud sync.",
+        )
+
+    cred = (
+        db.query(StorageCredential)
+        .filter(
+            StorageCredential.user_id == current_user.id,
+            StorageCredential.provider == StorageProviderEnum.gdrive,
+        )
+        .order_by(StorageCredential.is_primary.desc())
+        .first()
+    )
+    if not cred:
+        raise HTTPException(status_code=400, detail="Google Drive is not connected for this user")
+
+    tokens_json = decrypt_credential(cred.encrypted_auth_data)
+    if not tokens_json:
+        raise HTTPException(status_code=400, detail="Failed to decrypt Google Drive credentials")
+
+    try:
+        tokens = json.loads(tokens_json)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Google Drive credentials payload")
+
+    try:
+        credentials, refreshed = refresh_google_credentials(tokens)
+        _persist_gdrive_tokens(db, cred, tokens, refreshed)
+    except RefreshError as e:
+        _raise_gdrive_refresh_http_exception(tokens, e)
+
+    try:
+        content, mime = download_file_bytes(credentials, file_id)
+    except Exception as e:
+        logger.exception("GDrive free_file download failed: %s", e)
+        raise HTTPException(status_code=400, detail="Failed to download file from Google Drive")
+
+    return Response(content=content, media_type=mime or "application/octet-stream")
 
 
 @router.post("/storage/gdrive/sync_leaf_files")
@@ -610,6 +773,12 @@ def sync_gdrive_leaf_files(
     )
     if not roll:
         raise HTTPException(status_code=404, detail="Roll not found")
+
+    if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
+        raise HTTPException(
+            status_code=402,
+            detail="Cloud scan backup requires Plus or Pro. Free saves scans on this device only.",
+        )
 
     # Pick the primary gdrive connection if available, else first connection.
     cred = (
@@ -726,7 +895,9 @@ def sync_gdrive_leaf_files(
             roll_id=str(roll.id),
             image_id=file_id,
             file_content=content,
-            strategy="PERSONAL_CLOUD",  # GDrive sync is personal cloud strategy
+            # SYSTEM_CLOUD: real R2 keys. PERSONAL_CLOUD non-Pro returned gdrive:// stubs
+            # which _build_roll_dashboard drops → empty image_urls in the app.
+            strategy="SYSTEM_CLOUD",
         )
 
         existing_frame = (
@@ -747,9 +918,7 @@ def sync_gdrive_leaf_files(
             logger.info("GDrive sync: created new frame %d", idx)
         synced_count += 1
 
-    # Mark roll as scanned once sync completes successfully.
-    roll.status = RollStatusEnum.scanned
-    db.add(roll)
+    _finalize_roll_after_drive_ingest(db, roll)
     db.commit()
 
     return {
@@ -991,7 +1160,7 @@ def sync_gdrive_zip_images(
                     skipped_existing += 1
                     continue
 
-                # Upload via TransferService to apply Pro auto-sync/quota logic.
+                # Upload to R2 (enforces quota). Same rationale as folder ingest above.
                 from ...services.transfer_service import transfer_service
                 full_key = transfer_service.route_transfer(
                     db=db,
@@ -999,7 +1168,7 @@ def sync_gdrive_zip_images(
                     roll_id=str(roll.id),
                     image_id=image_id,
                     file_content=file_content,
-                    strategy="PERSONAL_CLOUD",
+                    strategy="SYSTEM_CLOUD",
                 )
 
                 # Match or create Image record by roll_id and frame_number
@@ -1021,9 +1190,7 @@ def sync_gdrive_zip_images(
                     logger.info("GDrive sync: [zip] created new frame %d", idx)
                 synced_count += 1
 
-            # Mark roll as scanned once sync completes successfully.
-            roll.status = RollStatusEnum.scanned
-            db.add(roll)
+            _finalize_roll_after_drive_ingest(db, roll)
             db.commit()
 
             return {
@@ -1064,6 +1231,14 @@ def _perform_gdrive_sync(user_id: str, roll_id: str, gdrive_url_or_id: str):
             logger.error(f"[Sync] User {user_id} not found")
             return
 
+        if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
+            roll = db.query(Roll).filter(Roll.id == roll_id).first()
+            if roll and roll.status == RollStatusEnum.syncing:
+                roll.status = RollStatusEnum.lab
+                db.add(roll)
+                db.commit()
+            return
+
         roll = db.query(Roll).filter(Roll.id == roll_id).first()
         if not roll:
             logger.error(f"[Sync] Roll {roll_id} not found")
@@ -1101,19 +1276,22 @@ def _perform_gdrive_sync(user_id: str, roll_id: str, gdrive_url_or_id: str):
                     current_user=current_user,
                     db=db,
                 )
-            
-            # If no images were found, revert status to 'lab' so user can try again
-            if result and result.get("total_image_candidates", 0) == 0:
-                logger.info(f"[Sync] No images found for roll {roll_id}, reverting to LAB")
-                roll.status = RollStatusEnum.lab
             else:
-                # MARK as scanned here only if images were actually found
-                # (The sub-functions also set scanned, but we re-assert it here for safety)
-                roll.status = RollStatusEnum.scanned
-            
-            # 3. Explicitly commit the final status
-            db.commit()
-            db.refresh(roll)
+                logger.error("[Sync] Unrecognized gdrive_url_or_id for roll %s", roll_id)
+                db.refresh(roll)
+                roll.status = RollStatusEnum.lab
+                db.add(roll)
+                db.commit()
+                return
+
+            if result:
+                logger.info(
+                    "[Sync] roll=%s candidates=%s synced=%s skipped=%s",
+                    roll_id,
+                    result.get("total_image_candidates"),
+                    result.get("synced_count"),
+                    result.get("skipped_existing"),
+                )
                 
         except Exception as e:
             logger.exception(f"[Sync] Background sync failed for roll {roll_id}: {e}")
@@ -1141,6 +1319,11 @@ async def sync_images_from_url(
 
     If background_tasks is provided, this returns 202 immediately and runs in background.
     """
+    if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
+        raise HTTPException(
+            status_code=402,
+            detail="Cloud scan backup requires Plus or Pro. Free saves scans on this device only.",
+        )
 
     if background_tasks:
         # Set status to syncing immediately so frontend sees it on re-fetch
