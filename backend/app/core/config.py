@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str
     S3_REGION: str = "auto"
 
+    # Email (Gmail SMTP via App Password)
+    EMAIL_HOST: str = "smtp.gmail.com"
+    EMAIL_PORT: int = 587
+    EMAIL_USER: Optional[str] = None          # halide.app.notify@gmail.com
+    EMAIL_APP_PASSWORD: Optional[str] = None  # 16-char App Password (no spaces)
+    EMAIL_FROM_NAME: str = "Halide"
+    EMAIL_FROM_ADDRESS: Optional[str] = None  # hello@halide.io.vn
+
     # Billing (optional for local dev)
     REVENUE_CAT_WEBHOOK_SECRET: Optional[str] = None
     REVENUE_CAT_SECRET_KEY: Optional[str] = None

@@ -158,6 +158,34 @@ class StorageService:
         except Exception:
             return None
 
+    def get_object_bytes(self, key: str) -> Optional[bytes]:
+        """Fetch an object by key and return its raw bytes."""
+        if self._s3 is None:
+            return None
+        try:
+            r = self._s3.get_object(Bucket=self.bucket_name, Key=key)
+            body = r.get("Body")
+            if body is None:
+                return None
+            return body.read()
+        except Exception:
+            return None
+
+    def put_object_bytes(self, key: str, content: bytes, content_type: str = "application/octet-stream") -> bool:
+        """Upload raw bytes to an object key."""
+        if self._s3 is None:
+            return False
+        try:
+            self._s3.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=content,
+                ContentType=content_type,
+            )
+            return True
+        except Exception:
+            return False
+
     def replace_roll_image_at_key(self, storage_key: str, file_content: bytes, content_type: str = "image/jpeg") -> str:
         """
         Overwrite an existing roll image at the same S3/R2 key and regenerate its thumbnail.

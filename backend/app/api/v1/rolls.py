@@ -9,6 +9,9 @@ from ...db.models.user import User
 from uuid import UUID
 from ...core.dependencies import get_current_user
 from ...services import roll_service
+from ...services.export_service import export_roll_as_zip
+from ...services.email_service import send_export_zip_ready
+from ...services.storage_service import storage_service
 
 router = APIRouter()
 
@@ -120,4 +123,40 @@ def log_shot(
         notes=shot.notes,
         user_id=current_user.id
     )
+
+
+class RollExportOut(BaseModel):
+    download_url: str
+    expires_in_seconds: int
+
+
+@router.post("/rolls/{roll_id}/export-zip", response_model=RollExportOut)
+def export_roll_zip(
+    roll_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a ZIP export for one roll and email the download link to the user.
+    The link is time-limited (default 7 days).
+    """
+    zip_key = export_roll_as_zip(db, roll_id=str(roll_id), user=current_user)
+
+    expires = 60 * 60 * 24 * 7  # 7 days
+    url = storage_service.presigned_get_object_url(zip_key, expires_in=expires)
+    if not url:
+        raise HTTPException(status_code=503, detail="Failed to generate download URL")
+
+    # Best-effort email: endpoint still returns URL even if email fails.
+    if current_user.email:
+        roll = roll_service.get_roll(db, str(roll_id), current_user.id)
+        title = getattr(roll, "title", None) or "Your roll"
+        send_export_zip_ready(
+            to=current_user.email,
+            display_name=current_user.display_name or "there",
+            roll_title=title,
+            download_url=url,
+        )
+
+    return RollExportOut(download_url=url, expires_in_seconds=expires)
 

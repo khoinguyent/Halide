@@ -20,5 +20,21 @@
 # Build artifacts
 *.tar.gz
 
+# Python
+**/.venv/
+**/venv/
+**/__pycache__/
+*.pyc
+
+# Flutter / Dart
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+
+# iOS / macOS ephemeral
+**/Flutter/ephemeral/
+
 # Git worktrees
 worktrees/

@@ -19,6 +19,7 @@ import '../views/settings_view.dart';
 import '../features/storage/presentation/views/storage_account_list_view.dart';
 import '../features/storage/presentation/views/storage_strategy_view.dart';
 import '../views/edit_profile_view.dart';
+import '../views/support_view.dart';
 import '../features/billing/presentation/views/paywall_view.dart';
 import '../providers/ui_state_provider.dart';
 
@@ -182,6 +183,10 @@ final appRouter = GoRouter(
                 GoRoute(
                   path: 'terms',
                   builder: (context, state) => const TermsConditionsView(),
+                ),
+                GoRoute(
+                  path: 'support',
+                  builder: (context, state) => const SupportView(),
                 ),
               ],
             ),

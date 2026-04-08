@@ -98,7 +98,7 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
                   _ProfileOption(
                     icon: Icons.help_outline,
                     label: 'Support',
-                    onTap: () {},
+                    onTap: () => context.go('/profile/support'),
                   ),
                   const _Divider(),
                   _ProfileOption(

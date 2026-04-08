@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional
+from datetime import timedelta
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from ...core.dependencies import get_current_user
 from ...db.models.user import User, PurchaseHistory
 from ...db.session import get_db
+from ...services.email_service import send_downgrade_warning
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -72,6 +74,23 @@ def _update_user_tier(user: User, entitlements: list | None = None, entitlement_
         user.subscription_tier,
         active_ids,
     )
+
+
+def _maybe_email_downgrade_notice(*, previous_tier: Optional[str], new_tier: Optional[str], user: User) -> None:
+    """
+    Send a retention email exactly when a user transitions from premium -> free.
+    RevenueCat's CANCELLATION means "will not renew" but entitlement may still be active;
+    so we only email when tier actually becomes free.
+    """
+    prev = (previous_tier or "").lower()
+    new = (new_tier or "").lower()
+    if prev in ("pro", "plus") and new == "free" and user.email:
+        deletion_date = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%b %d, %Y")
+        send_downgrade_warning(
+            to=user.email,
+            display_name=user.display_name or "there",
+            deletion_date=deletion_date,
+        )
 
 
 def parse_active_entitlements_from_customer_json(data: dict) -> list[dict]:
@@ -277,6 +296,8 @@ async def revenue_cat_webhook(
         db.commit()
         return {"status": "user_not_found"}
 
+    previous_tier = user.subscription_tier
+
     # --- Non-renewing purchase (storage add-on + optional tier) ---
     if event_type == "NON_RENEWING_PURCHASE":
         product_id = event.get("product_id")
@@ -285,6 +306,7 @@ async def revenue_cat_webhook(
             logger.info("[Billing] Added 10GB to user %s", user.id)
         ents, eids = _normalized_entitlement_inputs(event)
         _update_user_tier(user, entitlements=ents, entitlement_ids=eids)
+        _maybe_email_downgrade_notice(previous_tier=previous_tier, new_tier=user.subscription_tier, user=user)
         db.add(user)
         db.commit()
         return {"status": "ok"}
@@ -309,6 +331,7 @@ async def revenue_cat_webhook(
                 ok = await apply_tier_from_revenuecat_api(db, user)
                 if ok:
                     logger.info("[Billing] Reconciled tier from RevenueCat API after %s for %s", event_type, user.id)
+        _maybe_email_downgrade_notice(previous_tier=previous_tier, new_tier=user.subscription_tier, user=user)
         db.add(user)
         db.commit()
         return {"status": "ok"}

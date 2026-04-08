@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>Halide Export Ready</title>
+    <style>
+      @media screen and (max-width: 600px) {
+        .outer { padding: 0 !important; }
+        .card { border-radius: 0 !important; border-left: 0 !important; border-right: 0 !important; }
+      }
+    </style>
+  </head>
+  <body style="margin:0;padding:0;background:#000000;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#000000;margin:0;padding:0;">
+      <tr>
+        <td align="center" class="outer" style="padding:24px 12px;">
+          <!--[if (gte mso 9)|(IE)]>
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+          <![endif]-->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;border-collapse:separate;border-spacing:0;">
+            <tr>
+              <td class="card" style="background:#09090b;border:1px solid rgba(255,255,255,0.10);border-radius:18px;overflow:hidden;">
+                <!-- Accent bar -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:0;">
+                      <div style="height:6px;line-height:6px;background:linear-gradient(90deg,#f97316 0%,#a855f7 50%,#06b6d4 100%);"></div>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Header -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:18px 20px 14px 20px;border-bottom:1px solid rgba(255,255,255,0.08);">
+                      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#ffffff;">
+                        <div style="letter-spacing:6px;font-weight:800;font-size:12px;opacity:.85;">HALIDE</div>
+                        <div style="margin-top:10px;font-size:22px;font-weight:900;letter-spacing:.4px;line-height:1.2;">Your roll is ready</div>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Body -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:18px 20px 8px 20px;">
+                      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;font-size:14px;line-height:1.7;color:#a1a1aa;">
+                        <p style="margin:0 0 10px 0;color:#ffffff;">Hi {{ user_name }},</p>
+                        <p style="margin:0 0 14px 0;">
+                          Your export for <strong style="color:#ffffff;">{{ roll_name }}</strong> is finished.
+                        </p>
+
+                        <!-- Button -->
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0 18px 0;">
+                          <tr>
+                            <td bgcolor="#ffffff" align="center" style="border-radius:14px;">
+                              <a href="{{ download_url }}" target="_blank"
+                                 style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+                                        font-size:14px;font-weight:900;letter-spacing:.6px;
+                                        color:#09090b;text-decoration:none;
+                                        padding:12px 18px;display:inline-block;border-radius:14px;">
+                                Download ZIP
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+
+                        <p style="margin:0 0 10px 0;">This link expires in <strong style="color:#ffffff;">{{ expiry_days }}</strong>.</p>
+                        <p style="margin:0 0 18px 0;">Tip: once downloaded, keep a second copy somewhere safe.</p>
+                        <p style="margin:18px 0 0 0;opacity:.9;">— The Halide Team</p>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Footer -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:14px 20px 18px 20px;border-top:1px solid rgba(255,255,255,0.08);">
+                      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;font-size:12px;line-height:1.4;color:#a1a1aa;opacity:.85;letter-spacing:.2px;">
+                        Developed by Halide.
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+          <!--[if (gte mso 9)|(IE)]>
+          </td></tr></table>
+          <![endif]-->
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+
