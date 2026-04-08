@@ -20,7 +20,17 @@ fi
 echo "Building Halide for iOS (ipa)..."
 echo "Flavor: $FLAVOR"
 
-flutter build ipa --release \
+BUILD_ARGS=()
+if [ -n "${BUILD_NUMBER:-}" ]; then
+  echo "Build number override: $BUILD_NUMBER"
+  BUILD_ARGS+=(--build-number="$BUILD_NUMBER")
+fi
+if [ -n "${BUILD_NAME:-}" ]; then
+  echo "Build name override: $BUILD_NAME"
+  BUILD_ARGS+=(--build-name="$BUILD_NAME")
+fi
+
+flutter build ipa --release "${BUILD_ARGS[@]}" \
     --dart-define=FLAVOR=$FLAVOR \
     --dart-define=REVENUE_CAT_APPLE_KEY=$REVENUE_CAT_APPLE_KEY \
     --dart-define=REVENUE_CAT_GOOGLE_KEY=$REVENUE_CAT_GOOGLE_KEY \
