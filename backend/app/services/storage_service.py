@@ -1,10 +1,33 @@
-from typing import Optional
+from typing import Optional, Tuple
 from urllib.parse import urlparse, urlunparse
 
 import boto3
 from botocore.client import Config
 from ..core.config import settings
 import io
+
+# Gear photos: web/display only — normalize to JPEG to save R2 and user quota.
+_GEAR_JPEG_MAX_SIDE = 1280
+_GEAR_JPEG_QUALITY = 78
+_GEAR_THUMB_MAX_SIDE = 480
+_GEAR_THUMB_JPEG_QUALITY = 72
+
+
+def _encode_gear_main_and_thumb(file_content: bytes) -> Tuple[bytes, bytes]:
+    from PIL import Image as PILImage  # type: ignore
+
+    img = PILImage.open(io.BytesIO(file_content))
+    img = img.convert("RGB")
+    main = img.copy()
+    main.thumbnail((_GEAR_JPEG_MAX_SIDE, _GEAR_JPEG_MAX_SIDE), PILImage.Resampling.LANCZOS)
+    mb = io.BytesIO()
+    main.save(mb, format="JPEG", quality=_GEAR_JPEG_QUALITY, optimize=True)
+    main_bytes = mb.getvalue()
+    thumb = img.copy()
+    thumb.thumbnail((_GEAR_THUMB_MAX_SIDE, _GEAR_THUMB_MAX_SIDE), PILImage.Resampling.LANCZOS)
+    tb = io.BytesIO()
+    thumb.save(tb, format="JPEG", quality=_GEAR_THUMB_JPEG_QUALITY, optimize=True)
+    return main_bytes, tb.getvalue()
 
 def _is_s3_configured() -> bool:
     """True if S3 endpoint looks like a real URL (not a placeholder)."""
@@ -101,10 +124,13 @@ class StorageService:
         image_id: str,
         file_content: bytes,
         content_type: str = "image/jpeg",
-    ) -> str:
+    ) -> Tuple[str, int]:
         """
-        Upload a user gear photo to S3/R2.
+        Upload a user gear photo to S3/R2. Full image is re-encoded as JPEG (max side
+        [_GEAR_JPEG_MAX_SIDE]) to save storage; a smaller thumb is stored alongside.
         Key format: users/{uid}/gear/{user_camera_id}/{image_id}.jpg
+
+        Returns (storage key for the full image, bytes charged to user quota — main object only).
         """
         if self._s3 is None:
             raise RuntimeError("S3/R2 is not configured. Set S3_ENDPOINT and credentials in .env for uploads.")
@@ -113,34 +139,40 @@ class StorageService:
         full_key = f"{base_key}.jpg"
         thumb_key = f"{base_key}_thumb.jpg"
 
+        main_bytes: bytes
+        thumb_bytes: Optional[bytes] = None
+        try:
+            main_bytes, thumb_bytes = _encode_gear_main_and_thumb(file_content)
+        except Exception:
+            # Unusual format or PIL failure — store raw bytes as uploaded (still .jpg key)
+            main_bytes = file_content
+            try:
+                from PIL import Image as PILImage  # type: ignore
+
+                img = PILImage.open(io.BytesIO(file_content))
+                img = img.convert("RGB")
+                img.thumbnail((_GEAR_THUMB_MAX_SIDE, _GEAR_THUMB_MAX_SIDE), PILImage.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=_GEAR_THUMB_JPEG_QUALITY, optimize=True)
+                thumb_bytes = buf.getvalue()
+            except Exception:
+                thumb_bytes = None
+
         self._s3.put_object(
             Bucket=self.bucket_name,
             Key=full_key,
-            Body=file_content,
-            ContentType=content_type,
+            Body=main_bytes,
+            ContentType="image/jpeg",
         )
-
-        try:
-            from PIL import Image as PILImage  # type: ignore
-
-            img = PILImage.open(io.BytesIO(file_content))
-            img = img.convert("RGB")
-            img.thumbnail((800, 800))
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=80)
-            buf.seek(0)
+        if thumb_bytes:
             self._s3.put_object(
                 Bucket=self.bucket_name,
                 Key=thumb_key,
-                Body=buf.getvalue(),
+                Body=thumb_bytes,
                 ContentType="image/jpeg",
             )
-        except ModuleNotFoundError:
-            pass
-        except Exception:
-            pass
 
-        return full_key
+        return full_key, len(main_bytes)
 
     def presigned_get_object_url(self, key: str, expires_in: int = 43200) -> Optional[str]:
         """

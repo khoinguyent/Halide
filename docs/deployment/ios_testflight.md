@@ -25,14 +25,16 @@ flutter clean
 flutter pub get
 ```
 
-### 3. Staging flavor via `.env`
-In `frontend/.env`, set:
+### 3. Flavor via `.env`
+In `frontend/.env`, set **`FLAVOR`** (the build script exports `.env` and passes `--dart-define=FLAVOR=...`):
 
 ```bash
-FLAVOR=staging
+FLAVOR=staging   # API https://stagging-api.smartconnector.io.vn
+# or
+FLAVOR=prod      # API https://api.smartconnector.io.vn
 ```
 
-Also set `REVENUE_CAT_*` and `GOOGLE_DRIVE_SERVER_CLIENT_ID` as needed. The build script exports `.env` and passes `--dart-define=FLAVOR=...` so `AppConfig` uses the staging API (`https://stagging-api.smartconnector.io.vn`).
+Also set `REVENUE_CAT_*` and `GOOGLE_DRIVE_SERVER_CLIENT_ID` as needed.
 
 ### 4. Build IPA
 Use the provided build script which injects environment variables from `.env`.
@@ -60,6 +62,9 @@ If your exported IPA has a different name, use `ls build/ios/ipa/`.
 
 | Build | Version | Date | Delivery UUID |
 |-------|---------|------|---------------|
+| 54 | 1.0.0+54 | 2026-04-10 | cbd87724-e6a8-4d20-b676-53c3f023e888 |
+| 53 | 1.0.0+53 | 2026-04-10 | b12d8922-fb49-495f-96d0-c85d828fc1cc |
+| 52 | 1.0.0+52 | 2026-04-09 | f849f546-465c-4afe-bec9-98feb15710b2 |
 | 49 | 1.0.0+49 | 2026-04-07 | 29166f64-1484-4c6a-b9bc-ec17d744b7e8 |
 | 48 | 1.0.0+48 | 2026-04-06 | 683ecfe0-5857-4628-8b70-74192462368c |
 | 47 | 1.0.0+47 | 2026-04-05 | d8164b6c-5619-4aac-a06a-a2992045a2da |

@@ -223,11 +223,11 @@ class _LoginViewState extends ConsumerState<LoginView> {
           ),
         ),
         Text(
-          'FILM PHOTOGRAPHY'.toUpperCase(),
+          'Analog heart, Digital Brain',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5), 
-            fontSize: 12, 
-            letterSpacing: 3,
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 12,
+            letterSpacing: 0.8,
             fontWeight: FontWeight.bold,
           ),
         ),

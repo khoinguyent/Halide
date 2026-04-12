@@ -7,8 +7,11 @@ import 'package:image_picker/image_picker.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/gear_provider.dart';
+import '../services/gear_service.dart';
 import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
+import '../core/utils/local_image_thumb.dart';
+import '../core/constants/gear_image_upload.dart';
 
 class GearImageUploaderWidget extends ConsumerStatefulWidget {
   final String cameraId;
@@ -44,7 +47,13 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
       return;
     }
 
-    final List<XFile> images = await _picker.pickMultiImage();
+    final List<XFile> images = await _picker.pickMultiImage(
+      maxWidth: kGearImagePickerMaxDimension.toDouble(),
+      maxHeight: kGearImagePickerMaxDimension.toDouble(),
+      imageQuality: kGearImagePickerQuality,
+      requestFullMetadata: false,
+      limit: remainingSlots,
+    );
     if (images.isNotEmpty) {
       // Enforce the constraint
       final imagesToAdd = images.take(remainingSlots).toList();
@@ -95,6 +104,24 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
             'SUCCESSFULLY UPLOADED ${files.length} IMAGE(S)!',
             type: NotificationType.success,
           );
+    } on GearImageUploadException catch (e, st) {
+      debugPrint('[GearImageUploader] upload failed: $e\n$st');
+      if (mounted) {
+        final detail = e.detail?.toUpperCase() ?? '';
+        String message = 'UPLOAD FAILED. CHECK CONNECTION OR STORAGE.';
+        if (e.statusCode == 404 ||
+            detail.contains('USER CAMERA NOT FOUND') ||
+            detail.contains('NOT FOUND')) {
+          message =
+              'GEAR NOT FOUND FOR THIS ACCOUNT. OPEN THE LOCKER, PULL TO REFRESH, THEN TRY AGAIN.';
+        } else if (e.statusCode == 402 || detail.contains('STORAGE LIMIT')) {
+          message = 'STORAGE LIMIT REACHED. FREE SOME SPACE OR UPGRADE YOUR PLAN.';
+        } else if (e.statusCode == 400) {
+          message = detail.isNotEmpty ? detail : 'UPLOAD REJECTED. CHECK FILE SIZE (MAX 15 MB) AND FORMAT.';
+        }
+        ref.read(notificationProvider.notifier).show(message, type: NotificationType.error);
+        ref.invalidate(userGearProvider);
+      }
     } catch (e, st) {
       debugPrint('[GearImageUploader] upload failed: $e\n$st');
       if (mounted) {
@@ -166,6 +193,7 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
               scrollDirection: Axis.horizontal,
               itemCount: _selectedImages.length,
               itemBuilder: (context, index) {
+                final thumbPx = localImageDecodeCacheExtent(context, 120);
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: Stack(
@@ -177,6 +205,9 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
                           height: 120,
                           width: 120,
                           fit: BoxFit.cover,
+                          cacheWidth: thumbPx,
+                          cacheHeight: thumbPx,
+                          filterQuality: FilterQuality.low,
                         ),
                       ),
                       Positioned(

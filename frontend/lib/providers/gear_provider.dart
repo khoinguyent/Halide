@@ -210,14 +210,8 @@ final cameraProvider = Provider.family<Camera?, String>((ref, id) {
   final gearAsync = ref.watch(userGearProvider);
   final gearList = gearAsync.value;
   if (gearList == null) return null;
-  try {
-    return gearList.firstWhere((c) => c.id == id);
-  } catch (_) {
-    return Camera(
-      id: id,
-      nickname: 'Unknown Camera',
-      brand: 'Unknown',
-      model: 'Model',
-    );
+  for (final c in gearList) {
+    if (c.id == id) return c;
   }
+  return null;
 });

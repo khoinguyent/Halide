@@ -38,6 +38,7 @@ class SupportView extends ConsumerWidget {
     final u = authService.currentUser;
     final uid = u?.uid ?? '';
     final email = u?.email ?? '';
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
 
     return HalideScaffold(
       appBar: AppBar(
@@ -55,7 +56,10 @@ class SupportView extends ConsumerWidget {
         elevation: 0,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        // This view is usually displayed inside the shell, where the bottom
+        // glass dock sits above the content. Add padding so the tip isn't
+        // hidden under the dock.
+        padding: EdgeInsets.fromLTRB(24, 16, 24, safeBottom + 64 + 24 + 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

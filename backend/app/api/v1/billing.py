@@ -201,7 +201,20 @@ def _collect_transfer_user_ids(event: dict) -> dict[str, str]:
     return out
 
 
-# TODO: Secure this with REVENUE_CAT_WEBHOOK_SECRET token verification
+def _webhook_auth_ok(authorization: Optional[str], secret: str) -> bool:
+    """
+    RevenueCat sends the dashboard \"authorization header\" value as the raw
+    `Authorization` header (no automatic \"Bearer \" prefix). Accept either
+    `Bearer <secret>` or `<secret>` so the dashboard matches typical env config.
+    """
+    if not authorization:
+        return False
+    auth = authorization.strip()
+    bearer = f"Bearer {secret}"
+    return auth == secret or auth == bearer
+
+
+# TODO: Optionally verify RevenueCat's signed payload when they document it.
 @router.post("/webhook")
 async def revenue_cat_webhook(
     request: Request,
@@ -215,7 +228,7 @@ async def revenue_cat_webhook(
     from ...core.config import settings
 
     if settings.REVENUE_CAT_WEBHOOK_SECRET:
-        if authorization != f"Bearer {settings.REVENUE_CAT_WEBHOOK_SECRET}":
+        if not _webhook_auth_ok(authorization, settings.REVENUE_CAT_WEBHOOK_SECRET):
             logger.warning("[Billing] Unauthorized webhook attempt")
             raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -226,21 +239,23 @@ async def revenue_cat_webhook(
 
     is_sandbox_raw = event.get("is_sandbox")
     environment_raw = event.get("environment")
-    is_sandbox = is_sandbox_raw
-    if is_sandbox is None:
+    is_sandbox: Optional[bool] = is_sandbox_raw
+    if is_sandbox is None and environment_raw is not None:
         is_sandbox = environment_raw == "SANDBOX"
 
-    if settings.IS_REVENUE_CAT_SANDBOX != is_sandbox:
-        env_str = "SANDBOX" if is_sandbox else "PRODUCTION"
-        server_env = "SANDBOX" if settings.IS_REVENUE_CAT_SANDBOX else "PRODUCTION"
-        logger.info(
-            "[Billing] Dropping %s event on %s server (is_sandbox=%s environment=%s)",
-            env_str,
-            server_env,
-            is_sandbox_raw,
-            environment_raw,
-        )
-        return {"status": "ignored", "reason": "environment_mismatch"}
+    # Dashboard \"Send test event\" uses type TEST and is often SANDBOX; always accept.
+    if event_type != "TEST" and is_sandbox is not None:
+        if settings.IS_REVENUE_CAT_SANDBOX != is_sandbox:
+            env_str = "SANDBOX" if is_sandbox else "PRODUCTION"
+            server_env = "SANDBOX" if settings.IS_REVENUE_CAT_SANDBOX else "PRODUCTION"
+            logger.info(
+                "[Billing] Dropping %s event on %s server (is_sandbox=%s environment=%s)",
+                env_str,
+                server_env,
+                is_sandbox_raw,
+                environment_raw,
+            )
+            return {"status": "ignored", "reason": "environment_mismatch"}
 
     if not event_type:
         return {"status": "ignored", "reason": "missing_fields"}

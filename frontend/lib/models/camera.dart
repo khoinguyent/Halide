@@ -72,7 +72,7 @@ class Camera {
         : 0;
     
     return Camera(
-      id: json['id']?.toString() ?? '',
+      id: (json['id'] ?? json['user_camera_id'])?.toString() ?? '',
       nickname: json['gear_nickname'] ?? json['nickname'] ?? '',
       brand: json['brand'] ?? camera?['brand'] ?? '',
       model: json['model'] ?? camera?['model'] ?? '',

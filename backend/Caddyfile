@@ -1,7 +1,13 @@
 api.smartconnector.io.vn {
     reverse_proxy backend:8000
+    log {
+        output stdout
+    }
 }
 
 stagging-api.smartconnector.io.vn {
     reverse_proxy backend-staging:8000
+    log {
+        output stdout
+    }
 }

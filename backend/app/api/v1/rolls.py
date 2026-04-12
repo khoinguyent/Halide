@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -104,6 +106,8 @@ class ShotCreate(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     notes: Optional[str] = None
+    # Device time when the user logged the shot (ISO 8601). If omitted, server time is used.
+    logged_at: Optional[datetime] = None
 
 
 @router.post("/rolls/{id}/shots", response_model=ImageOut)
@@ -121,6 +125,7 @@ def log_shot(
         lat=shot.lat,
         lng=shot.lng,
         notes=shot.notes,
+        logged_at=shot.logged_at,
         user_id=current_user.id
     )
 

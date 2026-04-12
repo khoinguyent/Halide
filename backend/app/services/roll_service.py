@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import HTTPException
@@ -95,6 +96,30 @@ def _halide_users_key_from_image_url_field(raw: Optional[str]) -> Optional[str]:
     return None
 
 
+def _single_gallery_http_url(
+    k: str,
+    owner_tier: Optional[str],
+    url_base: str,
+    gallery_public_opt: Optional[str],
+) -> Optional[str]:
+    """Turn a stored object key or legacy URL into a browser-loadable HTTPS (or path) URL."""
+    if not isinstance(k, str) or not str(k).strip():
+        return None
+    users_key = _halide_users_key_from_image_url_field(k)
+    if users_key:
+        if gallery_public_opt is not None:
+            return f"{url_base}/{users_key}".rstrip("/")
+        if _tier_uses_public_object_urls(owner_tier):
+            return f"{url_base}/{users_key}".rstrip("/")
+        signed = storage_service.presigned_get_object_url(users_key)
+        if signed:
+            return signed
+        return f"{url_base}/{users_key}".rstrip("/")
+    if k.startswith("/") or k.startswith("http://") or k.startswith("https://"):
+        return k.split("?", 1)[0]
+    return None
+
+
 def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
     """Build RollOutDashboard for a single Roll."""
     owner = db.query(User).filter(User.id == r.user_id).first()
@@ -149,25 +174,9 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
     gallery_public_opt = _gallery_public_url_base()
     image_urls = []
     for k in keys:
-        if not isinstance(k, str):
-            continue
-        users_key = _halide_users_key_from_image_url_field(k)
-        if users_key:
-            # When R2_PUBLIC_BASE_URL is set, use unsigned pub-* URLs for every tier (matches staging).
-            # Presigned URLs always use the S3 API hostname (cloudflarestorage.com), not pub.r2.dev,
-            # and cannot be trivially swapped without invalidating the signature.
-            if gallery_public_opt is not None:
-                image_urls.append(f"{url_base}/{users_key}".rstrip("/"))
-            elif _tier_uses_public_object_urls(owner_tier):
-                image_urls.append(f"{url_base}/{users_key}".rstrip("/"))
-            else:
-                signed = storage_service.presigned_get_object_url(users_key)
-                if signed:
-                    image_urls.append(signed)
-                else:
-                    image_urls.append(f"{url_base}/{users_key}".rstrip("/"))
-        elif k.startswith("/") or k.startswith("http://") or k.startswith("https://"):
-            image_urls.append(k.split("?", 1)[0])
+        u = _single_gallery_http_url(k, owner_tier, url_base, gallery_public_opt)
+        if u:
+            image_urls.append(u)
 
     # Apply shot_offset shift for alignment calibration
     # Moves the first N frames to the end of the list.
@@ -187,9 +196,18 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         if row.image_url is None or (isinstance(row.image_url, str) and not str(row.image_url).strip())
     ]
     log_rows_sorted = sorted(log_rows, key=lambda x: (x.frame_number is None, x.frame_number or 0))
-    shots_out: List[ImageOut] = [ImageOut.model_validate(r) for r in image_rows] + [
-        ImageOut.model_validate(r) for r in log_rows_sorted
-    ]
+    # Expose resolved https URLs on each shot so clients can fall back to [Shot.imageUrl] when
+    # [image_urls] is empty or filtered differently (e.g. after offset).
+    shots_gallery: List[ImageOut] = []
+    for row in image_rows:
+        out = ImageOut.model_validate(row)
+        raw = row.image_url
+        if raw and isinstance(raw, str) and raw.strip():
+            resolved = _single_gallery_http_url(raw, owner_tier, url_base, gallery_public_opt)
+            if resolved:
+                out = out.model_copy(update={"image_url": resolved})
+        shots_gallery.append(out)
+    shots_out: List[ImageOut] = shots_gallery + [ImageOut.model_validate(r) for r in log_rows_sorted]
 
     return RollOutDashboard(
         id=str(r.id),
@@ -352,6 +370,7 @@ def log_shot(
     lat: Optional[float] = None,
     lng: Optional[float] = None,
     notes: Optional[str] = None,
+    logged_at: Optional[datetime] = None,
 ):
     db_roll = get_roll(db, roll_id, user_id)
     if not db_roll:
@@ -361,7 +380,7 @@ def log_shot(
     max_frame = db.query(func.max(Image.frame_number)).filter(Image.roll_id == str(roll_id)).scalar()
     start_frame = (max_frame + 1) if max_frame is not None else 0
 
-    db_image = Image(
+    img_kwargs = dict(
         roll_id=str(roll_id),
         frame_number=start_frame,
         image_url=None,  # This is a log-only entry
@@ -371,6 +390,10 @@ def log_shot(
         location_lat=lat,
         location_lng=lng,
     )
+    if logged_at is not None:
+        img_kwargs["created_at"] = logged_at
+
+    db_image = Image(**img_kwargs)
     db.add(db_image)
     db.commit()
     db.refresh(db_image)

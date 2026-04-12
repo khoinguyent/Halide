@@ -22,6 +22,10 @@ import '../services/authenticated_drive_folder_import_service.dart';
 import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
 import '../providers/guidance_pending_provider.dart';
+import '../providers/ui_state_provider.dart';
+
+/// Matches [RollDetailView] / [FolderTabs]: tab 1 is Shot Log.
+const int _kRollDetailShotLogTabIndex = 1;
 
 /// Whether this roll’s card shows the link/sync control (top-right next to the date).
 /// Keep in sync with [RollCard] layout — [HomeView] uses this to decide when Drive/sync coach marks apply.
@@ -648,7 +652,10 @@ class _ShootingContent extends ConsumerWidget {
             children: [
               TextButton(
                 key: guidanceViewLogsKey,
-                onPressed: () => context.push('/roll/$rollId'),
+                onPressed: () {
+                  ref.read(rollTabStateProvider.notifier).setTab(rollId, _kRollDetailShotLogTabIndex);
+                  context.push('/roll/$rollId');
+                },
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   minimumSize: Size.zero,
@@ -729,7 +736,7 @@ class _ShootingContent extends ConsumerWidget {
   }
 }
 
-class _LabContent extends StatelessWidget {
+class _LabContent extends ConsumerWidget {
   final String rollId;
   final int maxFrames;
 
@@ -740,7 +747,7 @@ class _LabContent extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -755,7 +762,10 @@ class _LabContent extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: TextButton(
-            onPressed: () => context.push('/roll/$rollId'),
+            onPressed: () {
+              ref.read(rollTabStateProvider.notifier).setTab(rollId, _kRollDetailShotLogTabIndex);
+              context.push('/roll/$rollId');
+            },
             style: TextButton.styleFrom(
               padding: EdgeInsets.zero,
               minimumSize: Size.zero,

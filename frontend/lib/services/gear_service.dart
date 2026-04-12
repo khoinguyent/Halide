@@ -5,6 +5,25 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../config/app_config.dart';
 
+/// Thrown when gear image upload fails; includes HTTP status and API body for UX.
+class GearImageUploadException implements Exception {
+  final int statusCode;
+  final String body;
+
+  GearImageUploadException(this.statusCode, this.body);
+
+  String? get detail {
+    try {
+      final map = jsonDecode(body);
+      if (map is Map && map['detail'] != null) return map['detail'].toString();
+    } catch (_) {}
+    return null;
+  }
+
+  @override
+  String toString() => 'GearImageUploadException($statusCode): $body';
+}
+
 class GearService {
   Future<List<dynamic>> fetchUserGear(String token) async {
     final response = await http.get(
@@ -72,16 +91,31 @@ class GearService {
           'files',
           f.path,
           filename: name.isEmpty ? 'photo.jpg' : name,
-          contentType: MediaType('image', 'jpeg'),
+          contentType: _imageMediaType(f.path),
         ),
       );
     }
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+    final client = http.Client();
+    try {
+      final streamed = await client.send(request).timeout(const Duration(minutes: 3));
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      throw GearImageUploadException(response.statusCode, response.body);
+    } finally {
+      client.close();
     }
-    throw Exception('Gear image upload failed: ${response.statusCode} ${response.body}');
+  }
+
+  static MediaType _imageMediaType(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.png')) return MediaType('image', 'png');
+    if (lower.endsWith('.webp')) return MediaType('image', 'webp');
+    if (lower.endsWith('.heic') || lower.endsWith('.heif')) {
+      return MediaType('image', 'heic');
+    }
+    return MediaType('image', 'jpeg');
   }
 
   /// Update user camera (e.g. image_urls, primary_image_index, gear_nickname).

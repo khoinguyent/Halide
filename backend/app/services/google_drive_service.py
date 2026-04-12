@@ -248,6 +248,36 @@ def extract_drive_folder_id(folder_url_or_id: str) -> str:
     raise ValueError(f"Could not extract folder id from: {folder_url_or_id}")
 
 
+def get_drive_entry_mime_type(credentials: Credentials, file_id: str, _depth: int = 0) -> Optional[str]:
+    """
+    Return the effective mimeType for a Drive id (folder, zip, shortcut target, etc.).
+    Used to choose folder-ingest vs ZIP-ingest when the share URL is ambiguous
+    (e.g. https://drive.google.com/open?id=...).
+    """
+    if _depth > 5:
+        return None
+    try:
+        service = build("drive", "v3", credentials=credentials, cache_discovery=False)
+        meta = (
+            service.files()
+            .get(fileId=file_id, fields="mimeType,shortcutDetails", supportsAllDrives=True)
+            .execute()
+        )
+        mime = meta.get("mimeType")
+        if mime == "application/vnd.google-apps.shortcut":
+            sd = meta.get("shortcutDetails") or {}
+            target_mime = sd.get("targetMimeType")
+            if target_mime:
+                return str(target_mime)
+            target_id = sd.get("targetId")
+            if target_id:
+                return get_drive_entry_mime_type(credentials, str(target_id), _depth + 1)
+        return mime
+    except HttpError as e:
+        logger.warning("Drive files.get mimeType failed for id=%s: %s", file_id, e)
+        return None
+
+
 def _list_folder_children(
     service,
     *,

@@ -121,6 +121,8 @@ class RollService {
     final body = <String, dynamic>{
       'aperture': aperture,
       'shutter_speed': shutterSpeed,
+      // Device-local instant so shot log times match the photographer, not the API server clock.
+      'logged_at': DateTime.now().toIso8601String(),
     };
     if (lat != null) body['lat'] = lat;
     if (lng != null) body['lng'] = lng;

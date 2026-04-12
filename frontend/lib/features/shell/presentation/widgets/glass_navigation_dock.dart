@@ -37,8 +37,8 @@ class GlassNavigationDock extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildNavItem(Icons.home_outlined, 0),
-                _buildNavItem(Icons.grid_view_outlined, 1), // Locker (Grid)
+                _buildNavItem(Icons.camera_roll_outlined, 0),
+                _buildNavItem(Icons.photo_camera_outlined, 1),
                 const SizedBox(width: 48), // central FAB space
                 _buildNavItem(Icons.exposure_outlined, 2, showLock: !plan.isPro),  // Meter (Exposure)
                 _buildNavItem(Icons.person_outline, 3),    // Profile

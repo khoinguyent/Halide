@@ -13,7 +13,10 @@ import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
 import '../providers/gear_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/gear_service.dart';
 import '../core/utils/notifications.dart';
+import '../core/utils/local_image_thumb.dart';
+import '../core/constants/gear_image_upload.dart';
 
 class CameraDetailView extends ConsumerWidget {
   final String cameraId;
@@ -64,7 +67,7 @@ class CameraDetailView extends ConsumerWidget {
                     child: _EditGearSheet(
                       camera: camera,
                       onSave: (nickname, brand, model, serialNumber, format, status) {
-                        ref.read(userGearProvider.notifier).updateCameraDetails(cameraId,
+                        ref.read(userGearProvider.notifier).updateCameraDetails(camera.id,
                           nickname: nickname,
                           brand: brand,
                           model: model,
@@ -207,7 +210,7 @@ class CameraDetailView extends ConsumerWidget {
                       onPressed: () => _showGearImagesEditSheet(
                         context,
                         ref,
-                        cameraId: cameraId,
+                        cameraId: camera.id,
                         currentUrls: camera.imageUrls,
                         plan: plan,
                       ),
@@ -258,12 +261,19 @@ class CameraDetailView extends ConsumerWidget {
                         childAspectRatio: 1,
                       ),
                       itemBuilder: (context, index) {
+                        final thumbPx = gearGalleryGridThumbCacheExtent(context);
                         final path = camera.imageUrls[index];
                         final isLocal = path.startsWith('/') || path.startsWith(RegExp(r'^[A-Za-z]:'));
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: isLocal
-                              ? Image.file(File(path), fit: BoxFit.cover)
+                              ? Image.file(
+                                  File(path),
+                                  fit: BoxFit.cover,
+                                  cacheWidth: thumbPx,
+                                  cacheHeight: thumbPx,
+                                  filterQuality: FilterQuality.low,
+                                )
                               : Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.5))),
                         );
                       },
@@ -299,7 +309,7 @@ class CameraDetailView extends ConsumerWidget {
                       );
                       return;
                     }
-                    _showLinkLensSheet(context, ref, cameraId);
+                    _showLinkLensSheet(context, ref, camera.id);
                   },
                   child: Row(
                     children: [
@@ -678,7 +688,15 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
   Future<void> _pickMore() async {
     final remaining = _maxImages - _totalCount;
     if (remaining <= 0) return;
-    final files = await _picker.pickMultiImage();
+    // Downscale at export time on iOS/Android — full-res HEIC/JPEG export is slow before we even paint.
+    // requestFullMetadata: false avoids extra Photos work on iOS.
+    final files = await _picker.pickMultiImage(
+      maxWidth: kGearImagePickerMaxDimension.toDouble(),
+      maxHeight: kGearImagePickerMaxDimension.toDouble(),
+      imageQuality: kGearImagePickerQuality,
+      requestFullMetadata: false,
+      limit: remaining,
+    );
     if (files.isEmpty) return;
     setState(() {
       for (final f in files.take(remaining)) {
@@ -721,6 +739,27 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
       if (!mounted) return;
       widget.onSave(fromServer);
       ref.invalidate(userGearProvider);
+    } on GearImageUploadException catch (e, st) {
+      debugPrint('[GearImagesEditSheet] upload failed: $e\n$st');
+      if (mounted) {
+        final detail = e.detail?.toUpperCase() ?? '';
+        String message = 'UPLOAD FAILED. CHECK CONNECTION OR STORAGE.';
+        if (e.statusCode == 404 ||
+            detail.contains('USER CAMERA NOT FOUND') ||
+            detail.contains('NOT FOUND')) {
+          message =
+              'GEAR NOT FOUND FOR THIS ACCOUNT. OPEN THE LOCKER, PULL TO REFRESH, THEN TRY AGAIN.';
+        } else if (e.statusCode == 402 || detail.contains('STORAGE LIMIT')) {
+          message = 'STORAGE LIMIT REACHED. FREE SOME SPACE OR UPGRADE YOUR PLAN.';
+        } else if (e.statusCode == 400) {
+          message = detail.isNotEmpty ? detail : 'UPLOAD REJECTED. CHECK FILE SIZE (MAX 15 MB) AND FORMAT.';
+        }
+        ref.read(notificationProvider.notifier).show(
+              message,
+              type: NotificationType.error,
+            );
+        ref.invalidate(userGearProvider);
+      }
     } catch (e, st) {
       debugPrint('[GearImagesEditSheet] upload failed: $e\n$st');
       if (mounted) {
@@ -770,7 +809,10 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  GridView.builder(
+                  Builder(
+                    builder: (context) {
+                      final thumbPx = gearGalleryGridThumbCacheExtent(context);
+                      return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: _urls.length + _pendingAdds.length,
@@ -790,7 +832,13 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(10),
                               child: isLocal
-                                  ? Image.file(File(path), fit: BoxFit.cover)
+                                  ? Image.file(
+                                      File(path),
+                                      fit: BoxFit.cover,
+                                      cacheWidth: thumbPx,
+                                      cacheHeight: thumbPx,
+                                      filterQuality: FilterQuality.low,
+                                    )
                                   : Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.broken_image_outlined, color: Colors.white54)),
                             ),
                             Positioned(
@@ -815,7 +863,13 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: Image.file(File(xFile.path), fit: BoxFit.cover),
+                            child: Image.file(
+                              File(xFile.path),
+                              fit: BoxFit.cover,
+                              cacheWidth: thumbPx,
+                              cacheHeight: thumbPx,
+                              filterQuality: FilterQuality.low,
+                            ),
                           ),
                           Positioned(
                             top: 4,
@@ -831,6 +885,8 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
                           ),
                         ],
                       );
+                    },
+                  );
                     },
                   ),
                   if (_totalCount < _maxImages) ...[

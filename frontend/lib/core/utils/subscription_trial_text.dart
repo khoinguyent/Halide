@@ -24,13 +24,23 @@ String? introOfferShortLabel(StoreProduct product) {
   return '$n-$unit free trial';
 }
 
-/// Pro package for current billing period toggle, or null.
-Package? proPackageForSelection(Offerings offerings, {required bool annual}) {
+/// Same offering as [proPackageForSelection], for reading both package prices.
+Offering? proOfferingFrom(Offerings offerings) {
   try {
-    final offering = offerings.all.values.firstWhere(
+    return offerings.all.values.firstWhere(
       (o) => o.identifier.toLowerCase().contains('pro'),
       orElse: () => offerings.current!,
     );
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Pro package for current billing period toggle, or null.
+Package? proPackageForSelection(Offerings offerings, {required bool annual}) {
+  try {
+    final offering = proOfferingFrom(offerings);
+    if (offering == null) return null;
     return annual ? offering.annual : offering.monthly;
   } catch (_) {
     return null;

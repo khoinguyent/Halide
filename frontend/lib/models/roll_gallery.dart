@@ -16,22 +16,53 @@ typedef RollGalleryTriple = (List<String> urls, List<String> imageIds, List<Shot
 class RollGalleryPairs {
   RollGalleryPairs._();
 
+  static bool _isDisplayableAssetUrl(String? raw) {
+    final u = (raw ?? '').trim();
+    if (u.isEmpty) return false;
+    return u.startsWith('http') ||
+        u.startsWith('/') ||
+        u.startsWith('file://');
+  }
+
   /// Server [image_urls] aligned with shots that carry frames (no local lab merge).
   ///
-  /// Builds URLs first (skipping unusable entries), then pairs with shots that have
-  /// a non-empty [Shot.imageUrl] by index; if the API omits shot rows, uses placeholders
-  /// so a non-empty [Roll.imageUrls] still renders.
+  /// 1) Uses [Roll.imageUrls] when present (https / file / absolute paths).
+  /// 2) If that list is empty, falls back to each [Shot.imageUrl] in frame order so
+  ///    cloud URLs still load when the top-level array is empty but per-shot URLs exist.
+  /// 3) If still empty, [tripleAsync] may use on-device lab imports.
   static RollGalleryTriple tripleServerOnly(Roll roll) {
     final urls = <String>[];
     for (final u in roll.imageUrls) {
-      if (u.trim().isEmpty) continue;
-      if (!u.startsWith('http') && !u.startsWith('/') && !u.startsWith('file://')) {
-        continue;
-      }
-      urls.add(u);
+      if (!_isDisplayableAssetUrl(u)) continue;
+      urls.add(u.trim());
     }
+
+    var urlsFromShotsOnly = false;
+    if (urls.isEmpty) {
+      urlsFromShotsOnly = true;
+      final sortedShots = [...roll.shots]
+        ..sort((a, b) => (a.frameNumber ?? 0).compareTo(b.frameNumber ?? 0));
+      for (final s in sortedShots) {
+        if (!_isDisplayableAssetUrl(s.imageUrl)) continue;
+        urls.add(s.imageUrl!.trim());
+      }
+    }
+
     if (urls.isEmpty) {
       return ([], [], []);
+    }
+
+    if (urlsFromShotsOnly) {
+      final ids = <String>[];
+      final alignedShots = <Shot>[];
+      final sortedShots = [...roll.shots]
+        ..sort((a, b) => (a.frameNumber ?? 0).compareTo(b.frameNumber ?? 0));
+      for (final s in sortedShots) {
+        if (!_isDisplayableAssetUrl(s.imageUrl)) continue;
+        ids.add(s.id);
+        alignedShots.add(s);
+      }
+      return (urls, ids, alignedShots);
     }
 
     final shotsWithImage =
@@ -52,7 +83,7 @@ class RollGalleryPairs {
     return (urls, ids, alignedShots);
   }
 
-  /// Prefer cloud/R2 URLs from the API; if there are none, use locally saved lab scans (`lab:*`).
+  /// Prefer cloud/R2 URLs from the API ([imageUrls] or per-shot URLs); if none, lab files on device.
   static Future<RollGalleryTriple> tripleAsync(Roll roll) async {
     final server = tripleServerOnly(roll);
     if (server.$1.isNotEmpty) return server;

@@ -66,8 +66,19 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(http_be
         email = decoded_token.get("email")
         display_name = decoded_token.get("name") or (email.split("@")[0] if email else "New User")
         user = User(id=uid, email=email, display_name=display_name)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        try:
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        except Exception as e:
+            db.rollback()
+            # If it was an IntegrityError (race condition), the user should exist now
+            user = db.query(User).filter(User.id == uid).first()
+            if not user:
+                logger.error("get_current_user: Failed to create/retrieve user %s: %s", uid, e)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Error during user initialization"
+                )
     
     return user

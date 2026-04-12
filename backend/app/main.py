@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from strawberry.fastapi import GraphQLRouter
 
+from fastapi.middleware.cors import CORSMiddleware
 from .api.v1 import auth, gear, rolls, storage, master, dashboard, user, billing
 from .graphql.schema import schema, get_context
 from .core.firebase import init_firebase
@@ -18,6 +19,15 @@ Base.metadata.create_all(bind=engine)
 from .tasks.transfer_worker import start_worker, stop_worker
 
 app = FastAPI(title="Halide API")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def startup_event():

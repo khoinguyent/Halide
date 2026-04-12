@@ -11,6 +11,7 @@ import '../models/lens.dart';
 import '../widgets/gear_status_selector.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
+import '../core/utils/local_image_thumb.dart';
 
 class LockerView extends ConsumerWidget {
   const LockerView({Key? key}) : super(key: key);
@@ -210,11 +211,15 @@ class _GearCard extends StatelessWidget {
                         
                         final isLocal = url.startsWith('/') || url.startsWith(RegExp(r'^[A-Za-z]:'));
                         if (isLocal) {
+                          final px = localImageDecodeCacheExtent(context, 56);
                           return Image.file(
                             File(url),
                             fit: BoxFit.cover,
                             width: 56,
                             height: 56,
+                            cacheWidth: px,
+                            cacheHeight: px,
+                            filterQuality: FilterQuality.low,
                             errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white38, size: 28),
                           );
                         }

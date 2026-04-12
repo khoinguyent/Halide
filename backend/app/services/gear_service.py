@@ -1,4 +1,5 @@
 import uuid as uuid_lib
+import logging
 from typing import List, Optional
 
 from sqlalchemy.orm import Session, joinedload
@@ -8,6 +9,8 @@ from ..db.models.user import User
 from ..db.schemas.camera import UserCameraCreate, UserLensCreate, UserCameraUpdate, UserLensUpdate
 from .storage_service import storage_service
 from .roll_service import public_http_url_for_storage_key
+
+logger = logging.getLogger(__name__)
 
 def get_user_cameras(db: Session, user_id: str, skip: int = 0, limit: int = 100):
     return db.query(UserCamera).options(
@@ -117,6 +120,13 @@ def upload_gear_photos(
     """
     row = db.query(UserCamera).filter(UserCamera.id == user_camera_id, UserCamera.user_id == user_id).first()
     if not row:
+        other = db.query(UserCamera).filter(UserCamera.id == user_camera_id).first()
+        logger.warning(
+            "upload_gear_photos: no UserCamera for user_camera_id=%s user_id=%s row_exists_other_user=%s",
+            user_camera_id,
+            user_id,
+            other is not None,
+        )
         return None
 
     user = db.query(User).filter(User.id == user_id).first()
@@ -133,7 +143,7 @@ def upload_gear_photos(
             break
 
         image_id = str(uuid_lib.uuid4())
-        key = storage_service.upload_gear_image(
+        key, stored_main_bytes = storage_service.upload_gear_image(
             user_id,
             str(user_camera_id),
             image_id,
@@ -141,7 +151,7 @@ def upload_gear_photos(
         )
         public_url = public_http_url_for_storage_key(key)
         existing_urls.append(public_url)
-        user.storage_used_bytes += len(file_content)
+        user.storage_used_bytes += stored_main_bytes
         db.add(user)
 
     row.image_urls = existing_urls

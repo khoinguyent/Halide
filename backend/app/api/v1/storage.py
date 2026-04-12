@@ -31,6 +31,7 @@ from ...core.encryption import decrypt_credential, encrypt_credential
 from ...core.config import settings
 from ...services.google_drive_service import (
     extract_drive_folder_id,
+    get_drive_entry_mime_type,
     list_folder_leaf_files,
     refresh_google_credentials,
     download_file_bytes,
@@ -42,6 +43,8 @@ from googleapiclient.errors import HttpError
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_GOOGLE_DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
 
 
 def _tier_uses_cloud_drive_r2_sync(tier: Optional[str]) -> bool:
@@ -1254,35 +1257,104 @@ def _perform_gdrive_sync(user_id: str, roll_id: str, gdrive_url_or_id: str):
         # Note: We call the endpoint function but it works because it's just a function.
         # However, we need to handle the return value or errors.
         try:
-            # We must use 'await' if we call it directly, but wait...
-            # sync_images_from_url is now async.
-            # In a background task (which is sync), we should call a sync version of the logic.
-            # Actually, sync_images_from_url just routes to sync_gdrive_leaf_files (sync)
-            # or sync_gdrive_zip_images (sync).
-            # So let's just do the routing here.
-            
             raw = (payload.gdrive_url_or_id or "").strip()
-            raw_lower = raw.lower()
             result = None
-            if "/folders/" in raw_lower:
+            try:
+                node_id = extract_drive_folder_id(raw)
+            except ValueError:
+                logger.error("[Sync] Could not parse Drive URL for roll %s (snippet=%r)", roll_id, raw[:120])
+                db.refresh(roll)
+                roll.status = RollStatusEnum.lab
+                db.add(roll)
+                db.commit()
+                return
+
+            cred = (
+                db.query(StorageCredential)
+                .filter(
+                    StorageCredential.user_id == current_user.id,
+                    StorageCredential.provider == StorageProviderEnum.gdrive,
+                )
+                .order_by(StorageCredential.is_primary.desc())
+                .first()
+            )
+            if not cred:
+                logger.error("[Sync] No Google Drive connection for user %s", user_id)
+                db.refresh(roll)
+                roll.status = RollStatusEnum.lab
+                db.add(roll)
+                db.commit()
+                return
+
+            tokens_json = decrypt_credential(cred.encrypted_auth_data)
+            if not tokens_json:
+                logger.error("[Sync] Could not decrypt GDrive credentials for user %s", user_id)
+                db.refresh(roll)
+                roll.status = RollStatusEnum.lab
+                db.add(roll)
+                db.commit()
+                return
+
+            try:
+                tokens = json.loads(tokens_json)
+            except Exception:
+                logger.exception("[Sync] Invalid GDrive token JSON for user %s", user_id)
+                db.refresh(roll)
+                roll.status = RollStatusEnum.lab
+                db.add(roll)
+                db.commit()
+                return
+
+            try:
+                credentials, refreshed = refresh_google_credentials(tokens)
+                _persist_gdrive_tokens(db, cred, tokens, refreshed)
+            except RefreshError as e:
+                logger.warning("[Sync] GDrive token refresh failed: %s", e)
+                db.refresh(roll)
+                roll.status = RollStatusEnum.lab
+                db.add(roll)
+                db.commit()
+                return
+
+            mime = get_drive_entry_mime_type(credentials, node_id)
+            if mime == _GOOGLE_DRIVE_FOLDER_MIME:
                 result = sync_gdrive_leaf_files(
                     payload=GDriveSyncRequest(roll_id=payload.roll_id, folder_url_or_id=raw),
                     current_user=current_user,
                     db=db,
                 )
-            elif "/file/d/" in raw_lower or "export=download" in raw_lower or raw_lower.endswith(".zip"):
+            elif mime:
                 result = sync_gdrive_zip_images(
                     payload=GDriveZipSyncRequest(roll_id=payload.roll_id, zip_url_or_id=raw),
                     current_user=current_user,
                     db=db,
                 )
             else:
-                logger.error("[Sync] Unrecognized gdrive_url_or_id for roll %s", roll_id)
-                db.refresh(roll)
-                roll.status = RollStatusEnum.lab
-                db.add(roll)
-                db.commit()
-                return
+                # files.get failed — fall back to URL substring heuristics (older behavior)
+                raw_lower = raw.lower()
+                if "/folders/" in raw_lower:
+                    result = sync_gdrive_leaf_files(
+                        payload=GDriveSyncRequest(roll_id=payload.roll_id, folder_url_or_id=raw),
+                        current_user=current_user,
+                        db=db,
+                    )
+                elif "/file/d/" in raw_lower or "export=download" in raw_lower or raw_lower.endswith(".zip"):
+                    result = sync_gdrive_zip_images(
+                        payload=GDriveZipSyncRequest(roll_id=payload.roll_id, zip_url_or_id=raw),
+                        current_user=current_user,
+                        db=db,
+                    )
+                else:
+                    logger.error(
+                        "[Sync] Could not resolve Drive url for roll %s id=%s (mime lookup returned None)",
+                        roll_id,
+                        node_id,
+                    )
+                    db.refresh(roll)
+                    roll.status = RollStatusEnum.lab
+                    db.add(roll)
+                    db.commit()
+                    return
 
             if result:
                 logger.info(
@@ -1325,39 +1397,16 @@ async def sync_images_from_url(
             detail="Cloud scan backup requires Plus or Pro. Free saves scans on this device only.",
         )
 
-    if background_tasks:
-        # Set status to syncing immediately so frontend sees it on re-fetch
-        roll = db.query(Roll).filter(Roll.id == payload.roll_id, Roll.user_id == current_user.id).first()
-        if roll:
-            roll.status = RollStatusEnum.syncing
-            db.add(roll)
-            db.commit()
-            
-        background_tasks.add_task(_perform_gdrive_sync, current_user.id, payload.roll_id, payload.gdrive_url_or_id)
-        return {"detail": "Sync started in background"}
-
     raw = (payload.gdrive_url_or_id or "").strip()
     if not raw:
         raise HTTPException(status_code=400, detail="gdrive_url_or_id is required")
 
-    raw_lower = raw.lower()
-    if "/folders/" in raw_lower:
-        return sync_gdrive_leaf_files(
-            payload=GDriveSyncRequest(roll_id=payload.roll_id, folder_url_or_id=raw),
-            current_user=current_user,
-            db=db,
-        )
+    # Always queue background ingest — holds a DB session for minutes when done inline.
+    roll = db.query(Roll).filter(Roll.id == payload.roll_id, Roll.user_id == current_user.id).first()
+    if roll:
+        roll.status = RollStatusEnum.syncing
+        db.add(roll)
+        db.commit()
 
-    # Route to ZIP sync if it looks like a file link, direct download, or has .zip extension
-    if "/file/d/" in raw_lower or "export=download" in raw_lower or raw_lower.endswith(".zip"):
-        return sync_gdrive_zip_images(
-            payload=GDriveZipSyncRequest(roll_id=payload.roll_id, zip_url_or_id=raw),
-            current_user=current_user,
-            db=db,
-        )
-
-    # Ambiguous raw IDs: we cannot know whether it's a folder or zip file from the string alone.
-    raise HTTPException(
-        status_code=400,
-        detail="Ambiguous Drive identifier. Please send a shared URL containing either '/folders/' or '/file/d/'.",
-    )
+    background_tasks.add_task(_perform_gdrive_sync, current_user.id, payload.roll_id, payload.gdrive_url_or_id)
+    return {"detail": "Sync started in background"}

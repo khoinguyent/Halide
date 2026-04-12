@@ -297,10 +297,26 @@ class _PaywallViewState extends ConsumerState<PaywallView> {
     );
   }
 
+  /// Shown on the Pro card. Uses App Store / Play prices from RevenueCat when offerings load.
+  String _proPriceLabel({required bool annual}) {
+    final o = _cachedOfferings;
+    if (o != null) {
+      final off = proOfferingFrom(o);
+      final pkg = annual ? off?.annual : off?.monthly;
+      final ps = pkg?.storeProduct.priceString;
+      if (ps != null && ps.isNotEmpty) return ps;
+    }
+    return annual ? r'$39.99' : r'$3.99';
+  }
+
   Widget _buildPlanSelector() {
     final plans = [
       {'name': 'Free', 'monthly': '0', 'annual': '0'},
-      {'name': 'Pro', 'monthly': '5.99', 'annual': '59.99'},
+      {
+        'name': 'Pro',
+        'monthly': _proPriceLabel(annual: false),
+        'annual': _proPriceLabel(annual: true),
+      },
     ];
 
     return Padding(
@@ -357,7 +373,7 @@ class _PaywallViewState extends ConsumerState<PaywallView> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          index == 0 ? 'Free' : '\$$displayPrice',
+                          index == 0 ? 'Free' : displayPrice,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: index == 0 ? 18 : 16,
