@@ -792,6 +792,14 @@ class _StatusBadge extends StatelessWidget {
                 letterSpacing: 1.0,
               ),
             ),
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 14,
+                color: fg,
+              ),
+            ],
           ],
         ),
       ),

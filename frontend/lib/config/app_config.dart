@@ -5,13 +5,19 @@ import 'env_loader.dart';
 enum AppFlavor { dev, staging, prod }
 
 /// App configuration.
-/// Loads [FLAVOR] from bundled `frontend/.env` first, then `--dart-define=FLAVOR=...`.
+///
+/// **FLAVOR** resolution order:
+/// 1. Non-empty `--dart-define=FLAVOR=...` (wins so `flutter run --dart-define=FLAVOR=staging`
+///    hits staging even if `.env` still says `dev`).
+/// 2. Non-empty `FLAVOR` in bundled `frontend/.env`.
+/// 3. Default **`staging`** (shared staging API, not localhost).
 class AppConfig {
   static String get _flavor {
-    return halideEnvString(
-      'FLAVOR',
-      fromDefine: const String.fromEnvironment('FLAVOR', defaultValue: 'dev'),
-    );
+    const fromDefine = String.fromEnvironment('FLAVOR', defaultValue: '');
+    if (fromDefine.trim().isNotEmpty) {
+      return fromDefine.trim();
+    }
+    return halideEnvString('FLAVOR', fromDefine: 'staging');
   }
 
   static AppFlavor get flavor {
@@ -40,4 +46,11 @@ class AppConfig {
   static String get apiUrl => '$baseUrl/api/v1';
   static String get authUrl => baseUrl;
   static String get graphqlUrl => '$baseUrl/graphql';
+
+  /// Public marketing / legal pages (App Store review: Privacy + Terms links on paywall).
+  static const String privacyPolicyWebUrl = 'https://www.halide.io.vn/privacy';
+
+  /// Apple standard EULA for licensed applications (Terms of Use link on subscription UI).
+  static const String appleStandardEulaUrl =
+      'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 }

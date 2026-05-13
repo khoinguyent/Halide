@@ -1,4 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "halide.io.vn" }],
+      "destination": "https://www.halide.io.vn/:path*",
+      "permanent": true
+    }
+  ]
 }

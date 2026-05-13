@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 from datetime import timedelta
+from typing import Any, Optional
+from urllib.parse import quote, unquote, urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 WEBHOOK_TIER_SYNC_EVENT_TYPES = frozenset(
     {
         "INITIAL_PURCHASE",
+        "NON_RENEWING_PURCHASE",
         "RENEWAL",
         "PRODUCT_CHANGE",
         "EXPIRATION",
@@ -35,6 +37,18 @@ WEBHOOK_TIER_SYNC_EVENT_TYPES = frozenset(
         "REFUND_REVERSED",
     }
 )
+
+# Stackable storage add-ons (consumable / non-consumable): count purchases in RevenueCat
+# `subscriber.non_subscriptions[product_id]` (V1 API) and multiply by GB per SKU.
+STORAGE_ADDON_PRODUCT_GB = {
+    "halide_storage_5gb": 5,
+    "halide_storage_10gb": 10,
+    "halide_storage_50gb": 50,
+    "extra_storage_10gb": 10,
+}
+
+# Entitlements that grant storage quota but must not set subscription_tier to "pro".
+STORAGE_ONLY_ENTITLEMENT_IDS = frozenset({"halide_cloud_system_storage"})
 
 
 def _normalized_entitlement_inputs(event: dict) -> tuple[list, list]:
@@ -65,7 +79,8 @@ def _update_user_tier(user: User, entitlements: list | None = None, entitlement_
         active_ids.extend([str(e.get("id", "")).lower().strip() for e in entitlements if e.get("id")])
 
     known_pro_ids = [id.strip().lower() for id in settings.REVENUE_CAT_PRO_ENTITLEMENT_IDS.split(",")]
-    is_premium = any(eid in known_pro_ids for eid in active_ids)
+    tier_ids = [eid for eid in active_ids if eid not in STORAGE_ONLY_ENTITLEMENT_IDS]
+    is_premium = any(eid in known_pro_ids for eid in tier_ids)
 
     user.subscription_tier = "pro" if is_premium else "free"
     logger.info(
@@ -127,6 +142,176 @@ def parse_active_entitlements_from_customer_json(data: dict) -> list[dict]:
     return active_entitlements
 
 
+def _purchase_count_in_non_subscriptions(non_sub: dict, product_id: str) -> int:
+    if not non_sub or product_id not in non_sub:
+        return 0
+    val = non_sub[product_id]
+    if isinstance(val, list):
+        return len(val)
+    if isinstance(val, dict):
+        return 1
+    return 0
+
+
+def additional_storage_bytes_from_non_subscriptions(non_sub: dict) -> int:
+    total = 0
+    for pid, gb in STORAGE_ADDON_PRODUCT_GB.items():
+        n = _purchase_count_in_non_subscriptions(non_sub, pid)
+        total += n * gb * 1024 * 1024 * 1024
+    return total
+
+
+def _v2_purchase_storage_sku(purchase: dict) -> Optional[str]:
+    """Map a V2 purchase object to a STORAGE_ADDON_PRODUCT_GB key (App Store / store identifier)."""
+    keys = STORAGE_ADDON_PRODUCT_GB.keys()
+    pid = purchase.get("product_id")
+    if isinstance(pid, str) and pid in keys:
+        return pid
+    prod = purchase.get("product")
+    if isinstance(prod, dict):
+        sid = prod.get("store_identifier")
+        if isinstance(sid, str) and sid in keys:
+            return sid
+    ent_block = purchase.get("entitlements")
+    if not isinstance(ent_block, dict):
+        return None
+    for ent in ent_block.get("items") or []:
+        if not isinstance(ent, dict):
+            continue
+        prods = ent.get("products")
+        if not isinstance(prods, dict):
+            continue
+        for pr in prods.get("items") or []:
+            if not isinstance(pr, dict):
+                continue
+            sid = pr.get("store_identifier")
+            if isinstance(sid, str) and sid in keys:
+                return sid
+    return None
+
+
+def additional_storage_bytes_from_v2_purchase_items(items: list[dict]) -> int:
+    """Sum stackable storage from RevenueCat V2 GET .../customers/{id}/purchases items."""
+    total = 0
+    for p in items:
+        if not isinstance(p, dict) or p.get("object") != "purchase":
+            continue
+        status = (p.get("status") or "owned").lower()
+        if status in ("refunded", "revoked"):
+            continue
+        sku = _v2_purchase_storage_sku(p)
+        if not sku:
+            continue
+        gb = STORAGE_ADDON_PRODUCT_GB[sku]
+        try:
+            qty = int(p.get("quantity") or 1)
+        except (TypeError, ValueError):
+            qty = 1
+        if qty < 1:
+            qty = 1
+        total += qty * gb * 1024 * 1024 * 1024
+    return total
+
+
+async def fetch_revenuecat_v2_customer_purchase_items(
+    app_user_id: str,
+) -> list[dict]:
+    """
+    Paginate GET /v2/projects/{project_id}/customers/{customer_id}/purchases.
+    Uses the same secret key as other V2 customer endpoints (V1 subscriber key is often incompatible).
+    """
+    from ...core.config import settings
+
+    if not settings.REVENUE_CAT_SECRET_KEY or not settings.REVENUE_CAT_PROJECT_ID:
+        return []
+
+    encoded_id = quote(app_user_id, safe="")
+    base_path = (
+        f"https://api.revenuecat.com/v2/projects/{settings.REVENUE_CAT_PROJECT_ID}"
+        f"/customers/{encoded_id}/purchases"
+    )
+    env = "sandbox" if settings.IS_REVENUE_CAT_SANDBOX else "production"
+    headers = {
+        "Authorization": f"Bearer {settings.REVENUE_CAT_SECRET_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    out: list[dict] = []
+    next_url: Optional[str] = base_path
+    next_params: Optional[dict[str, Any]] = {"limit": 100, "environment": env}
+
+    async with httpx.AsyncClient() as client:
+        for _ in range(100):
+            if not next_url:
+                break
+            response = await client.get(next_url, headers=headers, params=next_params)
+            if response.status_code != 200:
+                logger.warning(
+                    "[Billing] RevenueCat V2 GET purchases %s failed: %s %s",
+                    app_user_id,
+                    response.status_code,
+                    response.text[:500],
+                )
+                break
+            body = response.json()
+            if not isinstance(body, dict):
+                break
+            items = body.get("items") or []
+            for it in items:
+                if isinstance(it, dict):
+                    out.append(it)
+            np = body.get("next_page")
+            if not np or not isinstance(np, str):
+                break
+            if np.startswith("http"):
+                next_url = np
+                next_params = None
+            else:
+                parsed = urlparse(np)
+                next_url = f"https://api.revenuecat.com{parsed.path}"
+                next_params = _parse_qs_to_dict(parsed.query) if parsed.query else None
+
+    return out
+
+
+def _parse_qs_to_dict(qs: str) -> dict[str, str]:
+    """Parse query string from RevenueCat `next_page` URLs into httpx params."""
+    out: dict[str, str] = {}
+    for part in qs.split("&"):
+        if not part:
+            continue
+        if "=" in part:
+            k, v = part.split("=", 1)
+            out[unquote(k)] = unquote(v)
+        else:
+            out[unquote(part)] = ""
+    return out
+
+
+async def fetch_revenuecat_v1_subscriber_json(app_user_id: str) -> Optional[dict]:
+    """V1 subscriber payload includes `non_subscriptions` (needed for consumable stack counts)."""
+    from ...core.config import settings
+
+    if not settings.REVENUE_CAT_SECRET_KEY:
+        return None
+    url = f"https://api.revenuecat.com/v1/subscribers/{app_user_id}"
+    headers = {
+        "Authorization": f"Bearer {settings.REVENUE_CAT_SECRET_KEY}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
+        if response.status_code != 200:
+            logger.warning(
+                "[Billing] RevenueCat V1 GET subscriber %s failed: %s %s",
+                app_user_id,
+                response.status_code,
+                response.text[:500],
+            )
+            return None
+        return response.json()
+
+
 async def fetch_revenuecat_customer_json(app_user_id: str) -> Optional[dict]:
     """GET subscriber/customer from RevenueCat (V2 project or V1). Returns None on failure."""
     from ...core.config import settings
@@ -135,7 +320,8 @@ async def fetch_revenuecat_customer_json(app_user_id: str) -> Optional[dict]:
         return None
 
     if settings.REVENUE_CAT_PROJECT_ID:
-        url = f"https://api.revenuecat.com/v2/projects/{settings.REVENUE_CAT_PROJECT_ID}/customers/{app_user_id}"
+        cid = quote(app_user_id, safe="")
+        url = f"https://api.revenuecat.com/v2/projects/{settings.REVENUE_CAT_PROJECT_ID}/customers/{cid}"
     else:
         url = f"https://api.revenuecat.com/v1/subscribers/{app_user_id}"
 
@@ -157,13 +343,65 @@ async def fetch_revenuecat_customer_json(app_user_id: str) -> Optional[dict]:
         return response.json()
 
 
-async def apply_tier_from_revenuecat_api(db: Session, user: User) -> bool:
-    """Fetch current entitlements from RevenueCat REST API and update user tier. Returns True if applied."""
+async def sync_user_from_revenuecat(db: Session, user: User) -> bool:
+    """
+    Fetch RevenueCat REST data and update subscription_tier plus stackable
+    additional_storage_bytes.
+
+    - **V2 project** (`REVENUE_CAT_PROJECT_ID`): stackable storage from
+      `GET /v2/projects/.../customers/{id}/purchases` (same secret as other V2 calls).
+      V1 `GET /v1/subscribers/{id}` is not used (modern secret keys are often V2-only).
+    - **Legacy (no project id)**: storage from V1 `subscriber.non_subscriptions` only.
+    """
+    from ...core.config import settings
+
     data = await fetch_revenuecat_customer_json(user.id)
     if not data:
         return False
     active = parse_active_entitlements_from_customer_json(data)
     _update_user_tier(user, entitlements=active)
+
+    non_sub: dict = {}
+    sub = data.get("subscriber") if isinstance(data.get("subscriber"), dict) else None
+    if isinstance(sub, dict):
+        non_sub = dict(sub.get("non_subscriptions") or {})
+
+    if settings.REVENUE_CAT_PROJECT_ID:
+        v2_items = await fetch_revenuecat_v2_customer_purchase_items(user.id)
+        storage_bytes = additional_storage_bytes_from_v2_purchase_items(v2_items)
+        if storage_bytes == 0 and non_sub:
+            storage_bytes = additional_storage_bytes_from_non_subscriptions(non_sub)
+        user.additional_storage_bytes = storage_bytes
+        matched_skus: set[str] = set()
+        for it in v2_items:
+            if isinstance(it, dict):
+                s = _v2_purchase_storage_sku(it)
+                if s:
+                    matched_skus.add(s)
+        logger.info(
+            "[Billing] Storage sync user=%s additional_storage_bytes=%s "
+            "(v2_purchase_items=%s matched_skus=%s)",
+            user.id,
+            user.additional_storage_bytes,
+            len(v2_items),
+            sorted(matched_skus),
+        )
+    else:
+        v1_data = await fetch_revenuecat_v1_subscriber_json(user.id)
+        if isinstance(v1_data, dict):
+            v1_sub = v1_data.get("subscriber")
+            if isinstance(v1_sub, dict):
+                v1_non = v1_sub.get("non_subscriptions") or {}
+                if v1_non:
+                    non_sub = dict(v1_non)
+        user.additional_storage_bytes = additional_storage_bytes_from_non_subscriptions(non_sub)
+        logger.info(
+            "[Billing] Storage sync user=%s additional_storage_bytes=%s (non_sub keys=%s)",
+            user.id,
+            user.additional_storage_bytes,
+            list(non_sub.keys()) if non_sub else [],
+        )
+
     db.add(user)
     return True
 
@@ -280,7 +518,15 @@ async def revenue_cat_webhook(
             logger.warning("[Billing] Failed to log purchase history: %s", e)
 
     env_str = "SANDBOX" if is_sandbox else "PRODUCTION"
-    logger.info("[Billing] [%s] Webhook %s for app_user_id=%s", env_str, event_type, app_user_id)
+    logger.info(
+        "[Billing] [%s] Webhook type=%s app_user_id=%s product_id=%s transaction_id=%s rc_event_id=%s",
+        env_str,
+        event_type,
+        app_user_id,
+        event.get("product_id"),
+        event.get("transaction_id"),
+        event.get("id"),
+    )
 
     # --- TRANSFER: refresh tier for every affected user via API (authoritative) ---
     if event_type == "TRANSFER":
@@ -294,7 +540,7 @@ async def revenue_cat_webhook(
             if not u:
                 logger.info("[Billing] TRANSFER skip unknown user id=%s (%s)", uid, label)
                 continue
-            ok = await apply_tier_from_revenuecat_api(db, u)
+            ok = await sync_user_from_revenuecat(db, u)
             logger.info("[Billing] TRANSFER sync user %s (%s) -> %s", uid, label, ok)
 
         db.commit()
@@ -313,42 +559,30 @@ async def revenue_cat_webhook(
 
     previous_tier = user.subscription_tier
 
-    # --- Non-renewing purchase (storage add-on + optional tier) ---
-    if event_type == "NON_RENEWING_PURCHASE":
-        product_id = event.get("product_id")
-        if product_id == "extra_storage_10gb":
-            user.additional_storage_bytes = (user.additional_storage_bytes or 0) + (10 * 1024 * 1024 * 1024)
-            logger.info("[Billing] Added 10GB to user %s", user.id)
-        ents, eids = _normalized_entitlement_inputs(event)
-        _update_user_tier(user, entitlements=ents, entitlement_ids=eids)
-        _maybe_email_downgrade_notice(previous_tier=previous_tier, new_tier=user.subscription_tier, user=user)
-        db.add(user)
-        db.commit()
-        return {"status": "ok"}
-
-    # --- Subscription lifecycle: use webhook entitlements, then REST for ambiguous cases ---
+    # --- Subscription + consumable storage: reconcile tier and stackable storage from RevenueCat REST ---
     if event_type in WEBHOOK_TIER_SYNC_EVENT_TYPES:
-        ents, eids = _normalized_entitlement_inputs(event)
-        _update_user_tier(user, entitlements=ents, entitlement_ids=eids)
-
-        # Refunds / cancellations sometimes omit entitlement_ids; use RevenueCat as source of truth.
-        if event_type in frozenset(
-            {
-                "EXPIRATION",
-                "CANCELLATION",
-                "BILLING_ISSUE",
-                "REFUND_REVERSED",
-                "UNCANCELLATION",
-                "PRODUCT_CHANGE",
-            }
-        ):
-            if settings.REVENUE_CAT_SECRET_KEY:
-                ok = await apply_tier_from_revenuecat_api(db, user)
-                if ok:
-                    logger.info("[Billing] Reconciled tier from RevenueCat API after %s for %s", event_type, user.id)
+        if settings.REVENUE_CAT_SECRET_KEY:
+            ok = await sync_user_from_revenuecat(db, user)
+            if not ok:
+                ents, eids = _normalized_entitlement_inputs(event)
+                _update_user_tier(user, entitlements=ents, entitlement_ids=eids)
+        else:
+            ents, eids = _normalized_entitlement_inputs(event)
+            _update_user_tier(user, entitlements=ents, entitlement_ids=eids)
         _maybe_email_downgrade_notice(previous_tier=previous_tier, new_tier=user.subscription_tier, user=user)
         db.add(user)
         db.commit()
+        product_id = event.get("product_id")
+        if isinstance(product_id, str) and product_id in STORAGE_ADDON_PRODUCT_GB:
+            logger.info(
+                "[Billing] Storage add-on applied user=%s product_id=%s transaction_id=%s "
+                "additional_storage_bytes=%s tier=%s",
+                user.id,
+                product_id,
+                event.get("transaction_id"),
+                user.additional_storage_bytes or 0,
+                user.subscription_tier,
+            )
         return {"status": "ok"}
 
     db.add(user)
@@ -369,8 +603,13 @@ async def sync_billing_status(
     if not settings.REVENUE_CAT_SECRET_KEY:
         raise HTTPException(status_code=501, detail="RevenueCat Secret Key not configured")
 
-    if not await apply_tier_from_revenuecat_api(db, current_user):
+    if not await sync_user_from_revenuecat(db, current_user):
         raise HTTPException(status_code=502, detail="Failed to fetch from RevenueCat")
 
     db.commit()
-    return {"status": "synced", "tier": current_user.subscription_tier}
+    return {
+        "status": "synced",
+        "tier": current_user.subscription_tier,
+        "additional_storage_bytes": current_user.additional_storage_bytes or 0,
+        "total_storage_limit": current_user.total_storage_limit,
+    }

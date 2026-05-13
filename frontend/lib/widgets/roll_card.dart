@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/fetch_scans_helper.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -73,158 +75,19 @@ class _RollCardState extends ConsumerState<RollCard> {
   String? _fetchingRollId;
 
   Future<void> _handleFetchScans(String rollId, String driveUrl) async {
-    debugPrint('Fetching from $driveUrl');
-    if (!mounted) return;
-
-    final trimmed = driveUrl.trim();
-    if (!PublicDriveLabImportService.isDriveFolderUrl(trimmed)) {
-      setState(() => _fetchingRollId = rollId);
-      try {
-        final count = await PublicDriveLabImportService.importPublicFileOrZipToLocal(
-          rollId: rollId,
-          driveUrlOrId: trimmed,
-        );
-        if (count > 0) {
-          final user = ref.read(userProvider);
-          final token = await user?.getIdToken();
-          if (token != null) {
-            try {
-              await ref.read(rollServiceProvider).updateRollStatus(token, rollId, 'scanned');
-            } catch (e) {
-              debugPrint('[RollCard] mark scanned: $e');
-            }
-          }
-          ref.invalidate(rollDetailProvider(rollId));
-          ref.invalidate(rollGalleryPairsProvider(rollId));
-          ref.invalidate(rollHasLocalLabScansProvider(rollId));
-          ref.invalidate(dashboardRollsProvider);
-          if (mounted) {
-            ref.read(notificationProvider.notifier).show(
-                  'SAVED $count PHOTO(S) ON THIS DEVICE.',
-                  type: NotificationType.success,
-                );
-          }
-          return;
-        }
-      } catch (e) {
-        debugPrint('[RollCard] local lab import failed, will try cloud: $e');
-      } finally {
-        if (mounted) setState(() => _fetchingRollId = null);
-      }
-    }
-
-    final gdriveOk = await ensureGoogleDriveConnected(context, ref);
-    if (!gdriveOk) return;
-
-    if (PublicDriveLabImportService.isDriveFolderUrl(trimmed) &&
-        ref.read(userPlanProvider) == UserPlan.free) {
-      setState(() => _fetchingRollId = rollId);
-      try {
-        final count = await AuthenticatedDriveFolderImportService.importFolder(
-          api: _api,
-          rollId: rollId,
-          folderUrl: trimmed,
-        );
-        if (count > 0) {
-          final user = ref.read(userProvider);
-          final token = await user?.getIdToken();
-          if (token != null) {
-            try {
-              await ref.read(rollServiceProvider).updateRollStatus(token, rollId, 'scanned');
-            } catch (e) {
-              debugPrint('[RollCard] mark scanned: $e');
-            }
-          }
-          ref.invalidate(rollDetailProvider(rollId));
-          ref.invalidate(rollGalleryPairsProvider(rollId));
-          ref.invalidate(rollHasLocalLabScansProvider(rollId));
-          ref.invalidate(dashboardRollsProvider);
-          if (mounted) {
-            ref.read(notificationProvider.notifier).show(
-                  'SAVED $count PHOTO(S) ON THIS DEVICE.',
-                  type: NotificationType.success,
-                );
-          }
-        }
-      } catch (e) {
-        debugPrint('[RollCard] free folder import failed: $e');
+    await FetchScansHelper.handleFetchScans(
+      context: context,
+      ref: ref,
+      rollId: rollId,
+      driveUrl: driveUrl,
+      onFetchingStateChanged: (isFetching) {
         if (mounted) {
-          ref.read(notificationProvider.notifier).show(
-                'COULDN\'T DOWNLOAD FOLDER. CHECK DRIVE ACCESS AND TRY AGAIN.',
-                type: NotificationType.error,
-              );
+          setState(() {
+            _fetchingRollId = isFetching ? rollId : null;
+          });
         }
-      } finally {
-        if (mounted) setState(() => _fetchingRollId = null);
-      }
-      return;
-    }
-
-    setState(() => _fetchingRollId = rollId);
-    try {
-      final resp = await _api.post(
-        '/api/v1/storage/gdrive/sync_images_from_url',
-        data: {
-          'roll_id': rollId,
-          'gdrive_url_or_id': driveUrl,
-        },
-      );
-      final detail = resp.data is Map ? resp.data['detail']?.toString() : null;
-      if (detail != null && detail.toLowerCase().contains('background')) {
-        debugPrint(
-          '[RollCard] Drive folder sync runs on the server; thumbnails appear after ingest finishes (pull to refresh or wait ~5–30s).',
-        );
-      }
-
-      if (!mounted) return;
-      ref.invalidate(dashboardRollsProvider);
-      ref.invalidate(rollDetailProvider(rollId));
-      ref.invalidate(rollGalleryPairsProvider(rollId));
-      ref.invalidate(rollHasLocalLabScansProvider(rollId));
-
-      try {
-        final roll = await ref.read(rollDetailProvider(rollId).future);
-        final triple = await RollGalleryPairs.tripleAsync(roll);
-        final urls = <String>[];
-        final ids = <String>[];
-        for (var i = 0; i < triple.$1.length; i++) {
-          if (triple.$1[i].startsWith('http')) {
-            urls.add(triple.$1[i]);
-            ids.add(triple.$2[i]);
-          }
-        }
-        if (urls.isNotEmpty) {
-          await LocalSyncService().syncRollParallel(roll.id, urls, imageIds: ids);
-        }
-      } catch (e) {
-        debugPrint('[RollCard] prefetch after Drive sync: $e');
-      }
-
-      if (mounted) {
-        ref.invalidate(dashboardRollsProvider);
-        ref.invalidate(rollDetailProvider(rollId));
-      }
-
-      // No snackbar for background sync as per user request
-    } on DioException catch (e) {
-      if (!mounted) return;
-      final data = e.response?.data;
-      final detail = data is Map && data['detail'] != null ? data['detail'].toString() : null;
-      debugPrint('[RollCard] Fetch failed: status=${e.response?.statusCode} detail=$detail data=$data');
-      ref.read(notificationProvider.notifier).show(
-        'COULDN\'T RETRIEVE PHOTOS. PLEASE CHECK YOUR DRIVE LINK.',
-        type: NotificationType.error,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ref.read(notificationProvider.notifier).show(
-        'SOMETHING WENT WRONG WHILE FETCHING PHOTOS.',
-        type: NotificationType.error,
-      );
-    } finally {
-      if (!mounted) return;
-      setState(() => _fetchingRollId = null);
-    }
+      },
+    );
   }
 
   @override
@@ -504,14 +367,25 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.5), width: 1),
       ),
-      child: Text(
-        status.label.toUpperCase(),
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            status.label.toUpperCase(),
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(width: 2),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 14,
+            color: color,
+          ),
+        ],
       ),
     );
   }

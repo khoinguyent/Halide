@@ -283,6 +283,22 @@ a:hover {
   color: var(--text-muted);
 }
 
+.legal-intro {
+  margin: 1rem 0 0;
+}
+
+.legal-cta {
+  display: inline-block;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.legal-cta:hover {
+  text-decoration: underline;
+}
+
 .back-link {
   display: inline-block;
   margin-bottom: 1rem;

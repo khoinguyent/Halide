@@ -7,7 +7,8 @@ Future<void> loadHalideEnv() async {
   try {
     await dotenv.load(fileName: '.env');
     if (kDebugMode) {
-      debugPrint('[Env] Loaded .env (${dotenv.env.length} keys)');
+      final fv = dotenv.env['FLAVOR']?.trim();
+      debugPrint('[Env] Loaded .env (${dotenv.env.length} keys) dotenv FLAVOR=${fv ?? '(unset)'}');
     }
   } catch (e, st) {
     debugPrint('[Env] Failed to load .env asset: $e\n$st');
@@ -18,7 +19,8 @@ Future<void> loadHalideEnv() async {
   }
 }
 
-/// Prefer value from [dotenv] when non-empty; otherwise compile-time --dart-define.
+/// Prefer value from [dotenv] when non-empty; otherwise [fromDefine].
+/// ([AppConfig] treats [FLAVOR] specially: `--dart-define=FLAVOR=...` overrides dotenv.)
 String halideEnvString(String key, {required String fromDefine}) {
   final raw = dotenv.env[key];
   if (raw != null) {

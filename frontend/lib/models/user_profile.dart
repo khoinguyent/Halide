@@ -31,6 +31,10 @@ class UserProfile {
   final bool hasSeenOnboarding;
   final bool hasSeenRollGuide;
   final bool hasSeenLabGuide;
+  /// From GET /api/v1/me (System Cloud quota). Null if older backend responses omit fields.
+  final int? storageUsedBytes;
+  final int? additionalStorageBytes;
+  final int? totalStorageLimitBytes;
 
   const UserProfile({
     required this.id,
@@ -44,7 +48,17 @@ class UserProfile {
     this.hasSeenOnboarding = false,
     this.hasSeenRollGuide = false,
     this.hasSeenLabGuide = false,
+    this.storageUsedBytes,
+    this.additionalStorageBytes,
+    this.totalStorageLimitBytes,
   });
+
+  static int? _parseInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
+  }
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
@@ -61,6 +75,9 @@ class UserProfile {
       hasSeenOnboarding: json['has_seen_onboarding'] as bool? ?? false,
       hasSeenRollGuide: json['has_seen_roll_guide'] as bool? ?? false,
       hasSeenLabGuide: json['has_seen_lab_guide'] as bool? ?? false,
+      storageUsedBytes: _parseInt(json['storage_used_bytes']),
+      additionalStorageBytes: _parseInt(json['additional_storage_bytes']),
+      totalStorageLimitBytes: _parseInt(json['total_storage_limit']),
     );
   }
 }

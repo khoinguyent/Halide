@@ -4,12 +4,13 @@ import 'package:go_router/go_router.dart';
 import '../../core/widgets/glass_panel.dart';
 import '../../core/widgets/halide_scaffold.dart';
 
-/// Shared layout for Terms & Conditions and Privacy Policy — matches [SettingsView] / profile stack styling.
+/// Shared layout for Terms & Conditions and Privacy Policy — matches profile stack styling.
 class LegalDocumentView extends StatelessWidget {
   const LegalDocumentView({
     super.key,
     required this.appBarTitle,
     required this.documentLabel,
+    this.belowDocumentLabel,
     required this.sections,
     required this.lastUpdated,
   });
@@ -17,6 +18,8 @@ class LegalDocumentView extends StatelessWidget {
   final String appBarTitle;
   /// Short uppercase label above the body (e.g. TERMS OF SERVICE).
   final String documentLabel;
+  /// Optional content directly under [documentLabel] (e.g. link to Apple Standard EULA).
+  final Widget? belowDocumentLabel;
   final List<({String title, String body})> sections;
   final String lastUpdated;
 
@@ -79,6 +82,10 @@ class LegalDocumentView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(documentLabel, style: _documentLabelStyle),
+              if (belowDocumentLabel != null) ...[
+                const SizedBox(height: 14),
+                belowDocumentLabel!,
+              ],
               const SizedBox(height: 20),
               ...sections.expand((s) => [
                     Text(s.title, style: _headingStyle),

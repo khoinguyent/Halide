@@ -53,4 +53,10 @@ class RollsRepository {
     });
     return Roll.fromJson(response.data);
   }
+
+  Future<void> updateRollDriveUrl(String rollId, String driveUrl) async {
+    await _apiService.patch('/api/v1/rolls/$rollId/drive-url', data: {
+      'drive_url': driveUrl,
+    });
+  }
 }

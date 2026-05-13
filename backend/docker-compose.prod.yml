@@ -28,6 +28,10 @@ services:
       POSTGRES_USER: halide_user
       POSTGRES_PASSWORD: halide_password
       POSTGRES_DB: halide
+    # Loopback only on the host — connect from your laptop with: ssh -L 5433:127.0.0.1:15432 ...
+    # Do not publish 0.0.0.0:5432; that exposes the DB to the whole internet.
+    ports:
+      - "127.0.0.1:15432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

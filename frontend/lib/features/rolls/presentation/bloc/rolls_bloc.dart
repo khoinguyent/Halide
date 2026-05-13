@@ -14,6 +14,8 @@ class AddRollEvent extends RollsEvent {
   final int? shotAtIso;
   final int? expiredYear;
   final int? maxFrames;
+  final String? status;
+  final String? driveUrl;
 
   AddRollEvent({
     required this.filmStockId,
@@ -23,6 +25,8 @@ class AddRollEvent extends RollsEvent {
     this.shotAtIso,
     this.expiredYear,
     this.maxFrames,
+    this.status,
+    this.driveUrl,
   });
 }
 class UpdateRollStatusEvent extends RollsEvent {
@@ -46,8 +50,9 @@ class RollsError extends RollsState {
 class RollActionSuccess extends RollsState {
   /// Set when a roll was just created (for first-run UI such as shooting intro).
   final String? createdRollId;
+  final String? driveUrlToSync;
 
-  RollActionSuccess({this.createdRollId});
+  RollActionSuccess({this.createdRollId, this.driveUrlToSync});
 }
 
 // BLoC
@@ -86,7 +91,22 @@ class RollsBloc extends Bloc<RollsEvent, RollsState> {
           expiredYear: event.expiredYear,
           maxFrames: event.maxFrames,
         );
-        emit(RollActionSuccess(createdRollId: created.id));
+
+        if (event.driveUrl != null && event.driveUrl!.isNotEmpty) {
+          await repository.updateRollDriveUrl(created.id, event.driveUrl!);
+          if (event.status == null || event.status == 'shooting') {
+            await repository.updateRollStatus(created.id, 'scanned');
+          } else {
+            await repository.updateRollStatus(created.id, event.status!);
+          }
+        } else if (event.status != null && event.status != 'shooting') {
+          await repository.updateRollStatus(created.id, event.status!);
+        }
+
+        emit(RollActionSuccess(
+          createdRollId: created.id,
+          driveUrlToSync: (event.driveUrl != null && event.driveUrl!.isNotEmpty) ? event.driveUrl : null,
+        ));
         add(RefreshRolls());
       } catch (e) {
         emit(RollsError(e.toString()));

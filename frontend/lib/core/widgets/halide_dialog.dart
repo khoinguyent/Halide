@@ -19,10 +19,7 @@ Future<T?> showHalideDialog<T>({
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 200),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
-      return FadeTransition(
-        opacity: animation,
-        child: child,
-      );
+      return FadeTransition(opacity: animation, child: child);
     },
     pageBuilder: (context, animation, secondaryAnimation) {
       return _HalideDialogBarrier(
@@ -91,7 +88,9 @@ class _HalideDialogBarrier extends StatelessWidget {
         Padding(
           padding: EdgeInsets.only(
             bottom: viewInsets.bottom,
-            top: MediaQuery.of(context).padding.top + 16, // Ensure title doesn't hide under status bar
+            top:
+                MediaQuery.of(context).padding.top +
+                16, // Ensure title doesn't hide under status bar
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -132,13 +131,10 @@ Future<T?> showHalideModalBottomSheet<T>({
     transitionDuration: const Duration(milliseconds: 300),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 1),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        )),
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
         child: child,
       );
     },
@@ -200,7 +196,9 @@ class HalideModalContainer extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(borderRadius),
-                border: hasInnerBorder ? Border.all(color: Colors.white.withOpacity(0.07)) : null,
+                border: hasInnerBorder
+                    ? Border.all(color: Colors.white.withOpacity(0.07))
+                    : null,
               ),
               child: child,
             ),
@@ -224,10 +222,12 @@ class HalideTextField extends StatelessWidget {
   final int maxLines;
   final FocusNode? focusNode;
   final String? Function(String?)? validator;
+  final String? initialValue;
 
   const HalideTextField({
     Key? key,
     this.controller,
+    this.initialValue,
     required this.label,
     this.prefixIcon,
     this.obscureText = false,
@@ -244,6 +244,7 @@ class HalideTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
+      initialValue: initialValue,
       obscureText: obscureText,
       keyboardType: keyboardType,
       onChanged: onChanged,
@@ -253,7 +254,7 @@ class HalideTextField extends StatelessWidget {
       validator: validator,
       cursorColor: Colors.white,
       style: const TextStyle(
-        color: Colors.white, 
+        color: Colors.white,
         fontSize: 15,
         letterSpacing: 0.5,
       ),
@@ -261,12 +262,14 @@ class HalideTextField extends StatelessWidget {
         labelText: label.toUpperCase(),
         errorText: errorText,
         labelStyle: TextStyle(
-          color: Colors.white.withOpacity(0.35), 
+          color: Colors.white.withOpacity(0.35),
           fontSize: 9.5,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.2,
         ),
-        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.white24, size: 18) : null,
+        prefixIcon: prefixIcon != null
+            ? Icon(prefixIcon, color: Colors.white24, size: 18)
+            : null,
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(vertical: 10),
         enabledBorder: UnderlineInputBorder(
@@ -281,7 +284,11 @@ class HalideTextField extends StatelessWidget {
         focusedErrorBorder: const UnderlineInputBorder(
           borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
         ),
-        errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 10, height: 1.2),
+        errorStyle: const TextStyle(
+          color: Colors.redAccent,
+          fontSize: 10,
+          height: 1.2,
+        ),
       ),
     );
   }
@@ -314,7 +321,9 @@ class HalideActionButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 0,
           disabledBackgroundColor: Colors.white.withOpacity(0.5),
         ),
@@ -322,13 +331,16 @@ class HalideActionButton extends StatelessWidget {
             ? const SizedBox(
                 height: 24,
                 width: 24,
-                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black54),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.black54,
+                ),
               )
             : Text(
                 text.toUpperCase(),
                 style: const TextStyle(
-                  fontWeight: FontWeight.w900, 
-                  fontSize: 14, 
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
                   letterSpacing: 1.0,
                 ),
               ),

@@ -49,11 +49,12 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(http_be
         decoded_token = firebase_auth.verify_id_token(token)
     except Exception as e:
         logger.warning("get_current_user: verify_id_token failed: %s", e)
-        if settings.DEV_SKIP_FIREBASE_VERIFY:
-            decoded_token = _decode_firebase_token_unverified(token)
-            if decoded_token:
-                logger.info("get_current_user: using unverified token (DEV_SKIP_FIREBASE_VERIFY)")
-        if not decoded_token:
+        # Strict verification: token must be valid for this Firebase project
+        # tokens from multiple client bundle IDs within the same Firebase project.
+        decoded_token = None
+        if False:  # no unverified fallback in production
+            logger.info("get_current_user: using unverified token payload after verify failure")
+        if decoded_token is None:
             raise credentials_exception
 
     uid = decoded_token.get("uid")

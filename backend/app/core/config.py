@@ -52,7 +52,9 @@ class Settings(BaseSettings):
     REVENUE_CAT_SECRET_KEY: Optional[str] = None
     REVENUE_CAT_PROJECT_ID: Optional[str] = None
     IS_REVENUE_CAT_SANDBOX: bool = True
-    REVENUE_CAT_PRO_ENTITLEMENT_IDS: str = "pro,plus,halide pro,halide_pro"
+    REVENUE_CAT_PRO_ENTITLEMENT_IDS: str = (
+        "pro,plus,halide pro,halide_pro,halide_cloud_system_storage"
+    )
 
     model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 

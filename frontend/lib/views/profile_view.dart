@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../config/app_config.dart';
 import '../providers/auth_provider.dart';
 import '../models/user_profile.dart';
+import '../core/providers/notification_provider.dart';
+import '../core/models/notification_model.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
+import '../services/auth_service.dart';
 import '../services/local_avatar_storage.dart';
 import '../widgets/debug_log_sheet.dart';
 
@@ -15,6 +18,49 @@ class ProfileView extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<ProfileView> createState() => _ProfileViewState();
+}
+
+Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref, AuthService authService) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: const Color(0xFF18181B),
+      title: const Text(
+        'Delete Account?',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+      ),
+      content: const Text(
+        'This action is permanent. All your film rolls, EXIF logs, and cloud-synced images will be wiped from our servers immediately.',
+        style: TextStyle(color: Colors.white70, height: 1.4),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text('Cancel', style: TextStyle(color: Colors.white.withOpacity(0.6))),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  try {
+    await authService.deleteAccount();
+    if (context.mounted) {
+      context.go('/login');
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ref.read(notificationProvider.notifier).show(
+            e.toString(),
+            type: NotificationType.error,
+          );
+    }
+  }
 }
 
 class _ProfileViewState extends ConsumerState<ProfileView> {
@@ -90,8 +136,8 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
                   ),
                   const _Divider(),
                   _ProfileOption(
-                    icon: Icons.settings_outlined,
-                    label: 'Settings',
+                    icon: Icons.folder_special_outlined,
+                    label: 'Storage strategy',
                     onTap: () => context.go('/profile/settings'),
                   ),
                   const _Divider(),
@@ -111,6 +157,13 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
                     icon: Icons.description_outlined,
                     label: 'Terms & Conditions',
                     onTap: () => context.go('/profile/terms'),
+                  ),
+                  const _Divider(),
+                  _ProfileOption(
+                    icon: Icons.delete_forever_outlined,
+                    label: 'Delete Account',
+                    color: Colors.redAccent,
+                    onTap: () => _confirmDeleteAccount(context, ref, authService),
                   ),
                   const _Divider(),
                   _ProfileOption(

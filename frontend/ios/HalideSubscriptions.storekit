@@ -1,7 +1,53 @@
 {
   "identifier" : "B9E2B2D1",
   "nonRenewingSubscriptions" : [ ],
-  "products" : [ ],
+  "products" : [
+    {
+      "displayPrice" : "3.99",
+      "familyShareable" : false,
+      "internalID" : "STORAGE5GB",
+      "localizations" : [
+        {
+          "description" : "One-time purchase: 5 GB of Halide System Cloud storage.",
+          "displayName" : "System Cloud 5 GB",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "halide_storage_5gb",
+      "referenceName" : "Storage 5 GB",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "6.99",
+      "familyShareable" : false,
+      "internalID" : "STORAGE10GB",
+      "localizations" : [
+        {
+          "description" : "One-time purchase: 10 GB of Halide System Cloud storage.",
+          "displayName" : "System Cloud 10 GB",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "halide_storage_10gb",
+      "referenceName" : "Storage 10 GB",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "24.99",
+      "familyShareable" : false,
+      "internalID" : "STORAGE50GB",
+      "localizations" : [
+        {
+          "description" : "One-time purchase: 50 GB of Halide System Cloud storage.",
+          "displayName" : "System Cloud 50 GB",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "halide_storage_50gb",
+      "referenceName" : "Storage 50 GB",
+      "type" : "Consumable"
+    }
+  ],
   "settings" : {
     "_askToBuyEnabled" : false,
     "_billingGracePeriodEnabled" : false,

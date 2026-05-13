@@ -9,6 +9,7 @@ import 'router/app_router.dart';
 import 'services/purchase_service.dart';
 import 'core/utils/notifications.dart';
 import 'core/widgets/halide_notification.dart';
+import 'core/widgets/dismiss_notification_on_interaction.dart';
 import 'providers/auth_provider.dart';
 
 void main() async {
@@ -80,7 +81,7 @@ class AuthGate extends StatelessWidget {
             }
             return Stack(
               children: [
-                result,
+                DismissNotificationOnInteraction(child: result),
                 const Positioned(
                   top: 0,
                   left: 0,

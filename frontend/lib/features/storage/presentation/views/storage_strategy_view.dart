@@ -8,9 +8,9 @@ import 'package:frontend/models/storage_account.dart';
 import 'package:frontend/features/storage/presentation/widgets/storage_tier_selector.dart';
 import 'package:frontend/features/storage/presentation/widgets/cloud_providers_section.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../providers/storage_accounts_refresh_provider.dart';
 import '../../../../models/user_profile.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
-import 'package:frontend/core/utils/notifications.dart';
 import '../../../../core/providers/notification_provider.dart';
 import '../../../../core/models/notification_model.dart';
 
@@ -27,6 +27,11 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
   static const _zinc950 = Color(0xFF09090B);
   static const _orange500 = Color(0xFFF97316);
 
+  static String _formatGbFromBytes(int bytes, {int fractionDigits = 2}) {
+    final gb = bytes / (1024 * 1024 * 1024);
+    return '${gb.toStringAsFixed(fractionDigits)} GB';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -38,10 +43,9 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
   Widget build(BuildContext context) {
     final plan = ref.watch(userPlanProvider);
     final isFree = plan == UserPlan.free;
+    final storageListVersion = ref.watch(storageAccountsListVersionProvider);
 
-    return BlocProvider(
-      create: (context) => widget.bloc ?? (StorageAccountsBloc()..add(LoadStorageAccounts())),
-      child: HalideScaffold(
+    final shell = HalideScaffold(
         backgroundColor: _zinc950,
         appBar: AppBar(
           leading: IconButton(
@@ -68,6 +72,8 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildSystemCloudQuotaBanner(ref),
+              const SizedBox(height: 16),
               StorageTierSelector(
                 selectedIndex: _selectedTierIndex,
                 isFree: isFree,
@@ -87,7 +93,88 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
             ],
           ),
         ),
+      );
+
+    if (widget.bloc != null) {
+      return BlocProvider(
+        create: (_) => widget.bloc!,
+        child: shell,
+      );
+    }
+
+    return BlocProvider(
+      key: ValueKey(storageListVersion),
+      create: (_) => StorageAccountsBloc()..add(LoadStorageAccounts()),
+      child: shell,
+    );
+  }
+
+  /// Backend quota from GET /api/v1/me (shows **0 GB** when empty, not an em dash).
+  Widget _buildSystemCloudQuotaBanner(riverpod.WidgetRef ref) {
+    final profileAsync = ref.watch(userProfileProvider);
+    return profileAsync.when(
+      data: (UserProfile? p) {
+        if (p == null || p.totalStorageLimitBytes == null) {
+          return const SizedBox.shrink();
+        }
+        final used = p.storageUsedBytes ?? 0;
+        final cap = p.totalStorageLimitBytes!;
+        final usedLabel = _formatGbFromBytes(used, fractionDigits: 2);
+        final capLabel = _formatGbFromBytes(cap, fractionDigits: 1);
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.10)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'SYSTEM CLOUD QUOTA',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.55),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$usedLabel used of $capLabel',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if ((p.additionalStorageBytes ?? 0) > 0) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '+${_formatGbFromBytes(p.additionalStorageBytes!, fractionDigits: 1)} from add-on purchases',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _orange500),
+          ),
+        ),
       ),
+      error: (Object _, StackTrace _) => const SizedBox.shrink(),
     );
   }
 
@@ -390,7 +477,7 @@ class _StorageConsumptionCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => context.push('/paywall'),
+              onPressed: () => context.push('/profile/settings/add-storage'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF97316),
                 foregroundColor: Colors.white,

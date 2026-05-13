@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/notification_model.dart';
 
 class NotificationNotifier extends Notifier<NotificationModel?> {
+  int _token = 0;
+
   @override
   NotificationModel? build() => null;
 
@@ -9,7 +11,8 @@ class NotificationNotifier extends Notifier<NotificationModel?> {
     NotificationType type = NotificationType.info, 
     Duration duration = const Duration(seconds: 4),
   }) {
-    this.state = NotificationModel(
+    final int token = ++_token;
+    state = NotificationModel(
       message: message,
       type: type,
       duration: duration,
@@ -17,14 +20,15 @@ class NotificationNotifier extends Notifier<NotificationModel?> {
     
     // Auto-dismiss after duration
     Future.delayed(duration, () {
-      if (this.state?.message == message.toUpperCase()) {
+      if (_token == token) {
         dismiss();
       }
     });
   }
 
   void dismiss() {
-    this.state = null;
+    _token++;
+    state = null;
   }
 }
 

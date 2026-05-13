@@ -3,9 +3,15 @@ from fastapi import APIRouter, Depends, Form, File, UploadFile, HTTPException, s
 from sqlalchemy.orm import Session
 from typing import Optional
 
+from firebase_admin import auth as firebase_auth
+
 from ...db.session import get_db
 from ...db.schemas.user import UserOut
-from ...db.models.user import User
+from ...db.models.user import User, PurchaseHistory
+from ...db.models.roll import Roll
+from ...db.models.image import Image
+from ...db.models.camera import UserCamera, UserLens
+from ...db.models.storage_credential import StorageCredential
 from ...core.dependencies import get_current_user
 from ...services.storage_service import storage_service
 from ...core.config import settings
@@ -94,3 +100,45 @@ def mark_lab_guide_seen(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently delete the authenticated user's account and associated application data
+    (rolls, images, gear, storage credentials, purchase history). Does not delete
+    master catalog rows (cameras, lenses, film stocks).
+    """
+    uid = current_user.id
+    try:
+        roll_ids = [row[0] for row in db.query(Roll.id).filter(Roll.user_id == uid).all()]
+        if roll_ids:
+            db.query(Image).filter(Image.roll_id.in_(roll_ids)).delete(synchronize_session=False)
+        db.query(Roll).filter(Roll.user_id == uid).delete(synchronize_session=False)
+        db.query(UserLens).filter(UserLens.user_id == uid).delete(synchronize_session=False)
+        db.query(UserCamera).filter(UserCamera.user_id == uid).delete(synchronize_session=False)
+        db.query(StorageCredential).filter(StorageCredential.user_id == uid).delete(synchronize_session=False)
+        db.query(PurchaseHistory).filter(PurchaseHistory.user_id == uid).delete(synchronize_session=False)
+        db.query(User).filter(User.id == uid).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        logger.exception("delete_account: database delete failed for user_id=%s", uid)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete account data. Please try again.",
+        )
+
+    try:
+        firebase_auth.delete_user(uid)
+    except Exception:
+        logger.exception("delete_account: Firebase delete_user failed for uid=%s", uid)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Account data was removed but sign-in could not be finalized. Please contact support.",
+        )
+
+    return None

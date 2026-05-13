@@ -15,12 +15,12 @@ import '../views/camera_detail_view.dart';
 import '../views/roll_detail_view.dart';
 import '../views/legal/privacy_policy_view.dart';
 import '../views/legal/terms_conditions_view.dart';
-import '../views/settings_view.dart';
 import '../features/storage/presentation/views/storage_account_list_view.dart';
 import '../features/storage/presentation/views/storage_strategy_view.dart';
+import '../features/storage/presentation/views/storage_capacity_purchase_view.dart';
 import '../views/edit_profile_view.dart';
 import '../views/support_view.dart';
-import '../features/billing/presentation/views/paywall_view.dart';
+import '../views/subscription_view.dart';
 import '../providers/ui_state_provider.dart';
 
 // Global keys for navigation
@@ -80,7 +80,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/paywall',
-      builder: (context, state) => const PaywallView(),
+      builder: (context, state) => const SubscriptionView(),
     ),
     GoRoute(
       path: '/roll/:id',
@@ -164,11 +164,11 @@ final appRouter = GoRouter(
               routes: [
                 GoRoute(
                   path: 'settings',
-                  builder: (context, state) => const SettingsView(),
+                  builder: (context, state) => const StorageStrategyView(),
                   routes: [
                     GoRoute(
-                      path: 'storage-strategy',
-                      builder: (context, state) => const StorageStrategyView(),
+                      path: 'add-storage',
+                      builder: (context, state) => const StorageCapacityPurchaseView(),
                     ),
                   ],
                 ),

@@ -56,9 +56,19 @@ class PurchaseSuccess extends BillingState {
   List<Object?> get props => [entitlementId];
 }
 
-class BillingError extends BillingState {
+class PurchaseCancelled extends BillingState {}
+
+class OfferingsLoadFailed extends BillingState {
   final String message;
-  BillingError(this.message);
+  OfferingsLoadFailed(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
+class PurchaseFailed extends BillingState {
+  final String message;
+  PurchaseFailed(this.message);
 
   @override
   List<Object?> get props => [message];
@@ -67,6 +77,24 @@ class BillingError extends BillingState {
 class BillingBloc extends Bloc<BillingEvent, BillingState> {
   final PurchaseService _purchaseService = PurchaseService();
   final ApiService _apiService = ApiService();
+
+  /// RevenueCat's REST payload can lag slightly behind StoreKit/Play success.
+  /// Multiple syncs give the backend a fresh purchase list before the UI refetches `/me`.
+  Future<void> _syncBillingBackendAfterPurchase() async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(
+          Duration(milliseconds: attempt == 1 ? 700 : 900),
+        );
+      }
+      try {
+        await _apiService.post('/api/v1/billing/sync');
+      } catch (e) {
+        // ignore: avoid_print
+        print('Backend billing/sync attempt ${attempt + 1} failed: $e');
+      }
+    }
+  }
 
   BillingBloc() : super(BillingInitial()) {
     on<LoadOfferings>(_onLoadOfferings);
@@ -82,46 +110,44 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
       if (offerings != null) {
         emit(OfferingsLoaded(offerings));
       } else {
-        emit(BillingError("No offerings available."));
+        emit(OfferingsLoadFailed("No offerings available."));
       }
     } catch (e) {
-      emit(BillingError(e.toString()));
+      emit(OfferingsLoadFailed(e.toString()));
     }
   }
 
   Future<void> _onPurchasePackage(PurchasePackage event, Emitter<BillingState> emit) async {
     emit(BillingLoading());
     try {
-      final success = await _purchaseService.purchasePackage(event.package);
-      if (success) {
-        // Sync with backend immediately to update tier and storage limits
-        try {
-          await _apiService.post('/api/v1/billing/sync');
-        } catch (e) {
-          // If sync fails, the webhook should still catch it later, 
-          // but we log it for debugging.
-          print('Backend sync failed after purchase: $e');
-        }
+      final result = await _purchaseService.purchasePackage(event.package);
+      if (result.outcome == PurchaseOutcome.success) {
+        await _syncBillingBackendAfterPurchase();
         emit(PurchaseSuccess("active_plan"));
+      } else if (result.outcome == PurchaseOutcome.cancelled) {
+        emit(PurchaseCancelled());
       } else {
-        emit(BillingError("Purchase failed."));
+        emit(PurchaseFailed(result.message ?? "Purchase failed."));
       }
     } catch (e) {
-      emit(BillingError(e.toString()));
+      emit(PurchaseFailed(e.toString()));
     }
   }
 
   Future<void> _onPurchaseStoreProduct(PurchaseStoreProduct event, Emitter<BillingState> emit) async {
     emit(BillingLoading());
     try {
-      final success = await _purchaseService.purchaseProduct(event.product.identifier);
-      if (success) {
+      final result = await _purchaseService.purchaseStoreProduct(event.product);
+      if (result.outcome == PurchaseOutcome.success) {
+        await _syncBillingBackendAfterPurchase();
         emit(PurchaseSuccess(event.product.identifier));
+      } else if (result.outcome == PurchaseOutcome.cancelled) {
+        emit(PurchaseCancelled());
       } else {
-        emit(BillingError("Purchase failed."));
+        emit(PurchaseFailed(result.message ?? "Purchase failed."));
       }
     } catch (e) {
-      emit(BillingError(e.toString()));
+      emit(PurchaseFailed(e.toString()));
     }
   }
 
@@ -129,10 +155,11 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     emit(BillingLoading());
     try {
       await _purchaseService.restorePurchases();
+      await _syncBillingBackendAfterPurchase();
       emit(BillingInitial()); // Refresh state
       add(LoadOfferings());
     } catch (e) {
-      emit(BillingError(e.toString()));
+      emit(OfferingsLoadFailed(e.toString()));
     }
   }
 }

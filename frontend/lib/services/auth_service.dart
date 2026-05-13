@@ -3,8 +3,12 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import '../config/app_config.dart';
+import 'api_service.dart';
+import 'purchase_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -83,6 +87,17 @@ class AuthService {
   // Apple Sign In
   Future<UserCredential?> signInWithApple() async {
     try {
+      if (!Platform.isIOS && !Platform.isMacOS) {
+        throw Exception('Sign in with Apple is only available on Apple devices.');
+      }
+
+      final available = await SignInWithApple.isAvailable();
+      if (!available) {
+        throw Exception(
+          'Sign in with Apple is not available on this device. Please check you are signed into iCloud and try again.',
+        );
+      }
+
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
@@ -90,12 +105,41 @@ class AuthService {
         ],
       );
 
+      final idToken = appleCredential.identityToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Apple sign-in failed to return an identity token. Please try again.');
+      }
+
       final OAuthCredential credential = OAuthProvider('apple.com').credential(
-        idToken: appleCredential.identityToken,
+        idToken: idToken,
         accessToken: appleCredential.authorizationCode,
       );
 
       return await _auth.signInWithCredential(credential);
+    } on SignInWithAppleAuthorizationException catch (e) {
+      // These codes come from AuthenticationServices (ASAuthorizationError).
+      // We translate them into user-friendly, actionable messages.
+      switch (e.code) {
+        case AuthorizationErrorCode.canceled:
+          // Treat cancel as a non-error for UX.
+          return null;
+        case AuthorizationErrorCode.notHandled:
+          throw Exception('Apple sign-in was not handled. Please try again.');
+        case AuthorizationErrorCode.notInteractive:
+          throw Exception('Apple sign-in requires user interaction. Please try again.');
+        case AuthorizationErrorCode.invalidResponse:
+          throw Exception('Apple sign-in returned an invalid response. Please try again.');
+        case AuthorizationErrorCode.failed:
+          throw Exception('Apple sign-in failed. Please try again.');
+        case AuthorizationErrorCode.unknown:
+          // This is commonly triggered by missing capability/entitlements or a signing mismatch.
+          throw Exception(
+            'Apple sign-in is not configured for this build (iOS error 1000). '
+            'Please update the app or use another login method.',
+          );
+        default:
+          throw Exception('Apple sign-in failed. Please try again.');
+      }
     } catch (e) {
       rethrow;
     }
@@ -105,6 +149,23 @@ class AuthService {
   Future<void> signOut() async {
     await _auth.signOut();
     await GoogleSignIn().signOut();
+  }
+
+  /// Deletes all backend data for the signed-in user, logs out of RevenueCat, then signs out.
+  /// The Firebase user record is removed by the backend after a successful wipe.
+  Future<void> deleteAccount() async {
+    final api = ApiService();
+    try {
+      await api.delete('/api/v1/user/account');
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      final msg = body is String ? body : body?.toString();
+      throw Exception(msg?.isNotEmpty == true ? msg : 'Could not delete account. Please try again.');
+    }
+    try {
+      await PurchaseService().logOut();
+    } catch (_) {}
+    await signOut();
   }
 
   // Password Reset

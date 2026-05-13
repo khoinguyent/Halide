@@ -1,10 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../models/user_profile.dart';
 import '../services/purchase_service.dart';
 import '../providers/profile_provider.dart';
+
+bool _entitlementListenerRegistered = false;
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
@@ -40,12 +43,60 @@ final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   }
 });
 
+/// RevenueCat entitlement-derived fallback plan.
+///
+/// Why: app-store review devices may have purchased but backend tier sync
+/// (webhook + /sync) can lag or fail. Features are gated on `userPlanProvider`,
+/// so we derive an on-device plan to avoid "purchased but still locked".
+UserPlan _planFromActiveEntitlementIds(Iterable<String> activeEntitlementIds) {
+  if (activeEntitlementIds.isEmpty) return UserPlan.free;
+
+  final keys = activeEntitlementIds.map((k) => k.toLowerCase());
+
+  // Non-renewing / longer-term plans first.
+  if (keys.any((k) => k.contains('lifetime'))) return UserPlan.lifetime;
+  if (keys.any((k) => k.contains('annually') || k.contains('annual') || k.contains('year')))
+    return UserPlan.annually;
+  if (keys.any((k) => k.contains('monthly') || k.contains('month'))) return UserPlan.monthly;
+  if (keys.any((k) => k.contains('weekly') || k.contains('week'))) return UserPlan.weekly;
+
+  if (keys.any((k) => k.contains('plus'))) return UserPlan.plus;
+  if (keys.any((k) => k.contains('halide_pro') || k.contains('halide pro') || k.contains('pro')))
+    return UserPlan.pro;
+
+  // Any active entitlement should imply premium access.
+  return UserPlan.pro;
+}
+
+class LocalEntitlementPlanNotifier extends Notifier<UserPlan> {
+  @override
+  UserPlan build() => UserPlan.free;
+
+  void updateFromActiveEntitlementIds(Iterable<String> ids) {
+    state = _planFromActiveEntitlementIds(ids);
+  }
+}
+
+final localEntitlementPlanProvider =
+    NotifierProvider<LocalEntitlementPlanNotifier, UserPlan>(
+  LocalEntitlementPlanNotifier.new,
+);
+
 final userPlanProvider = Provider<UserPlan>((ref) {
   final profileAsync = ref.watch(userProfileProvider);
-  final plan = profileAsync.value?.plan ?? UserPlan.free;
+  final localPlan = ref.watch(localEntitlementPlanProvider);
+  final backendPlan = profileAsync.value?.plan;
+
+  // Prefer backend for correctness once it arrives, but don't re-lock the UI
+  // while backend tier sync lags behind RevenueCat.
+  final plan = (backendPlan == null)
+      ? localPlan
+      : (backendPlan == UserPlan.free && localPlan.isPro)
+          ? localPlan
+          : backendPlan;
   
   // ignore: avoid_print
-  print('[Auth] current plan status: $plan (loading=${profileAsync.isLoading})');
+  print('[Auth] current plan status: $plan (backend=${profileAsync.value?.plan}, local=$localPlan, loading=${profileAsync.isLoading})');
   return plan;
 });
 
@@ -53,14 +104,48 @@ final userPlanProvider = Provider<UserPlan>((ref) {
 /// This handles trials ending (charging) and cancellations (downgrading) reactively.
 final entitlementListenerProvider = Provider<void>((ref) {
   // We don't watch userProvider here to avoid circularity.
-  // Instead, the listener is added once.
-  
+  // Instead, the listener is added once per app start.
+  if (_entitlementListenerRegistered) return;
+  _entitlementListenerRegistered = true;
+
   // ignore: avoid_print
-  print('[Auth] Setting up RevenueCat entitlement listener');
-  
-  Purchases.addCustomerInfoUpdateListener((customerInfo) {
+  print('[Auth] Setting up RevenueCat entitlement listener (local fallback enabled)');
+
+  // Seed local plan immediately (fixes "locked after purchase" when backend sync lags).
+  Purchases.getCustomerInfo().then((customerInfo) {
+    Future.microtask(() {
+      final ids = customerInfo.entitlements.active.keys;
+      ref
+          .read(localEntitlementPlanProvider.notifier)
+          .updateFromActiveEntitlementIds(ids);
+    });
+  }).catchError((e) {
     // ignore: avoid_print
-    print('[Auth] RevenueCat update detected. Refreshing profile if user is logged in...');
-    ref.invalidate(userProfileProvider);
+    print('[Auth] RevenueCat getCustomerInfo failed (local fallback): $e');
+  });
+
+  Purchases.addCustomerInfoUpdateListener((customerInfo) {
+    Future.microtask(() async {
+      // ignore: avoid_print
+      print('[Auth] RevenueCat update detected. Syncing billing server-side, then refreshing profile...');
+
+      final ids = customerInfo.entitlements.active.keys;
+      ref
+          .read(localEntitlementPlanProvider.notifier)
+          .updateFromActiveEntitlementIds(ids);
+
+      // Pull consumable / non-subscription counts into Postgres (`additional_storage_bytes`) before /me.
+      try {
+        final api = ApiService();
+        await api.post('/api/v1/billing/sync');
+        // RC server-side can trail the SDK by a short window; second sync improves quota freshness.
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+        await api.post('/api/v1/billing/sync');
+      } catch (e) {
+        // ignore: avoid_print
+        print('[Auth] billing/sync after RC update failed (webhook may still apply): $e');
+      }
+      ref.invalidate(userProfileProvider);
+    });
   });
 });
