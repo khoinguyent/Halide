@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/features/shell/presentation/widgets/halide_scaffold.dart';
+import 'package:frontend/features/light_table/logic/light_table_color.dart';
 import 'package:frontend/features/shell/presentation/widgets/glass_navigation_dock.dart';
 import 'package:frontend/features/rolls/presentation/widgets/add_roll_form.dart';
 import 'package:frontend/providers/rolls_provider.dart';
@@ -58,6 +59,9 @@ class MockRollsRepository implements RollsRepository {
       createdAt: DateTime.now(),
     );
   }
+
+  @override
+  Future<void> updateRollDriveUrl(String rollId, String driveUrl) async {}
 }
 
 void main() {
@@ -73,6 +77,7 @@ void main() {
           home: HalideScaffold(
             currentIndex: selectedIndex,
             onTabSelected: (index) => selectedIndex = index,
+            onLightTableTap: () {},
             child: const Center(child: Text('Home Content')),
           ),
         ),
@@ -84,6 +89,7 @@ void main() {
 
     // Verify GlassNavigationDock
     expect(find.byType(GlassNavigationDock), findsOneWidget);
+    expect(find.byIcon(LightTableTokens.navIcon), findsOneWidget);
 
     // Verify FAB
     expect(find.byType(FloatingActionButton), findsOneWidget);

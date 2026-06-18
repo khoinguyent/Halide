@@ -316,14 +316,15 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
   }
 
   Widget _buildLabImportBody(BuildContext context, Roll roll, RollGalleryTriple triple) {
+    final hasImages = triple.$1.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: GlassPanel(
+        if (!hasImages)
+          Padding(
             padding: const EdgeInsets.all(20),
-            child: _LabImportOptions(
+            child: _AtLabDualChoice(
               rollId: widget.rollId,
               onUploadComplete: () {
                 ref.refresh(rollDetailProvider(widget.rollId));
@@ -331,9 +332,26 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
                 ref.invalidate(dashboardRollsProvider);
               },
             ),
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: _GyroScanResumeBar(rollId: widget.rollId),
           ),
-        ),
-        if (triple.$1.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: GlassPanel(
+              padding: const EdgeInsets.all(20),
+              child: _LabImportOptions(
+                rollId: widget.rollId,
+                onUploadComplete: () {
+                  ref.refresh(rollDetailProvider(widget.rollId));
+                  ref.invalidate(rollGalleryPairsProvider(widget.rollId));
+                  ref.invalidate(dashboardRollsProvider);
+                },
+              ),
+            ),
+          ),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -956,6 +974,361 @@ class _RollMetaEditorState extends ConsumerState<_RollMetaEditor> {
 
 enum _LabImportMode { manual, drive }
 
+class _AtLabDualChoice extends ConsumerStatefulWidget {
+  final String rollId;
+  final VoidCallback onUploadComplete;
+
+  const _AtLabDualChoice({
+    required this.rollId,
+    required this.onUploadComplete,
+  });
+
+  @override
+  ConsumerState<_AtLabDualChoice> createState() => _AtLabDualChoiceState();
+}
+
+class _AtLabDualChoiceState extends ConsumerState<_AtLabDualChoice> {
+  final TextEditingController _driveUrlController = TextEditingController();
+  final ApiService _api = ApiService();
+  bool _isSubmittingDrive = false;
+  String? _driveError;
+
+  @override
+  void dispose() {
+    _driveUrlController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitDriveUrl() async {
+    final url = _driveUrlController.text.trim();
+    if (url.isEmpty) {
+      setState(() => _driveError = 'Paste a shared Google Drive folder or ZIP link.');
+      return;
+    }
+
+    final user = ref.read(userProvider);
+    if (user == null) {
+      setState(() => _driveError = 'Sign in to sync from Drive.');
+      return;
+    }
+
+    dismissKeyboardGlobally();
+    setState(() {
+      _isSubmittingDrive = true;
+      _driveError = null;
+    });
+
+    try {
+      final gdriveOk = await ensureGoogleDriveConnected(context, ref);
+      if (!gdriveOk) return;
+
+      await _api.patch(
+        '/api/v1/rolls/${widget.rollId}/drive-url',
+        data: {'drive_url': url},
+      );
+
+      if (!mounted) return;
+      ref.invalidate(rollDetailProvider(widget.rollId));
+      ref.invalidate(dashboardRollsProvider);
+
+      ref.read(notificationProvider.notifier).show(
+        'DRIVE LINK SAVED — SYNCING…',
+        type: NotificationType.info,
+      );
+
+      final resp = await _api.post(
+        '/api/v1/storage/gdrive/sync_images_from_url',
+        data: {
+          'roll_id': widget.rollId,
+          'gdrive_url_or_id': url,
+        },
+      );
+
+      if (!mounted) return;
+      widget.onUploadComplete();
+
+      final data = resp.data;
+      if (data is Map && data['detail'] == 'Sync started in background') {
+        ref.read(notificationProvider.notifier).show(
+          'SYNC STARTED IN BACKGROUND.',
+          type: NotificationType.info,
+        );
+      } else {
+        final synced = (data is Map && data['synced_count'] != null)
+            ? data['synced_count'].toString()
+            : '0';
+        ref.read(notificationProvider.notifier).show(
+          'IMPORTED $synced PHOTO(S) FROM DRIVE.',
+          type: NotificationType.success,
+        );
+      }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final detail = e.response?.data is Map
+          ? (e.response?.data as Map)['detail']?.toString()
+          : e.message;
+      setState(() => _driveError = detail ?? 'Could not sync from Drive.');
+    } catch (e) {
+      if (mounted) setState(() => _driveError = e.toString());
+    } finally {
+      if (mounted) setState(() => _isSubmittingDrive = false);
+    }
+  }
+
+  void _openGyroScan() {
+    final plan = ref.read(userPlanProvider);
+    if (!plan.isPro) {
+      context.push('/paywall');
+      return;
+    }
+    context.push('/roll/${widget.rollId}/gyro-scan');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final plan = ref.watch(userPlanProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'AT LAB',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Choose how to bring scans into this roll.',
+          style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13),
+        ),
+        const SizedBox(height: 20),
+        _DualChoiceCard(
+          icon: Icons.cloud_sync_rounded,
+          iconColor: Colors.blueAccent,
+          title: 'Lab Digital Sync',
+          subtitle: 'Paste a Google Drive folder or ZIP link from your lab.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _driveUrlController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'https://drive.google.com/...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.28)),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Colors.blueAccent),
+                  ),
+                ),
+              ),
+              if (_driveError != null) ...[
+                const SizedBox(height: 8),
+                Text(_driveError!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+              ],
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: _isSubmittingDrive ? null : _submitDriveUrl,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.95),
+                    foregroundColor: Colors.black,
+                    shape: const StadiumBorder(),
+                  ),
+                  child: _isSubmittingDrive
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Submit & Sync', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _DualChoiceCard(
+          icon: Icons.document_scanner_outlined,
+          iconColor: Colors.orange,
+          title: 'Camera Scanning',
+          subtitle: 'Hands-free gyro-assisted scan over a light table.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _openGyroScan,
+                  icon: Icon(plan.isPro ? Icons.camera_alt_rounded : Icons.lock_outline_rounded),
+                  label: const Text('Scan Negatives (Light Table)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.withOpacity(0.92),
+                    foregroundColor: Colors.black,
+                    shape: const StadiumBorder(),
+                  ),
+                ),
+              ),
+              if (!plan.isPro) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Premium feature — upgrade to scan with the gyro HUD.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Resume gyro scanning while roll is still at lab (multi-session scanning).
+class _GyroScanResumeBar extends ConsumerWidget {
+  final String rollId;
+
+  const _GyroScanResumeBar({required this.rollId});
+
+  void _openGyroScan(BuildContext context, WidgetRef ref) {
+    final plan = ref.read(userPlanProvider);
+    if (!plan.isPro) {
+      context.push('/paywall');
+      return;
+    }
+    context.push('/roll/$rollId/gyro-scan');
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final plan = ref.watch(userPlanProvider);
+
+    return Material(
+      color: Colors.orange.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: () => _openGyroScan(context, ref),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(
+                plan.isPro ? Icons.document_scanner_outlined : Icons.lock_outline_rounded,
+                color: Colors.orange,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Continue gyro scan',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      plan.isPro
+                          ? 'Add more frames, then tap Finish scanning when done.'
+                          : 'Premium — scan negatives with the gyro HUD.',
+                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Colors.orange),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DualChoiceCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _DualChoiceCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
 class _LabImportOptions extends ConsumerStatefulWidget {
   final String rollId;
   final VoidCallback onUploadComplete;
@@ -1101,7 +1474,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       }
     }
 
-    // ZIP URLs cannot be pre-listed at leaf level reliably, so we directly sync (Plus/Pro cloud only).
+    // ZIP URLs cannot be pre-listed at leaf level reliably, so we directly sync (Pro cloud only).
     if (_isDriveZipUrl(url) && !_isDriveFolderUrl(url)) {
       try {
         if (!mounted) return;
@@ -1284,7 +1657,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
             ),
             if (!_manualUploadDone) ...[
               ChoiceChip(
-                label: const Text('Drive URL (Plus)'),
+                label: const Text('Drive URL'),
                 selected: _mode == _LabImportMode.drive,
                 onSelected: (_) => setState(() => _mode = _LabImportMode.drive),
               ),

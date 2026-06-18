@@ -45,21 +45,22 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
   String? _productQueryError;
   Map<String, ProductDetails> _productDetailsById = const {};
 
+  /// Index 0 = Free (The Archive), 1 = Halide Pro. Plus-tier perks live in Free.
   final Map<int, List<String>> _planFeatures = {
     0: [
-      'Unlimited rolls and gear',
+      'Roll & frame logging (aperture, shutter, location)',
+      'Shooting → Lab → Scanned → Archived workflow',
+      'Up to 3 cameras (1 lens each) & unlimited rolls',
       'Fetch images from Lab Drive',
-      'Personal cloud (Drive, NAS)',
+      'Personal cloud sync (Google Drive, NAS)',
       'Standard EXIF logging',
-      'Basic roll management',
     ],
     1: [
       'Everything in Free',
-      '5GB dedicated cloud storage',
-      'Full Light Metering features',
-      'Precision Scan Alignment',
-      'Advanced AI metering advice',
-      'Priority support access',
+      'Halide Cloud Storage (hosted System Cloud)',
+      'Professional light meter (spot metering & EV)',
+      'Advanced exposure guidance',
+      'Priority support',
     ],
   };
 
@@ -298,7 +299,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
               if (_isPurchasing) {
                 _isPurchasing = false;
                 ref.read(notificationProvider.notifier).show(
-                  'Welcome to Halide Premium! Your plan is now active.',
+                  'Welcome to Halide Pro! Your plan is now active.',
                   type: NotificationType.success,
                 );
               }
@@ -400,7 +401,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 28),
                                 child: Text(
-                                  'Unlock professional gear tracking, cloud-syncing, and advanced light metering',
+                                  'Pro adds Halide Cloud Storage and the professional light meter',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.7),
@@ -620,7 +621,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
       final ps = pkg?.storeProduct.priceString;
       if (ps != null && ps.isNotEmpty) return ps;
     }
-    return annual ? r'$39.99' : r'$3.99';
+    return annual ? r'$59.99' : r'$5.99';
   }
 
   Widget _buildPlanSelector() {

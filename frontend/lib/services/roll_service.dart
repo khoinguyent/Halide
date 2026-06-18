@@ -52,6 +52,20 @@ class RollService {
     }
   }
 
+  Future<void> pauseGyroScanSession(String token, String rollId) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiUrl}/rolls/$rollId/gyro-scan/pause'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to pause gyro scan session: ${response.body}');
+    }
+  }
+
   Future<void> updateRollMeta(
     String token,
     String rollId, {

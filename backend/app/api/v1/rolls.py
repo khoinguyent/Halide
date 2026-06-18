@@ -56,6 +56,16 @@ def update_roll_status(
     return roll_service.update_roll_status(db, roll_id=id, new_status=status_update.status, user_id=current_user.id)
 
 
+@router.post("/rolls/{roll_id}/gyro-scan/pause", response_model=RollOut)
+def pause_gyro_scan_session(
+    roll_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Revert a prematurely scanned roll back to lab while scanning is still in progress."""
+    return roll_service.pause_gyro_scan_session(db, roll_id=str(roll_id), user_id=current_user.id)
+
+
 @router.patch("/rolls/{id}/meta", response_model=RollOutDashboard)
 def update_roll_meta(
     id: UUID,

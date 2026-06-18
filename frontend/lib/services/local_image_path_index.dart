@@ -98,6 +98,24 @@ class LocalImagePathIndex {
     await _persist();
   }
 
+  /// Gyro-scan keys `gyro:0` … sorted by numeric suffix.
+  Future<List<(int index, String key, String relativePath)>> listGyroEntriesSorted(String rollId) async {
+    await _ensureLoaded();
+    final m = _rolls[rollId];
+    if (m == null || m.isEmpty) return [];
+    final out = <(int, String, String)>[];
+    for (final e in m.entries) {
+      if (!e.key.startsWith('gyro:')) continue;
+      final suffix = e.key.substring(5);
+      if (suffix.contains('_')) continue;
+      final n = int.tryParse(suffix);
+      if (n == null) continue;
+      out.add((n, e.key, e.value));
+    }
+    out.sort((a, b) => a.$1.compareTo(b.$1));
+    return out;
+  }
+
   /// Lab-import keys `lab:0` … sorted by numeric suffix. Values are paths relative to app documents.
   Future<List<(int index, String key, String relativePath)>> listLabEntriesSorted(String rollId) async {
     await _ensureLoaded();

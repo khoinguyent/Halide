@@ -95,19 +95,21 @@ class _RollCardState extends ConsumerState<RollCard> {
     final roll = widget.roll;
 
     final showLinkFetchAction = rollShowsLinkSyncControl(roll, ref);
-    ref.watch(userPlanProvider);
+    final plan = ref.watch(userPlanProvider);
+    final showGyroScanAction = roll.status == RollStatus.lab;
 
     final driveUrl = (roll.driveUrl ?? '').trim();
     final hasDriveUrl = driveUrl.isNotEmpty;
+    final linkActionColor = hasDriveUrl
+        ? Colors.blueAccent
+        : Colors.white.withOpacity(0.55);
 
-    return GestureDetector(
-      onTap: () => context.push('/roll/${roll.id}'),
-      child: GlassPanel(
-        padding: EdgeInsets.zero,
-        child: InkWell(
-          onTap: () => context.push('/roll/${roll.id}'),
-          borderRadius: BorderRadius.circular(24),
-          child: Column(
+    return GlassPanel(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        onTap: () => context.push('/roll/${roll.id}'),
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Top Row: Status Badge (tappable quick action) and Timestamp
@@ -132,11 +134,23 @@ class _RollCardState extends ConsumerState<RollCard> {
                               fontSize: 12,
                             ),
                           ),
+                          if (showGyroScanAction) ...[
+                            const SizedBox(width: 10),
+                            _QuickActionIcon(
+                              icon: Icons.document_scanner_outlined,
+                              color: linkActionColor,
+                              showLock: !plan.isPro,
+                              onTap: () => _openGyroScan(context, roll.id, plan),
+                            ),
+                          ],
                           if (showLinkFetchAction) ...[
                             const SizedBox(width: 10),
-                            GestureDetector(
+                            _QuickActionIcon(
                               key: widget.guidanceLinkSyncKey,
-                              behavior: HitTestBehavior.opaque,
+                              icon: hasDriveUrl
+                                  ? Icons.cloud_download
+                                  : Icons.link_outlined,
+                              color: linkActionColor,
                               onTap: () async {
                                 if (_fetchingRollId == roll.id) return;
                                 if (hasDriveUrl) {
@@ -152,26 +166,8 @@ class _RollCardState extends ConsumerState<RollCard> {
                                   );
                                 }
                               },
-                              child: (_fetchingRollId == roll.id || roll.status == RollStatus.syncing)
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.blueAccent,
-                                        ),
-                                      ),
-                                    )
-                                  : Icon(
-                                      hasDriveUrl
-                                          ? Icons.cloud_download
-                                          : Icons.link_outlined,
-                                      size: 20,
-                                      color: hasDriveUrl
-                                          ? Colors.blueAccent
-                                          : Colors.white.withOpacity(0.55),
-                                    ),
+                              loading: _fetchingRollId == roll.id ||
+                                  roll.status == RollStatus.syncing,
                             ),
                           ],
                         ],
@@ -232,8 +228,7 @@ class _RollCardState extends ConsumerState<RollCard> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildScannedOrSyncingContent(Roll roll) {
@@ -326,6 +321,14 @@ class _RollCardState extends ConsumerState<RollCard> {
     );
   }
 
+  void _openGyroScan(BuildContext context, String rollId, UserPlan plan) {
+    if (!plan.isPro) {
+      context.push('/paywall');
+      return;
+    }
+    context.push('/roll/$rollId/gyro-scan');
+  }
+
   Future<void> _showUrlBottomSheet(
     BuildContext context,
     Roll roll, {
@@ -340,6 +343,63 @@ class _RollCardState extends ConsumerState<RollCard> {
         initialUrl: initialValue,
         onSavedFetch: onSavedFetch,
       ),
+    );
+  }
+}
+
+class _QuickActionIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final bool showLock;
+  final bool loading;
+
+  const _QuickActionIcon({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.showLock = false,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: loading ? null : onTap,
+      child: loading
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+              ),
+            )
+          : Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, size: 20, color: color),
+                if (showLock)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.orangeAccent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.lock,
+                        size: 8,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
     );
   }
 }

@@ -13,6 +13,7 @@ import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
 import '../providers/gear_provider.dart';
 import '../providers/auth_provider.dart';
+import '../core/constants/free_tier_limits.dart';
 import '../services/gear_service.dart';
 import '../core/utils/notifications.dart';
 import '../core/utils/local_image_thumb.dart';
@@ -300,17 +301,9 @@ class CameraDetailView extends ConsumerWidget {
                     ),
                   ],
                 ),
-                GestureDetector(
-                  onTap: () {
-                    if (plan == UserPlan.free && camera.lenses.length >= 1) {
-                      ref.read(notificationProvider.notifier).show(
-                        'Free tier is limited to 1 lens. Upgrade to add more.',
-                        type: NotificationType.error,
-                      );
-                      return;
-                    }
-                    _showLinkLensSheet(context, ref, camera.id);
-                  },
+                if (canMountLensOnCamera(plan, camera.lenses.length))
+                  GestureDetector(
+                  onTap: () => _showLinkLensSheet(context, ref, camera.id),
                   child: Row(
                     children: [
                       Icon(Icons.add_circle_outline, size: 16, color: Colors.white.withOpacity(0.5)),
@@ -464,6 +457,9 @@ class _LinkLensSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final plan = ref.watch(userPlanProvider);
+    final camera = ref.watch(cameraProvider(cameraId));
+    final mountBlocked = camera != null && !canMountLensOnCamera(plan, camera.lenses.length);
     final lensesAsync = ref.watch(allUserLensesProvider);
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -474,6 +470,13 @@ class _LinkLensSheet extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Select Lens to Mount', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          if (mountBlocked) ...[
+            const SizedBox(height: 12),
+            Text(
+              freeTierLensLimitMessage(),
+              style: TextStyle(color: Colors.orange.shade300, fontSize: 13, height: 1.35),
+            ),
+          ],
           const SizedBox(height: 16),
           lensesAsync.when(
             data: (lenses) {
@@ -495,10 +498,12 @@ class _LinkLensSheet extends ConsumerWidget {
                             title: Text('${lens.brand} ${lens.model}', style: const TextStyle(color: Colors.white)),
                             subtitle: Text(lens.nickname, style: TextStyle(color: Colors.white.withOpacity(0.6))),
                             trailing: Icon(Icons.add_link, color: Colors.white.withOpacity(0.5)),
-                            onTap: () {
-                              ref.read(userGearProvider.notifier).linkLens(lens.id, cameraId);
-                              Navigator.pop(ctx);
-                            },
+                            onTap: mountBlocked
+                                ? null
+                                : () {
+                                    ref.read(userGearProvider.notifier).linkLens(lens.id, cameraId);
+                                    Navigator.pop(ctx);
+                                  },
                           );
                         },
                       ),
@@ -507,10 +512,12 @@ class _LinkLensSheet extends ConsumerWidget {
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.add_circle_outline, color: Colors.blueAccent),
                       title: const Text('CREATE NEW LENS', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 13)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        CameraDetailView._showCreateLensSheet(context, ref, cameraId);
-                      },
+                      onTap: mountBlocked
+                          ? null
+                          : () {
+                              Navigator.pop(context);
+                              CameraDetailView._showCreateLensSheet(context, ref, cameraId);
+                            },
                     ),
                   ],
                 ),
@@ -560,6 +567,15 @@ class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
       ref.read(notificationProvider.notifier).show(
         'BRAND AND MODEL ARE REQUIRED.',
         type: NotificationType.error,
+      );
+      return;
+    }
+
+    final mountBlock = ref.read(userGearProvider.notifier).blockReasonForMountLens(widget.cameraId);
+    if (mountBlock != null) {
+      ref.read(notificationProvider.notifier).show(
+        mountBlock,
+        type: NotificationType.warning,
       );
       return;
     }

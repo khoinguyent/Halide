@@ -16,7 +16,7 @@ import 'package:frontend/providers/auth_provider.dart';
 import 'package:frontend/providers/storage_accounts_refresh_provider.dart';
 import 'package:frontend/services/purchase_service.dart';
 
-/// Choose stackable System Cloud storage add-ons (5 / 10 / 50 GB). Prices from the store (localized).
+/// Choose stackable System Cloud storage add-ons (+5 / +10 / +50 GB). Shown only after store prices load.
 class StorageCapacityPurchaseView extends ConsumerStatefulWidget {
   const StorageCapacityPurchaseView({Key? key}) : super(key: key);
 
@@ -33,7 +33,8 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
   Map<String, StoreProduct> _productsById = {};
   Map<String, ProductDetails> _iapDetailsById = {};
   bool _loadingProducts = true;
-  String? _productLoadNote;
+  /// True only when every catalog SKU returned a store product (user never sees tier UI without prices).
+  bool _productsReady = false;
   int _selectedIndex = 1;
 
   @override
@@ -51,10 +52,35 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
     super.dispose();
   }
 
-  Future<void> _fetchStoreProducts() async {
+  bool _allCatalogProductsPresent(Map<String, StoreProduct> map) {
+    for (final id in StorageAddonCatalog.allProductIds) {
+      final p = map[id];
+      if (p == null) return false;
+      // Require a localized store price (RevenueCat / StoreKit); never show USD placeholders.
+      if (p.priceString.trim().isEmpty) return false;
+    }
+    return map.isNotEmpty;
+  }
+
+  void _exitAfterLoadFailure({required bool isRefresh}) {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final msg = isRefresh
+          ? "We couldn't refresh prices. Please try again in a moment."
+          : "We couldn't load storage options. Check your connection and try again.";
+      ref.read(notificationProvider.notifier).show(
+            msg,
+            type: NotificationType.error,
+          );
+      if (context.canPop()) context.pop();
+    });
+  }
+
+  Future<void> _fetchStoreProducts({bool isRefresh = false}) async {
     setState(() {
       _loadingProducts = true;
-      _productLoadNote = null;
+      _productsReady = false;
     });
     try {
       final list = await PurchaseService().getNonSubscriptionProducts(StorageAddonCatalog.allProductIds);
@@ -62,27 +88,41 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
       for (final p in list) {
         map[p.identifier] = p;
       }
-      if (mounted) {
+      if (!mounted) return;
+
+      if (!_allCatalogProductsPresent(map)) {
         setState(() {
-          _productsById = map;
-          if (map.isEmpty) {
-            _productLoadNote =
-                'Store products are not available yet. Confirm consumable IAPs in App Store Connect and RevenueCat, then try again.';
-          }
+          _productsById = {};
+          _iapDetailsById = const {};
+          _loadingProducts = false;
+          _productsReady = false;
         });
+        _exitAfterLoadFailure(isRefresh: isRefresh);
+        return;
       }
+
+      setState(() {
+        _productsById = map;
+      });
+
       if (Platform.isIOS || Platform.isAndroid) {
         await _queryIapProductDetails();
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _productsById = {};
-          _productLoadNote = 'Could not load products. Check your RevenueCat and store configuration.';
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _loadingProducts = false);
+      if (!mounted) return;
+
+      setState(() {
+        _loadingProducts = false;
+        _productsReady = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _productsById = {};
+        _iapDetailsById = const {};
+        _loadingProducts = false;
+        _productsReady = false;
+      });
+      _exitAfterLoadFailure(isRefresh: isRefresh);
     }
   }
 
@@ -113,14 +153,16 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
     }
   }
 
-  String _priceLine(StorageAddonTier tier) {
+  /// Localized price from StoreKit / Play Billing, then RevenueCat. Never a hard-coded amount.
+  String? _localizedPrice(StorageAddonTier tier) {
     final iap = _iapDetailsById[tier.productId];
-    if (iap != null && iap.price.isNotEmpty) return iap.price;
-    final p = _productsById[tier.productId];
-    final ps = p?.priceString;
-    if (ps != null && ps.isNotEmpty) return ps;
-    return tier.guidePriceUsd;
+    if (iap != null && iap.price.trim().isNotEmpty) return iap.price;
+    final ps = _productsById[tier.productId]?.priceString;
+    if (ps != null && ps.trim().isNotEmpty) return ps;
+    return null;
   }
+
+  String _priceLine(StorageAddonTier tier) => _localizedPrice(tier) ?? '—';
 
   StoreProduct? _selectedProduct() {
     final id = StorageAddonCatalog.tiers[_selectedIndex].productId;
@@ -129,8 +171,6 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
 
   @override
   Widget build(BuildContext context) {
-    final tier = StorageAddonCatalog.tiers[_selectedIndex];
-
     return BlocProvider.value(
       value: _billingBloc,
       child: BlocConsumer<BillingBloc, BillingState>(
@@ -165,8 +205,10 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
         },
         builder: (context, state) {
           final purchasing = state is BillingLoading && _productsById.isNotEmpty;
-          final product = _selectedProduct();
-          final canPurchase = product != null && !purchasing;
+          final tier = StorageAddonCatalog.tiers[_selectedIndex];
+          final selectedPrice = _localizedPrice(tier);
+          final canPurchase =
+              _productsReady && !purchasing && selectedPrice != null;
 
           return HalideScaffold(
             backgroundColor: _zinc950,
@@ -191,105 +233,99 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
             ),
             child: Stack(
               children: [
-                SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Choose how much System Cloud space to add. '
-                        'Prices follow your App Store / Play country (same as the subscription paywall). '
-                        'You can buy the same pack again; each purchase increases your quota.',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.65),
-                          fontSize: 14,
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      ...List.generate(StorageAddonCatalog.tiers.length, (i) {
-                        final t = StorageAddonCatalog.tiers[i];
-                        final selected = i == _selectedIndex;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _TierCard(
-                            tier: t,
-                            priceLine: _priceLine(t),
-                            selected: selected,
-                            onTap: () => setState(() => _selectedIndex = i),
-                          ),
-                        );
-                      }),
-                      if (_productLoadNote != null) ...[
-                        const SizedBox(height: 8),
+                if (_productsReady)
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                         Text(
-                          _productLoadNote!,
+                          'Pick how much extra cloud space you need. Prices are shown in your '
+                          'local currency. You can buy the same size more than once — each '
+                          'purchase adds to your total.',
                           style: TextStyle(
-                            color: Colors.amber.withOpacity(0.85),
-                            fontSize: 12,
-                            height: 1.4,
+                            color: Colors.white.withOpacity(0.65),
+                            fontSize: 14,
+                            height: 1.45,
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 20),
-                      Text(
-                        'Consumable in-app purchase. After you buy, the app syncs billing with '
-                        'your server (and retries briefly) so your quota updates before you return.',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.45),
-                          fontSize: 11,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: canPurchase
-                              ? () {
-                                  final p = _selectedProduct();
-                                  if (p != null) {
-                                    _billingBloc.add(PurchaseStoreProduct(p));
-                                  }
-                                }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _orange500,
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: _orange500.withOpacity(0.35),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                        const SizedBox(height: 22),
+                        ...List.generate(StorageAddonCatalog.tiers.length, (i) {
+                          final t = StorageAddonCatalog.tiers[i];
+                          final selected = i == _selectedIndex;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _TierCard(
+                              tier: t,
+                              priceLine: _priceLine(t),
+                              selected: selected,
+                              onTap: () => setState(() => _selectedIndex = i),
                             ),
-                            elevation: 0,
+                          );
+                        }),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Each pack adds to your vault total — you can buy the same size again anytime. '
+                          'Payment uses the method on this device; extra space usually appears within a few moments.',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.45),
+                            fontSize: 11,
+                            height: 1.35,
                           ),
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: canPurchase
+                                ? () {
+                                    final p = _selectedProduct();
+                                    if (p != null) {
+                                      _billingBloc.add(PurchaseStoreProduct(p));
+                                    }
+                                  }
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _orange500,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: _orange500.withOpacity(0.35),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              selectedPrice == null
+                                  ? 'BUY ${tier.shortLabel.toUpperCase()}'
+                                  : 'Buy ${tier.shortLabel} — $selectedPrice',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: purchasing ? null : () => _fetchStoreProducts(isRefresh: true),
                           child: Text(
-                            product == null
-                                ? 'CONFIGURE STORE PRODUCTS'
-                                : 'BUY ${tier.shortLabel.toUpperCase()} — ${_priceLine(tier).toUpperCase()}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.8,
+                            'Refresh prices',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.55),
+                              fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
                           ),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: purchasing ? null : _fetchStoreProducts,
-                        child: Text(
-                          'Refresh prices',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.55),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                if (purchasing || _loadingProducts)
+                if (!_productsReady && _loadingProducts)
+                  const Center(
+                    child: CircularProgressIndicator(color: _orange500),
+                  ),
+                if (_productsReady && purchasing)
                   Positioned.fill(
                     child: Container(
                       color: _zinc950.withOpacity(0.55),

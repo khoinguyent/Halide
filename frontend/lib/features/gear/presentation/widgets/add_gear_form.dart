@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/constants/free_tier_limits.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
 import 'package:frontend/providers/auth_provider.dart';
 import 'package:frontend/providers/gear_provider.dart';
@@ -54,8 +55,23 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
       };
 
       if (_gearType == 'Camera') {
+        final block = ref.read(userGearProvider.notifier).blockReasonForNewCamera();
+        if (block != null) {
+          ref.read(notificationProvider.notifier).show(
+                block,
+                type: NotificationType.warning,
+              );
+          return;
+        }
         await gearService.addUserCamera(token, data);
       } else {
+        if (isFreeArchivePlan(ref.read(userPlanProvider))) {
+          ref.read(notificationProvider.notifier).show(
+                freeTierStandaloneLensMessage(),
+                type: NotificationType.warning,
+              );
+          return;
+        }
         await gearService.addUserLens(token, data);
       }
 
@@ -154,6 +170,15 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
   }
 
   Widget _buildGearTypeSelector() {
+    final plan = ref.watch(userPlanProvider);
+    final showLensTab = !isFreeArchivePlan(plan);
+
+    if (!showLensTab && _gearType == 'Lens') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _gearType = 'Camera');
+      });
+    }
+
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -163,7 +188,7 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
       child: Row(
         children: [
           Expanded(child: _buildTypeButton('Camera')),
-          Expanded(child: _buildTypeButton('Lens')),
+          if (showLensTab) Expanded(child: _buildTypeButton('Lens')),
         ],
       ),
     );

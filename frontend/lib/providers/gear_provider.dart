@@ -1,4 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/constants/free_tier_limits.dart';
+import '../core/models/notification_model.dart';
+import '../core/providers/notification_provider.dart';
 import '../services/gear_service.dart';
 import '../providers/auth_provider.dart';
 import '../models/camera.dart';
@@ -72,6 +75,39 @@ class UserGearNotifier extends AsyncNotifier<List<Camera>> {
         status: status,
       );
     });
+  }
+
+  Camera? _cameraById(String id) {
+    final list = state.value;
+    if (list == null) return null;
+    for (final c in list) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  /// Null if allowed; otherwise user-facing block reason.
+  String? blockReasonForNewCamera() {
+    final plan = ref.read(userPlanProvider);
+    final count = state.value?.length ?? 0;
+    if (!canAddCameraOnPlan(plan, count)) return freeTierCameraLimitMessage();
+    return null;
+  }
+
+  /// Null if allowed; otherwise user-facing block reason.
+  String? blockReasonForMountLens(String cameraId) {
+    final plan = ref.read(userPlanProvider);
+    final cam = _cameraById(cameraId);
+    if (cam == null) return null;
+    if (!canMountLensOnCamera(plan, cam.lenses.length)) return freeTierLensLimitMessage();
+    return null;
+  }
+
+  void _showBlock(String message) {
+    ref.read(notificationProvider.notifier).show(
+          message,
+          type: NotificationType.warning,
+        );
   }
 
   void addCameraImages(String id, List<String> newPathsOrUrls) {
@@ -163,6 +199,13 @@ class UserGearNotifier extends AsyncNotifier<List<Camera>> {
     } catch (_) {}
   }
   Future<void> linkLens(String lensId, String? cameraId) async {
+    if (cameraId != null) {
+      final reason = blockReasonForMountLens(cameraId);
+      if (reason != null) {
+        _showBlock(reason);
+        return;
+      }
+    }
     try {
       final user = ref.read(authServiceProvider).currentUser;
       final token = user == null ? null : await user.getIdToken();
@@ -180,6 +223,11 @@ class UserGearNotifier extends AsyncNotifier<List<Camera>> {
   }
 
   Future<void> addAndLinkLens(Map<String, dynamic> data, String cameraId) async {
+    final reason = blockReasonForMountLens(cameraId);
+    if (reason != null) {
+      _showBlock(reason);
+      return;
+    }
     try {
       final user = ref.read(authServiceProvider).currentUser;
       if (user == null) return;

@@ -22,6 +22,7 @@ Groups prevent users from buying multiple competing plans.
 1.  **Subscription Price**: Set your price (e.g., $29.99/year).
 2.  **App Store Localization**: Provide a display name and description for the App Store (e.g., "Pro Membership").
 3.  **Review Metadata**: You MUST upload a screenshot of your paywall for Apple review before you can submit.
+4.  **Promoted IAP / win-back promotional image** (if you use **Promote** on the product page or win-back offers): use **purpose-built 1024×1024-style artwork** with **large readable text**. Raw in-app screenshots with tiny UI copy often fail **Guideline 2.3.2** — see [app_store_iap_promotional_images.md](./app_store_iap_promotional_images.md).
 
 ## Step 5: RevenueCat Integration
 1.  **Shared Secret**: In App Store Connect, go to **App Information** and generate an **App-Specific Shared Secret**.

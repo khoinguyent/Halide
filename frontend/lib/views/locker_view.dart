@@ -11,6 +11,9 @@ import '../models/lens.dart';
 import '../widgets/gear_status_selector.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
+import '../core/constants/free_tier_limits.dart';
+import '../core/models/notification_model.dart';
+import '../core/providers/notification_provider.dart';
 import '../core/utils/local_image_thumb.dart';
 
 class LockerView extends ConsumerWidget {
@@ -19,6 +22,19 @@ class LockerView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final gearAsync = ref.watch(userGearProvider);
+    final plan = ref.watch(userPlanProvider);
+
+    void onAddGear() {
+      final cameras = gearAsync.value;
+      if (cameras != null && !canAddCameraOnPlan(plan, cameras.length)) {
+        ref.read(notificationProvider.notifier).show(
+              freeTierCameraLimitMessage(),
+              type: NotificationType.warning,
+            );
+        return;
+      }
+      context.push('/locker/add-gear');
+    }
 
     return HalideScaffold(
       appBar: AppBar(
@@ -39,7 +55,7 @@ class LockerView extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.add_rounded),
             tooltip: 'Add gear',
-            onPressed: () => context.push('/locker/add-gear'),
+            onPressed: onAddGear,
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
@@ -55,7 +71,7 @@ class LockerView extends ConsumerWidget {
         data: (cameras) {
           if (cameras.isEmpty) {
             return _EmptyState(
-              onAddFirstGear: () => context.push('/locker/add-gear'),
+              onAddFirstGear: onAddGear,
             );
           }
           return RefreshIndicator(

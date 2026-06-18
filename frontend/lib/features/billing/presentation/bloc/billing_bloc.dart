@@ -88,7 +88,7 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
         );
       }
       try {
-        await _apiService.post('/api/v1/billing/sync');
+        await _apiService.post('/api/v1/billing/sync?force_remote=true');
       } catch (e) {
         // ignore: avoid_print
         print('Backend billing/sync attempt ${attempt + 1} failed: $e');

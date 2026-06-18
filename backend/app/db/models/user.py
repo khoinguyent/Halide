@@ -46,6 +46,9 @@ class PurchaseHistory(Base):
     event_type = Column(String(100))
     product_id = Column(String(255), nullable=True)
     transaction_id = Column(String(255), nullable=True)
+    # From RevenueCat webhook `event` (Apple / RC identifiers for dedupe and audits).
+    original_transaction_id = Column(String(255), nullable=True)
+    rc_event_id = Column(String(255), nullable=True)
     payload = Column(String)  # Store raw JSON string
     created_at = Column(DateTime, server_default=func.now() if hasattr(func, 'now') else text('NOW()'))
 

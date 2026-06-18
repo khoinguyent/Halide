@@ -17,13 +17,15 @@ class HalideScaffold extends ConsumerWidget {
   final Widget child;
   final int currentIndex;
   final Function(int) onTabSelected;
+  final VoidCallback onLightTableTap;
 
   const HalideScaffold({
-    Key? key,
+    super.key,
     required this.child,
     required this.currentIndex,
     required this.onTabSelected,
-  }) : super(key: key);
+    required this.onLightTableTap,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,6 +43,7 @@ class HalideScaffold extends ConsumerWidget {
                 ref.read(homeTabIndexProvider.notifier).setIndex(index);
                 onTabSelected(index);
               },
+              onLightTableTap: onLightTableTap,
               plan: ref.watch(userPlanProvider),
             ),
           ),

@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
+# macOS tar can add AppleDouble `._*.py` next to real migrations; Alembic loads every
+# `*.py` under alembic/versions and those files contain NUL bytes → SyntaxError.
+RUN find /app/alembic/versions -name '._*.py' -delete 2>/dev/null || true
 
 # Expose port
 EXPOSE 8000

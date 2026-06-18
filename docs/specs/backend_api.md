@@ -217,37 +217,44 @@ Follows the same pattern as cameras.
 - **Response**: `FilmStock[]`
 
 ### 4.6 Film Rolls
+
+> **Implementation note:** Rolls and shots are documented end-to-end in [roll_and_shot_cycle.md](./roll_and_shot_cycle.md). The live API uses `RollOutDashboard` (flat object with `image_urls`, `shots`, `shot_offset`, etc.), not nested `roll` / `frames` / `images`.
+
 **GET** `/api/v1/rolls`  
-- **Query params**: `status` (optional)
-- **Response**: `FilmRoll[]`
+- **Response**: `RollOutDashboard[]` (dashboard list with film brand, camera name, gallery URLs, shot logs).
 
 **GET** `/api/v1/rolls/{id}`  
-- **Response**:
-```json
-{
-  "roll": "FilmRoll",
-  "frames": "Frame[]",
-  "images": "Image[]"
-}
-```
+- **Response**: `RollOutDashboard` (same shape as list item).
 
 **POST** `/api/v1/rolls`  
+- **Body**: `RollCreate` — `film_stock_id`, optional `user_camera_id`, `shot_at_iso`, `max_frames`, `title`, `description`.
+- **Default status**: `shooting`.
+
+**PATCH** `/api/v1/rolls/{id}/status`  
+- **Body**: `{ "status": "shooting" | "lab" | "scanned" | "archived" | ... }` — forward-only transitions.
+
+**PATCH** `/api/v1/rolls/{id}/meta`  
+- **Body**: `{ "title", "description", "shot_offset" }` — alignment calibration for scan vs. log order.
+
+**PATCH** `/api/v1/rolls/{id}/drive-url`  
+- **Body**: `{ "drive_url": "https://drive.google.com/..." }` — lab folder / ZIP for sync.
+
+**POST** `/api/v1/rolls/{id}/shots`  
+- **Description**: Log a **shot without a scan** (meter or EXIF modal while `shooting`).
 - **Body**:
 ```json
 {
-  "film_stock_id": "uuid",
-  "camera_id": "uuid|null",
-  "lens_id": "uuid|null",
-  "iso_override": 200,
-  "push_pull_stops": 1,
-  "notes": "string|null"
+  "aperture": 2.8,
+  "shutter_speed": "1/125",
+  "lat": 10.77,
+  "lng": 106.69,
+  "notes": "optional",
+  "logged_at": "2026-05-18T12:00:00"
 }
 ```
+- **Response**: `ImageOut` (`image_url` is null for log-only rows).
 
-**PATCH** `/api/v1/rolls/{id}`  
-- **Body**: Partial `FilmRoll` fields.
-
-### 4.7 Frames
+### 4.7 Frames (legacy spec)
 **POST** `/api/v1/rolls/{roll_id}/frames`  
 - **Description**: Create a new frame attached to the given roll.
 - **Body**:

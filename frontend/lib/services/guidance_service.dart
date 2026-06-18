@@ -47,4 +47,11 @@ class GuidanceService {
   Future<bool> get hasSeenMeterIntro async => _read(_kMeterIntro);
 
   Future<void> setMeterIntroSeen() async => _write(_kMeterIntro);
+
+  /// Gyro Scan HUD: preview mode toggle (negative vs positive).
+  String get _kGyroScanIntro => 'guidance_${AppConfig.flavor.name}_seen_gyro_scan_intro';
+
+  Future<bool> get hasSeenGyroScanIntro async => _read(_kGyroScanIntro);
+
+  Future<void> setGyroScanIntroSeen() async => _write(_kGyroScanIntro);
 }

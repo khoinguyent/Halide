@@ -83,11 +83,38 @@ class RollGalleryPairs {
     return (urls, ids, alignedShots);
   }
 
-  /// Prefer cloud/R2 URLs from the API ([imageUrls] or per-shot URLs); if none, lab files on device.
+  /// Prefer cloud/R2 URLs from the API ([imageUrls] or per-shot URLs); if none, gyro/lab files on device.
   static Future<RollGalleryTriple> tripleAsync(Roll roll) async {
     final server = tripleServerOnly(roll);
     if (server.$1.isNotEmpty) return server;
+    final gyro = await _localGyroTriple(roll);
+    if (gyro.$1.isNotEmpty) return gyro;
     return _localLabTriple(roll);
+  }
+
+  static Future<RollGalleryTriple> _localGyroTriple(Roll roll) async {
+    final docDir = await getApplicationDocumentsDirectory();
+    final entries = await LocalImagePathIndex.instance.listGyroEntriesSorted(roll.id);
+    if (entries.isEmpty) {
+      return (<String>[], <String>[], <Shot>[]);
+    }
+
+    final urls = <String>[];
+    final ids = <String>[];
+    for (final (_, key, rel) in entries) {
+      final abs = p.isAbsolute(rel) ? rel : p.join(docDir.path, rel);
+      final f = File(abs);
+      if (!await f.exists()) continue;
+      if (!await isPlausibleImageCacheFile(f)) continue;
+      urls.add(abs);
+      ids.add(key);
+    }
+    if (urls.isEmpty) {
+      return (<String>[], <String>[], <Shot>[]);
+    }
+
+    final shots = _galleryShotsForCount(roll, urls.length);
+    return (urls, ids, shots);
   }
 
   static Future<RollGalleryTriple> _localLabTriple(Roll roll) async {

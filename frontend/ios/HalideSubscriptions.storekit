@@ -13,7 +13,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "halide_storage_5gb",
+      "productID" : "halide_storage_5gb_ext",
       "referenceName" : "Storage 5 GB",
       "type" : "Consumable"
     },
@@ -28,7 +28,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "halide_storage_10gb",
+      "productID" : "halide_storage_10gb_ext",
       "referenceName" : "Storage 10 GB",
       "type" : "Consumable"
     },
@@ -43,7 +43,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "halide_storage_50gb",
+      "productID" : "halide_storage_50gb_ext",
       "referenceName" : "Storage 50 GB",
       "type" : "Consumable"
     }

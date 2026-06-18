@@ -9,6 +9,11 @@ from ..db.models.user import User
 from ..db.schemas.camera import UserCameraCreate, UserLensCreate, UserCameraUpdate, UserLensUpdate
 from .storage_service import storage_service
 from .roll_service import public_http_url_for_storage_key
+from .gear_tier_limits import (
+    assert_can_attach_lens,
+    assert_can_create_camera,
+    assert_can_create_standalone_lens,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +29,9 @@ def get_user_camera_by_id(db: Session, user_camera_id: UUID, user_id: str):
         joinedload(UserCamera.lenses).joinedload(UserLens.lens),
     ).filter(UserCamera.id == user_camera_id, UserCamera.user_id == user_id).first()
 
-def create_user_camera(db: Session, user_camera: UserCameraCreate, user_id: str):
+def create_user_camera(db: Session, user_camera: UserCameraCreate, user_id: str, *, user: Optional[User] = None):
+    if user is not None:
+        assert_can_create_camera(db, user)
     data = user_camera.dict(exclude_unset=True)
     camera_id = data.get("camera_id")
     
@@ -65,8 +72,14 @@ def update_user_camera(db: Session, user_camera_id: UUID, user_id: str, update: 
     db.refresh(row)
     return row
 
-def create_user_lens(db: Session, user_lens: UserLensCreate, user_id: str):
+def create_user_lens(db: Session, user_lens: UserLensCreate, user_id: str, *, user: Optional[User] = None):
     data = user_lens.dict(exclude_unset=True)
+    parent_id = data.get("parent_camera_id")
+    if user is not None:
+        if parent_id is None:
+            assert_can_create_standalone_lens(user)
+        else:
+            assert_can_attach_lens(db, user, parent_id)
     lens_id = data.get("lens_id")
     
     if not lens_id and data.get("brand") and data.get("model"):
@@ -94,11 +107,14 @@ def create_user_lens(db: Session, user_lens: UserLensCreate, user_id: str):
     # Reload with relations
     return db.query(UserLens).options(joinedload(UserLens.lens)).filter(UserLens.id == db_user_lens.id).first()
 
-def update_user_lens(db: Session, user_lens_id: UUID, user_id: str, update: UserLensUpdate):
+def update_user_lens(db: Session, user_lens_id: UUID, user_id: str, update: UserLensUpdate, *, user: Optional[User] = None):
     row = db.query(UserLens).filter(UserLens.id == user_lens_id, UserLens.user_id == user_id).first()
     if not row:
         return None
     data = update.dict(exclude_unset=True)
+    new_parent = data.get("parent_camera_id")
+    if user is not None and new_parent is not None and new_parent != row.parent_camera_id:
+        assert_can_attach_lens(db, user, new_parent, exclude_lens_id=user_lens_id)
     for k, v in data.items():
         setattr(row, k, v)
     db.commit()

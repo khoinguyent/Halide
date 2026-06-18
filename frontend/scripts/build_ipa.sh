@@ -17,8 +17,16 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+# Honor FLAVOR=prod ./scripts/build_ipa.sh (or BUILD_NUMBER=…) passed on the command line.
+PRESET_FLAVOR="${FLAVOR:-}"
+
 # shellcheck disable=SC2046
 export $(grep -v '^#' .env | grep -v '^\s*$' | xargs)
+
+if [ -n "$PRESET_FLAVOR" ]; then
+  export FLAVOR="$PRESET_FLAVOR"
+  echo "Using FLAVOR from environment: $FLAVOR"
+fi
 
 if [ "${STAGING_TESTFLIGHT:-}" = "1" ]; then
   export FLAVOR=staging

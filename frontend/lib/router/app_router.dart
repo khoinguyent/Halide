@@ -13,6 +13,8 @@ import '../views/auth/login_view.dart';
 import '../views/auth/register_view.dart';
 import '../views/camera_detail_view.dart';
 import '../views/roll_detail_view.dart';
+import '../features/gyro_scan/presentation/gyro_scan_hud_view.dart';
+import '../features/light_table/presentation/light_table_view.dart';
 import '../views/legal/privacy_policy_view.dart';
 import '../views/legal/terms_conditions_view.dart';
 import '../features/storage/presentation/views/storage_account_list_view.dart';
@@ -83,11 +85,25 @@ final appRouter = GoRouter(
       builder: (context, state) => const SubscriptionView(),
     ),
     GoRoute(
+      path: '/light-table',
+      builder: (context, state) => const LightTableView(),
+    ),
+    GoRoute(
       path: '/roll/:id',
       builder: (context, state) {
         final id = state.pathParameters['id']!;
         return RollDetailView(rollId: id);
       },
+      routes: [
+        GoRoute(
+          path: 'gyro-scan',
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) {
+            final id = state.pathParameters['id']!;
+            return GyroScanHudView(rollId: id);
+          },
+        ),
+      ],
     ),
 
     StatefulShellRoute.indexedStack(
@@ -102,6 +118,7 @@ final appRouter = GoRouter(
               // Using go for top-level tabs ensures state preservation in the shell
               context.go(branchPaths[index]);
             },
+            onLightTableTap: () => context.push('/light-table'),
             child: navigationShell,
           ),
         );

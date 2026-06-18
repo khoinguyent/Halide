@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     REVENUE_CAT_PRO_ENTITLEMENT_IDS: str = (
         "pro,plus,halide pro,halide_pro,halide_cloud_system_storage"
     )
+    # Optional: "prodabc:halide_storage_5gb_ext,proddef:halide_storage_10gb_ext"
+    REVENUE_CAT_V2_STORAGE_PRODUCT_MAP: str = ""
 
     model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 

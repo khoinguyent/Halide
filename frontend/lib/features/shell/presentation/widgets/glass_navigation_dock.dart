@@ -1,19 +1,21 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:frontend/features/light_table/logic/light_table_color.dart';
 import 'package:frontend/models/user_profile.dart';
-
 
 class GlassNavigationDock extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTabSelected;
+  final VoidCallback onLightTableTap;
   final UserPlan plan;
 
   const GlassNavigationDock({
-    Key? key,
+    super.key,
     required this.currentIndex,
     required this.onTabSelected,
+    required this.onLightTableTap,
     required this.plan,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +23,6 @@ class GlassNavigationDock extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
-        // Premium glass effect using BackdropFilter
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
@@ -40,8 +41,8 @@ class GlassNavigationDock extends StatelessWidget {
                 _buildNavItem(Icons.camera_roll_outlined, 0),
                 _buildNavItem(Icons.photo_camera_outlined, 1),
                 const SizedBox(width: 48), // central FAB space
-                _buildNavItem(Icons.exposure_outlined, 2, showLock: !plan.isPro),  // Meter (Exposure)
-                _buildNavItem(Icons.person_outline, 3),    // Profile
+                _buildNavItem(Icons.exposure_outlined, 2, showLock: !plan.isPro),
+                _buildActionItem(LightTableTokens.navIcon, onLightTableTap),
               ],
             ),
           ),
@@ -80,6 +81,27 @@ class GlassNavigationDock extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionItem(IconData icon, VoidCallback onTap) {
+    return Tooltip(
+      message: 'Light Table',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: Icon(
+              icon,
+              color: Colors.white.withOpacity(0.5),
+              size: 28,
+            ),
+          ),
+        ),
       ),
     );
   }

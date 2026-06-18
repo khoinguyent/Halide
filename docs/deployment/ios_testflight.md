@@ -143,6 +143,10 @@ If you intentionally need **production** API in a TestFlight build, set **`FLAVO
 | 30    | 1.0.0+30  | 2026-04-04 | 10ac5f61-ee2b-4303-b904-864584eb4440 |
 | 29    | 1.0.0+29  | 2026-04-04 | 17d5f4c6-988e-479a-8be7-715d87d50f6e |
 
+## App Store Review: promoted IAP / win-back images (Guideline 2.3.2)
+
+If review cites **2.3.2 – Accurate Metadata** and the **promotional image** for a **promoted In-App Purchase** or **win-back offer**, the fix is in **App Store Connect** (replace the promotional artwork), not in the Flutter binary. See **[app_store_iap_promotional_images.md](./app_store_iap_promotional_images.md)** for requirements and a resubmission checklist.
+
 ## Troubleshooting
 
 - **No signing certificate "iOS Distribution" found**: Install a distribution certificate and select the correct team in Xcode (**Runner** → Signing & Capabilities).

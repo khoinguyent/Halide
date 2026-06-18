@@ -8,7 +8,7 @@ from typing import Any, Optional
 from urllib.parse import quote, unquote, urlparse
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from ...core.dependencies import get_current_user
@@ -41,14 +41,64 @@ WEBHOOK_TIER_SYNC_EVENT_TYPES = frozenset(
 # Stackable storage add-ons (consumable / non-consumable): count purchases in RevenueCat
 # `subscriber.non_subscriptions[product_id]` (V1 API) and multiply by GB per SKU.
 STORAGE_ADDON_PRODUCT_GB = {
+    # Legacy (non-consumable / older App Store identifiers)
     "halide_storage_5gb": 5,
     "halide_storage_10gb": 10,
     "halide_storage_50gb": 50,
-    "extra_storage_10gb": 10,
+    # Current consumable IAP identifiers
+    "halide_storage_5gb_ext": 5,
+    "halide_storage_10gb_ext": 10,
+    "halide_storage_50gb_ext": 50,
 }
 
 # Entitlements that grant storage quota but must not set subscription_tier to "pro".
 STORAGE_ONLY_ENTITLEMENT_IDS = frozenset({"halide_cloud_system_storage"})
+
+# RevenueCat V2 internal product ids → App Store SKU. Needed when the API secret cannot
+# call GET /v2/.../products (missing project_configuration:products:read).
+REVENUE_CAT_V2_STORAGE_PRODUCT_ID_TO_SKU: dict[str, str] = {
+    "prod7334b44418": "halide_storage_5gb_ext",
+    "prod6ce8f884b2": "halide_storage_5gb_ext",
+    "prod1cab8213d3": "halide_storage_5gb_ext",
+    "prod1973c922e5": "halide_storage_5gb_ext",
+    "prod14bbf1c53f": "halide_storage_5gb_ext",
+    "prod629aa4ce2f": "halide_storage_50gb_ext",
+}
+
+
+def revenuecat_v2_storage_product_id_map() -> dict[str, str]:
+    """Static V2 id map plus optional `REVENUE_CAT_V2_STORAGE_PRODUCT_MAP` env overrides."""
+    from ...core.config import settings
+
+    merged = dict(REVENUE_CAT_V2_STORAGE_PRODUCT_ID_TO_SKU)
+    raw = (getattr(settings, "REVENUE_CAT_V2_STORAGE_PRODUCT_MAP", None) or "").strip()
+    for part in raw.split(","):
+        part = part.strip()
+        if ":" not in part:
+            continue
+        pid, sku = part.split(":", 1)
+        pid, sku = pid.strip(), sku.strip()
+        if pid and sku:
+            merged[pid] = sku
+    return merged
+
+
+def _webhook_apple_transaction_id(event: dict) -> Optional[str]:
+    """
+    Stable per-purchase id for stackable IAP rows.
+
+    RevenueCat usually sends `transaction_id`; some payloads also include
+    `original_transaction_id` (often identical for consumables). Prefer
+    `transaction_id` when present so repeat purchases of the same SKU remain
+    distinct rows.
+    """
+    tx = event.get("transaction_id")
+    if isinstance(tx, str) and tx.strip():
+        return tx.strip()
+    orig = event.get("original_transaction_id")
+    if isinstance(orig, str) and orig.strip():
+        return orig.strip()
+    return None
 
 
 def _normalized_entitlement_inputs(event: dict) -> tuple[list, list]:
@@ -161,10 +211,117 @@ def additional_storage_bytes_from_non_subscriptions(non_sub: dict) -> int:
     return total
 
 
+def additional_storage_bytes_from_purchase_history(db: Session, user_id: str) -> int:
+    """
+    Compute stackable storage from webhook-backed purchase history.
+
+    This is our most reliable source for V2 projects when the RevenueCat API key
+    can't resolve product ids to store identifiers.
+    """
+    # One logical purchase = (store product_id, Apple transaction id). Different
+    # `transaction_id` values for the same SKU (stackable consumables) are all counted.
+    purchased_keys: set[tuple[str, str]] = set()
+    refunded_keys: set[tuple[str, str]] = set()
+
+    rows = (
+        db.query(
+            PurchaseHistory.event_type,
+            PurchaseHistory.product_id,
+            PurchaseHistory.transaction_id,
+            PurchaseHistory.rc_event_id,
+        )
+        .filter(PurchaseHistory.user_id == user_id)
+        .filter(PurchaseHistory.product_id.in_(list(STORAGE_ADDON_PRODUCT_GB.keys())))
+        .all()
+    )
+
+    for ev_type, product_id, tx_id, rc_id in rows:
+        if not product_id:
+            continue
+        tid = (str(tx_id).strip() if tx_id else "") or (str(rc_id).strip() if rc_id else "")
+        if not tid:
+            continue
+        key = (product_id, tid)
+        et = (ev_type or "").upper()
+        if et in ("REFUND", "REFUNDED", "REVOKE", "REVOKED", "CANCELLATION"):
+            refunded_keys.add(key)
+            continue
+        if et in ("NON_RENEWING_PURCHASE", "INITIAL_PURCHASE"):
+            purchased_keys.add(key)
+
+    total = 0
+    for product_id, tx_id in purchased_keys:
+        if (product_id, tx_id) in refunded_keys:
+            continue
+        total += STORAGE_ADDON_PRODUCT_GB[product_id] * 1024 * 1024 * 1024
+    return total
+
+
+def backfill_purchase_history_from_v2_items(
+    db: Session,
+    user_id: str,
+    items: list[dict],
+    *,
+    product_id_to_store_identifier: dict[str, str],
+) -> None:
+    """Insert missing purchase_history rows from V2 purchases (reconcile without webhooks)."""
+    existing: set[tuple[str, str]] = set()
+    for product_id, tx_id in (
+        db.query(PurchaseHistory.product_id, PurchaseHistory.transaction_id)
+        .filter(PurchaseHistory.user_id == user_id)
+        .filter(PurchaseHistory.product_id.in_(list(STORAGE_ADDON_PRODUCT_GB.keys())))
+        .all()
+    ):
+        if product_id and tx_id:
+            existing.add((product_id, str(tx_id).strip()))
+
+    for p in items:
+        if not isinstance(p, dict) or p.get("object") != "purchase":
+            continue
+        status = (p.get("status") or "owned").lower()
+        if status in ("refunded", "revoked"):
+            continue
+        sku = _v2_purchase_storage_sku(p)
+        if not sku:
+            raw_pid = p.get("product_id")
+            if isinstance(raw_pid, str):
+                mapped = product_id_to_store_identifier.get(raw_pid)
+                if mapped in STORAGE_ADDON_PRODUCT_GB:
+                    sku = mapped
+        if not sku:
+            continue
+        tx = p.get("store_purchase_identifier")
+        if not isinstance(tx, str) or not tx.strip():
+            tx = p.get("id")
+        if not isinstance(tx, str) or not tx.strip():
+            continue
+        tx = tx.strip()
+        key = (sku, tx)
+        if key in existing:
+            continue
+        rc_id = p.get("id")
+        db.add(
+            PurchaseHistory(
+                user_id=user_id,
+                event_type="NON_RENEWING_PURCHASE",
+                product_id=sku,
+                transaction_id=tx,
+                original_transaction_id=None,
+                rc_event_id=rc_id if isinstance(rc_id, str) else None,
+                payload=json.dumps({"source": "v2_backfill", "purchase_id": rc_id}),
+            )
+        )
+        existing.add(key)
+
+
 def _v2_purchase_storage_sku(purchase: dict) -> Optional[str]:
     """Map a V2 purchase object to a STORAGE_ADDON_PRODUCT_GB key (App Store / store identifier)."""
     keys = STORAGE_ADDON_PRODUCT_GB.keys()
     pid = purchase.get("product_id")
+    if isinstance(pid, str):
+        mapped = revenuecat_v2_storage_product_id_map().get(pid)
+        if mapped in keys:
+            return mapped
     if isinstance(pid, str) and pid in keys:
         return pid
     prod = purchase.get("product")
@@ -190,7 +347,9 @@ def _v2_purchase_storage_sku(purchase: dict) -> Optional[str]:
     return None
 
 
-def additional_storage_bytes_from_v2_purchase_items(items: list[dict]) -> int:
+def additional_storage_bytes_from_v2_purchase_items(
+    items: list[dict], *, product_id_to_store_identifier: Optional[dict[str, str]] = None
+) -> int:
     """Sum stackable storage from RevenueCat V2 GET .../customers/{id}/purchases items."""
     total = 0
     for p in items:
@@ -200,6 +359,12 @@ def additional_storage_bytes_from_v2_purchase_items(items: list[dict]) -> int:
         if status in ("refunded", "revoked"):
             continue
         sku = _v2_purchase_storage_sku(p)
+        if not sku and product_id_to_store_identifier:
+            raw_pid = p.get("product_id")
+            if isinstance(raw_pid, str):
+                mapped = product_id_to_store_identifier.get(raw_pid)
+                if mapped in STORAGE_ADDON_PRODUCT_GB:
+                    sku = mapped
         if not sku:
             continue
         gb = STORAGE_ADDON_PRODUCT_GB[sku]
@@ -213,13 +378,59 @@ def additional_storage_bytes_from_v2_purchase_items(items: list[dict]) -> int:
     return total
 
 
-async def fetch_revenuecat_v2_customer_purchase_items(
+async def fetch_revenuecat_v2_product_store_identifier(product_id: str) -> Optional[str]:
+    """
+    Resolve RevenueCat V2 product id (e.g. "prod...") to the store identifier
+    (e.g. "halide_storage_50gb_ext") so we can map purchases to storage SKUs.
+    """
+    from ...core.config import settings
+
+    if not isinstance(product_id, str) or not product_id:
+        return None
+
+    mapped = revenuecat_v2_storage_product_id_map().get(product_id)
+    if mapped:
+        return mapped
+
+    if not settings.REVENUE_CAT_SECRET_KEY or not settings.REVENUE_CAT_PROJECT_ID:
+        return None
+
+    url = (
+        f"https://api.revenuecat.com/v2/projects/{settings.REVENUE_CAT_PROJECT_ID}"
+        f"/products/{quote(product_id, safe='')}"
+    )
+    headers = {
+        "Authorization": f"Bearer {settings.REVENUE_CAT_SECRET_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=headers)
+        if resp.status_code != 200:
+            logger.warning(
+                "[Billing] RevenueCat V2 GET product %s failed: %s %s",
+                product_id,
+                resp.status_code,
+                resp.text[:500],
+            )
+            return None
+        body = resp.json()
+        if not isinstance(body, dict):
+            return None
+        # Common shape: {"object":"product", ...} or {"product": {...}}
+        prod = body.get("product") if isinstance(body.get("product"), dict) else body
+        if not isinstance(prod, dict):
+            return None
+        sid = prod.get("store_identifier") or prod.get("lookup_key")
+        return sid if isinstance(sid, str) else None
+
+
+async def _fetch_revenuecat_v2_customer_purchase_items_for_env(
     app_user_id: str,
+    *,
+    environment: str,
 ) -> list[dict]:
-    """
-    Paginate GET /v2/projects/{project_id}/customers/{customer_id}/purchases.
-    Uses the same secret key as other V2 customer endpoints (V1 subscriber key is often incompatible).
-    """
+    """Paginate GET .../purchases for one RevenueCat environment (sandbox | production)."""
     from ...core.config import settings
 
     if not settings.REVENUE_CAT_SECRET_KEY or not settings.REVENUE_CAT_PROJECT_ID:
@@ -230,7 +441,6 @@ async def fetch_revenuecat_v2_customer_purchase_items(
         f"https://api.revenuecat.com/v2/projects/{settings.REVENUE_CAT_PROJECT_ID}"
         f"/customers/{encoded_id}/purchases"
     )
-    env = "sandbox" if settings.IS_REVENUE_CAT_SANDBOX else "production"
     headers = {
         "Authorization": f"Bearer {settings.REVENUE_CAT_SECRET_KEY}",
         "Content-Type": "application/json",
@@ -238,7 +448,7 @@ async def fetch_revenuecat_v2_customer_purchase_items(
 
     out: list[dict] = []
     next_url: Optional[str] = base_path
-    next_params: Optional[dict[str, Any]] = {"limit": 100, "environment": env}
+    next_params: Optional[dict[str, Any]] = {"limit": 100, "environment": environment}
 
     async with httpx.AsyncClient() as client:
         for _ in range(100):
@@ -247,8 +457,9 @@ async def fetch_revenuecat_v2_customer_purchase_items(
             response = await client.get(next_url, headers=headers, params=next_params)
             if response.status_code != 200:
                 logger.warning(
-                    "[Billing] RevenueCat V2 GET purchases %s failed: %s %s",
+                    "[Billing] RevenueCat V2 GET purchases %s env=%s failed: %s %s",
                     app_user_id,
+                    environment,
                     response.status_code,
                     response.text[:500],
                 )
@@ -272,6 +483,36 @@ async def fetch_revenuecat_v2_customer_purchase_items(
                 next_params = _parse_qs_to_dict(parsed.query) if parsed.query else None
 
     return out
+
+
+async def fetch_revenuecat_v2_customer_purchase_items(
+    app_user_id: str,
+) -> list[dict]:
+    """
+    Paginate GET /v2/projects/{project_id}/customers/{customer_id}/purchases.
+
+    When the server is configured for production (`IS_REVENUE_CAT_SANDBOX=false`), also
+  queries sandbox so TestFlight consumable purchases reconcile on the prod API host.
+    """
+    from ...core.config import settings
+
+    primary = "sandbox" if settings.IS_REVENUE_CAT_SANDBOX else "production"
+    items = await _fetch_revenuecat_v2_customer_purchase_items_for_env(app_user_id, environment=primary)
+    if not settings.IS_REVENUE_CAT_SANDBOX:
+        sandbox_items = await _fetch_revenuecat_v2_customer_purchase_items_for_env(
+            app_user_id, environment="sandbox"
+        )
+        seen: set[str] = set()
+        merged: list[dict] = []
+        for it in items + sandbox_items:
+            pid = it.get("id") if isinstance(it.get("id"), str) else None
+            if pid and pid in seen:
+                continue
+            if pid:
+                seen.add(pid)
+            merged.append(it)
+        return merged
+    return items
 
 
 def _parse_qs_to_dict(qs: str) -> dict[str, str]:
@@ -368,7 +609,45 @@ async def sync_user_from_revenuecat(db: Session, user: User) -> bool:
 
     if settings.REVENUE_CAT_PROJECT_ID:
         v2_items = await fetch_revenuecat_v2_customer_purchase_items(user.id)
-        storage_bytes = additional_storage_bytes_from_v2_purchase_items(v2_items)
+        # V2 purchases use RevenueCat product ids (e.g. "prod...") which must be resolved to
+        # store identifiers (e.g. "halide_storage_50gb_ext") to map to our SKU list.
+        product_id_to_store_identifier: dict[str, str] = {}
+        for it in v2_items:
+            if not isinstance(it, dict):
+                continue
+            raw_pid = it.get("product_id")
+            if not isinstance(raw_pid, str) or not raw_pid:
+                continue
+            if raw_pid in product_id_to_store_identifier:
+                continue
+            if raw_pid in STORAGE_ADDON_PRODUCT_GB:
+                product_id_to_store_identifier[raw_pid] = raw_pid
+                continue
+            static = revenuecat_v2_storage_product_id_map().get(raw_pid)
+            if static:
+                product_id_to_store_identifier[raw_pid] = static
+                continue
+            sid = await fetch_revenuecat_v2_product_store_identifier(raw_pid)
+            if isinstance(sid, str) and sid:
+                product_id_to_store_identifier[raw_pid] = sid
+
+        backfill_purchase_history_from_v2_items(
+            db,
+            user.id,
+            v2_items,
+            product_id_to_store_identifier=product_id_to_store_identifier,
+        )
+        db.flush()
+
+        v2_bytes = additional_storage_bytes_from_v2_purchase_items(
+            v2_items, product_id_to_store_identifier=product_id_to_store_identifier
+        )
+        history_bytes = additional_storage_bytes_from_purchase_history(db, user.id)
+        # V2 purchase pagination / mapping can lag behind webhooks (or miss consumables until
+        # RC indexes them). Webhook-backed history is authoritative for stackable SKUs we log.
+        # Take the max so a new purchase row increases quota even when v2_bytes is still stale
+        # but non-zero (e.g. partial mapping from product id resolution).
+        storage_bytes = max(v2_bytes, history_bytes)
         if storage_bytes == 0 and non_sub:
             storage_bytes = additional_storage_bytes_from_non_subscriptions(non_sub)
         user.additional_storage_bytes = storage_bytes
@@ -376,14 +655,22 @@ async def sync_user_from_revenuecat(db: Session, user: User) -> bool:
         for it in v2_items:
             if isinstance(it, dict):
                 s = _v2_purchase_storage_sku(it)
+                if not s:
+                    raw_pid = it.get("product_id")
+                    if isinstance(raw_pid, str):
+                        mapped = product_id_to_store_identifier.get(raw_pid)
+                        if mapped in STORAGE_ADDON_PRODUCT_GB:
+                            s = mapped
                 if s:
                     matched_skus.add(s)
         logger.info(
             "[Billing] Storage sync user=%s additional_storage_bytes=%s "
-            "(v2_purchase_items=%s matched_skus=%s)",
+            "(v2_purchase_items=%s v2_bytes=%s history_bytes=%s matched_skus=%s)",
             user.id,
             user.additional_storage_bytes,
             len(v2_items),
+            v2_bytes,
+            history_bytes,
             sorted(matched_skus),
         )
     else:
@@ -404,6 +691,33 @@ async def sync_user_from_revenuecat(db: Session, user: User) -> bool:
 
     db.add(user)
     return True
+
+
+def apply_billing_from_webhook_event(db: Session, user: User, event: dict) -> None:
+    """
+    Apply subscription tier from the webhook event and stackable storage from
+    `purchase_history` only (no RevenueCat REST calls).
+
+    Storage-only `NON_RENEWING_PURCHASE` events often omit entitlement fields; in
+    that case we only refresh add-on bytes so we do not overwrite `subscription_tier`
+    with `free` by mistake.
+    """
+    product_id = event.get("product_id")
+    event_type = (event.get("type") or "").upper()
+    ents, eids = _normalized_entitlement_inputs(event)
+    has_ent_signal = bool(ents) or bool(eids)
+
+    storage_only_purchase = (
+        event_type == "NON_RENEWING_PURCHASE"
+        and isinstance(product_id, str)
+        and product_id in STORAGE_ADDON_PRODUCT_GB
+    )
+
+    if has_ent_signal or not storage_only_purchase:
+        _update_user_tier(user, entitlements=ents, entitlement_ids=eids)
+
+    user.additional_storage_bytes = additional_storage_bytes_from_purchase_history(db, user.id)
+    db.add(user)
 
 
 async def _resolve_user_for_webhook(db: Session, event: dict) -> Optional[User]:
@@ -481,24 +795,26 @@ async def revenue_cat_webhook(
     if is_sandbox is None and environment_raw is not None:
         is_sandbox = environment_raw == "SANDBOX"
 
-    # Dashboard \"Send test event\" uses type TEST and is often SANDBOX; always accept.
-    if event_type != "TEST" and is_sandbox is not None:
-        if settings.IS_REVENUE_CAT_SANDBOX != is_sandbox:
-            env_str = "SANDBOX" if is_sandbox else "PRODUCTION"
-            server_env = "SANDBOX" if settings.IS_REVENUE_CAT_SANDBOX else "PRODUCTION"
-            logger.info(
-                "[Billing] Dropping %s event on %s server (is_sandbox=%s environment=%s)",
-                env_str,
-                server_env,
-                is_sandbox_raw,
-                environment_raw,
-            )
-            return {"status": "ignored", "reason": "environment_mismatch"}
-
     if not event_type:
         return {"status": "ignored", "reason": "missing_fields"}
 
-    # --- Purchase history (all events with a user id) ---
+    # TestFlight / Xcode StoreKit use SANDBOX IAP while the prod API may run with
+    # IS_REVENUE_CAT_SANDBOX=false. Still record purchases and stackable storage;
+    # only skip subscription tier updates when environments do not match.
+    skip_tier_sync = False
+    if event_type != "TEST" and is_sandbox is not None:
+        if settings.IS_REVENUE_CAT_SANDBOX != is_sandbox:
+            skip_tier_sync = True
+            env_str = "SANDBOX" if is_sandbox else "PRODUCTION"
+            server_env = "SANDBOX" if settings.IS_REVENUE_CAT_SANDBOX else "PRODUCTION"
+            logger.info(
+                "[Billing] Environment mismatch (%s event on %s server); "
+                "will still log purchase_history and stackable storage SKUs",
+                env_str,
+                server_env,
+            )
+
+    # --- Purchase history (all events with a user id) — before tier/storage apply ---
     history_user_id = app_user_id or event.get("original_app_user_id")
     if not history_user_id and event_type == "TRANSFER":
         tt = event.get("transferred_to") or []
@@ -506,25 +822,42 @@ async def revenue_cat_webhook(
             history_user_id = tt[0]
     if history_user_id:
         try:
+            tx_for_row = _webhook_apple_transaction_id(event)
+            orig_tx = event.get("original_transaction_id")
+            if isinstance(orig_tx, str):
+                orig_tx = orig_tx.strip() or None
+            else:
+                orig_tx = None
+            rc_ev = event.get("id")
+            if isinstance(rc_ev, str):
+                rc_ev = rc_ev.strip() or None
+            else:
+                rc_ev = None
             history = PurchaseHistory(
                 user_id=history_user_id,
                 event_type=event_type,
                 product_id=event.get("product_id"),
-                transaction_id=event.get("transaction_id"),
+                transaction_id=tx_for_row,
+                original_transaction_id=orig_tx,
+                rc_event_id=rc_ev,
                 payload=json.dumps(payload),
             )
             db.add(history)
+            # Ensure the row is visible to subsequent queries in this request (e.g. storage recompute).
+            db.flush()
         except Exception as e:
             logger.warning("[Billing] Failed to log purchase history: %s", e)
 
     env_str = "SANDBOX" if is_sandbox else "PRODUCTION"
+    resolved_tx = _webhook_apple_transaction_id(event)
     logger.info(
-        "[Billing] [%s] Webhook type=%s app_user_id=%s product_id=%s transaction_id=%s rc_event_id=%s",
+        "[Billing] [%s] Webhook type=%s app_user_id=%s product_id=%s transaction_id=%s original_transaction_id=%s rc_event_id=%s",
         env_str,
         event_type,
         app_user_id,
         event.get("product_id"),
-        event.get("transaction_id"),
+        resolved_tx,
+        event.get("original_transaction_id"),
         event.get("id"),
     )
 
@@ -559,16 +892,27 @@ async def revenue_cat_webhook(
 
     previous_tier = user.subscription_tier
 
-    # --- Subscription + consumable storage: reconcile tier and stackable storage from RevenueCat REST ---
+    # --- Subscription + consumable storage: tier from webhook; storage from DB history ---
     if event_type in WEBHOOK_TIER_SYNC_EVENT_TYPES:
-        if settings.REVENUE_CAT_SECRET_KEY:
-            ok = await sync_user_from_revenuecat(db, user)
-            if not ok:
-                ents, eids = _normalized_entitlement_inputs(event)
-                _update_user_tier(user, entitlements=ents, entitlement_ids=eids)
-        else:
-            ents, eids = _normalized_entitlement_inputs(event)
-            _update_user_tier(user, entitlements=ents, entitlement_ids=eids)
+        if skip_tier_sync:
+            product_id = event.get("product_id")
+            if isinstance(product_id, str) and product_id in STORAGE_ADDON_PRODUCT_GB:
+                user.additional_storage_bytes = additional_storage_bytes_from_purchase_history(
+                    db, user.id
+                )
+                db.add(user)
+                db.commit()
+                logger.info(
+                    "[Billing] Storage add-on (env mismatch) user=%s product_id=%s "
+                    "additional_storage_bytes=%s",
+                    user.id,
+                    product_id,
+                    user.additional_storage_bytes or 0,
+                )
+                return {"status": "ok", "note": "storage_only_env_mismatch"}
+            db.commit()
+            return {"status": "ignored", "reason": "environment_mismatch"}
+        apply_billing_from_webhook_event(db, user, event)
         _maybe_email_downgrade_notice(previous_tier=previous_tier, new_tier=user.subscription_tier, user=user)
         db.add(user)
         db.commit()
@@ -579,7 +923,7 @@ async def revenue_cat_webhook(
                 "additional_storage_bytes=%s tier=%s",
                 user.id,
                 product_id,
-                event.get("transaction_id"),
+                resolved_tx,
                 user.additional_storage_bytes or 0,
                 user.subscription_tier,
             )
@@ -594,21 +938,33 @@ async def revenue_cat_webhook(
 async def sync_billing_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    force_remote: bool = Query(
+        False,
+        description="If true, fetch subscriber state from RevenueCat and reconcile (heavy). "
+        "Default false: recompute stackable storage from purchase_history only.",
+    ),
 ):
     """
-    Manually sync user's entitlement status from RevenueCat REST API.
+    Default: recompute `additional_storage_bytes` from `purchase_history` (no RC calls).
+    Use `?force_remote=true` after a purchase/restore if you need an immediate full reconcile
+    while webhooks catch up.
     """
     from ...core.config import settings
 
-    if not settings.REVENUE_CAT_SECRET_KEY:
-        raise HTTPException(status_code=501, detail="RevenueCat Secret Key not configured")
-
-    if not await sync_user_from_revenuecat(db, current_user):
-        raise HTTPException(status_code=502, detail="Failed to fetch from RevenueCat")
+    if force_remote:
+        if not settings.REVENUE_CAT_SECRET_KEY:
+            raise HTTPException(status_code=501, detail="RevenueCat Secret Key not configured")
+        if not await sync_user_from_revenuecat(db, current_user):
+            raise HTTPException(status_code=502, detail="Failed to fetch from RevenueCat")
+    else:
+        current_user.additional_storage_bytes = additional_storage_bytes_from_purchase_history(
+            db, current_user.id
+        )
+        db.add(current_user)
 
     db.commit()
     return {
-        "status": "synced",
+        "status": "synced_remote" if force_remote else "synced_db",
         "tier": current_user.subscription_tier,
         "additional_storage_bytes": current_user.additional_storage_bytes or 0,
         "total_storage_limit": current_user.total_storage_limit,

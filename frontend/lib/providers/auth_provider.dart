@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
-import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../models/user_profile.dart';
 import '../services/purchase_service.dart';
@@ -125,26 +124,17 @@ final entitlementListenerProvider = Provider<void>((ref) {
   });
 
   Purchases.addCustomerInfoUpdateListener((customerInfo) {
-    Future.microtask(() async {
+      Future.microtask(() async {
       // ignore: avoid_print
-      print('[Auth] RevenueCat update detected. Syncing billing server-side, then refreshing profile...');
+      print('[Auth] RevenueCat update detected. Refreshing profile from backend (tier/storage come from DB; webhooks keep them updated)...');
 
       final ids = customerInfo.entitlements.active.keys;
       ref
           .read(localEntitlementPlanProvider.notifier)
           .updateFromActiveEntitlementIds(ids);
 
-      // Pull consumable / non-subscription counts into Postgres (`additional_storage_bytes`) before /me.
-      try {
-        final api = ApiService();
-        await api.post('/api/v1/billing/sync');
-        // RC server-side can trail the SDK by a short window; second sync improves quota freshness.
-        await Future<void>.delayed(const Duration(milliseconds: 700));
-        await api.post('/api/v1/billing/sync');
-      } catch (e) {
-        // ignore: avoid_print
-        print('[Auth] billing/sync after RC update failed (webhook may still apply): $e');
-      }
+      // Do not call RevenueCat-backed /billing/sync on every SDK tick — webhooks + optional
+      // post-purchase `?force_remote=true` reconcile are enough; /me reads Postgres.
       ref.invalidate(userProfileProvider);
     });
   });

@@ -37,6 +37,28 @@ class SensorService {
     1.0, 1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0,
   ];
 
+  /// Luminance-based EV₁₀₀: EV = log₂(L · S / K).
+  double ev100FromLuminance(double luminanceCdM2) {
+    if (luminanceCdM2 <= 0 || !luminanceCdM2.isFinite) return 0.0;
+    return _log2(luminanceCdM2 * 100.0 / 12.5);
+  }
+
+  /// EV at arbitrary ISO: EV_S = EV₁₀₀ + log₂(S / 100).
+  double evAtIso(double ev100, double iso) {
+    if (iso <= 0) return ev100;
+    return ev100 + _log2(iso / 100.0);
+  }
+
+  /// Reciprocal: N²/t = S · 2^EV / K  →  t = N² · K / (S · 2^EV).
+  double shutterFromReciprocityLaw({
+    required double aperture,
+    required double ev,
+    required double iso,
+  }) {
+    if (aperture <= 0 || iso <= 0) return 0.0;
+    return math.pow(aperture, 2) * 12.5 / (iso * math.pow(2, ev));
+  }
+
   // ── Core EV calculations ────────────────────────────────────────────────
 
   /// Raw EV at camera settings — NOT calibrated.

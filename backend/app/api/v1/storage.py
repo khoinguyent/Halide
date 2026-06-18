@@ -48,8 +48,8 @@ _GOOGLE_DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
 
 
 def _tier_uses_cloud_drive_r2_sync(tier: Optional[str]) -> bool:
-    """Plus/Pro: server downloads Drive and persists to R2. Free: on-device import only."""
-    return (tier or "free").lower() in ("plus", "pro")
+    """Pro: server downloads Drive and persists to R2. Free: on-device import only."""
+    return (tier or "free").lower() == "pro"
 
 
 @router.get("/storage/providers", response_model=List[StorageProviderMetadata])
@@ -189,6 +189,97 @@ async def upload_roll_images(
     
     db.commit()
     return uploaded_images
+
+
+@router.post("/rolls/{roll_id}/frames/{frame_number}/scan", response_model=ImageOut)
+async def upload_gyro_scan_frame(
+    roll_id: str,
+    frame_number: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Gyro-scan ingest: merge scanned image into the images table by frame_number.
+    Case A — row exists: keep EXIF metadata, update image_url.
+    Case B — no row: create a new Image with frame_number and R2 path.
+  Premium (pro tier) only.
+    """
+    if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Gyro scan cloud upload requires a premium subscription.",
+        )
+
+    roll = db.query(Roll).filter(Roll.id == roll_id).first()
+    if not roll:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Roll not found")
+    if roll.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    if frame_number < 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="frame_number must be >= 0")
+
+    max_bytes = 15 * 1024 * 1024
+    file_size = 0
+    chunk = await file.read(1024 * 1024)
+    chunks: list[bytes] = []
+    while chunk:
+        file_size += len(chunk)
+        if file_size > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File {file.filename} exceeds the 15 MB limit.",
+            )
+        chunks.append(chunk)
+        chunk = await file.read(1024 * 1024)
+    file_content = b"".join(chunks)
+    if not file_content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")
+
+    if current_user.storage_used_bytes + len(file_content) > current_user.total_storage_limit:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Upload would exceed your storage limit. Please upgrade your plan.",
+        )
+
+    image_id = str(uuid.uuid4())
+    from ...services.transfer_service import transfer_service
+
+    full_key = transfer_service.route_transfer(
+        db=db,
+        user_id=current_user.id,
+        roll_id=roll_id,
+        image_id=image_id,
+        file_content=file_content,
+        strategy="SYSTEM_CLOUD",
+    )
+
+    existing_frame = (
+        db.query(Image)
+        .filter(Image.roll_id == roll.id, Image.frame_number == frame_number)
+        .first()
+    )
+    if existing_frame:
+        existing_frame.image_url = full_key
+        db_image = existing_frame
+        logger.info("Gyro scan: updated existing frame %d for roll %s", frame_number, roll_id)
+    else:
+        db_image = Image(
+            roll_id=roll.id,
+            image_url=full_key,
+            frame_number=frame_number,
+        )
+        db.add(db_image)
+        logger.info("Gyro scan: created frame %d for roll %s", frame_number, roll_id)
+
+    current_user.storage_used_bytes += len(file_content)
+    db.add(current_user)
+    # Keep roll at lab until the user explicitly finishes scanning in the app.
+    db.add(roll)
+    db.commit()
+    db.refresh(db_image)
+    return db_image
 
 
 @router.put("/rolls/{roll_id}/images/{image_id}", response_model=ImageOut)
@@ -655,7 +746,7 @@ def free_folder_manifest(
     if _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
         raise HTTPException(
             status_code=400,
-            detail="Plus/Pro should use cloud sync.",
+            detail="Halide Pro should use cloud sync.",
         )
     roll = (
         db.query(Roll)
@@ -717,7 +808,7 @@ def download_gdrive_file_for_free_local_sync(
     if _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
         raise HTTPException(
             status_code=400,
-            detail="Plus/Pro should use cloud sync.",
+            detail="Halide Pro should use cloud sync.",
         )
 
     cred = (
@@ -780,7 +871,7 @@ def sync_gdrive_leaf_files(
     if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
         raise HTTPException(
             status_code=402,
-            detail="Cloud scan backup requires Plus or Pro. Free saves scans on this device only.",
+            detail="Cloud scan backup requires Halide Pro. Free saves scans on this device only.",
         )
 
     # Pick the primary gdrive connection if available, else first connection.
@@ -1036,11 +1127,10 @@ def sync_gdrive_zip_images(
     if not roll:
         raise HTTPException(status_code=404, detail="Roll not found")
 
-    # Plus tier or higher required for GDrive sync features
-    if current_user.subscription_tier not in ["plus", "pro"]:
+    if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Google Drive sync requires Plus or Pro subscription",
+            detail="Google Drive cloud sync requires Halide Pro subscription",
         )
 
     zip_id = extract_drive_folder_id(payload.zip_url_or_id)
@@ -1394,7 +1484,7 @@ async def sync_images_from_url(
     if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
         raise HTTPException(
             status_code=402,
-            detail="Cloud scan backup requires Plus or Pro. Free saves scans on this device only.",
+            detail="Cloud scan backup requires Halide Pro. Free saves scans on this device only.",
         )
 
     raw = (payload.gdrive_url_or_id or "").strip()

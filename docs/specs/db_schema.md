@@ -63,20 +63,31 @@ A specific roll of film shot by a User.
 | `user_id` | VARCHAR(255) | FOREIGN KEY (Users.id) | Owner of the roll |
 | `film_stock_id` | UUID | FOREIGN KEY (FilmStocks.id) | The film used |
 | `user_camera_id` | UUID | FOREIGN KEY (UserCameras.id) | The specific camera used |
+| `user_lens_id` | UUID | FOREIGN KEY (UserLenses.id) | Optional lens |
 | `shot_at_iso` | INTEGER | | ISO the user actually shot it at |
 | `expired_year` | INTEGER | | e.g. 2015, 2026. Null if fresh |
-| `status` | ENUM | DEFAULT 'Shooting' | 'Shooting', 'Finished Shooting', 'At Lab', 'Result Received' |
+| `max_frames` | INTEGER | DEFAULT 36 | Frame capacity (e.g. 24 / 36) |
+| `shot_offset` | INTEGER | DEFAULT 0 | Gallery alignment: skip N leader frames in scan order (see [roll_and_shot_cycle.md](./roll_and_shot_cycle.md)) |
+| `status` | ENUM | DEFAULT `shooting` | `loaded`, `shooting`, `lab`, `syncing`, `scanned`, `archived` |
+| `title` | VARCHAR(255) | | Display name / nickname |
+| `description` | TEXT | | Notes |
+| `drive_url` | TEXT | | Google Drive folder or ZIP for lab sync |
 | `created_at` | TIMESTAMP | DEFAULT NOW() | When the roll was started |
 
-## Images
-Individual exposures scanned from a Roll.
+**Lifecycle:** See [roll_and_shot_cycle.md](./roll_and_shot_cycle.md) for status flow and UI phases.
+
+## Images (shots + scans)
+One table stores **log-only shots** (no file yet) and **scanned frames** (cloud URL). See [roll_and_shot_cycle.md](./roll_and_shot_cycle.md).
 
 | Field | Type | Modifiers | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique identifier |
 | `roll_id` | UUID | FOREIGN KEY (Rolls.id) | Parent roll |
-| `frame_number` | INTEGER | | Frame 1-36 |
-| `image_url` | VARCHAR | NOT NULL | Cloud storage URL |
-| `aperture` | DECIMAL(3,1) | | Lens aperture used |
-| `shutter_speed`| VARCHAR(20) | | e.g. "1/250" |
-| `notes` | TEXT | | Optional context |
+| `frame_number` | INTEGER | | Order index: log sequence while shooting; scan index after ingest |
+| `image_url` | VARCHAR | **NULLABLE** | R2/storage key or URL; **NULL** = log-only shot |
+| `aperture` | FLOAT | | e.g. 2.8 |
+| `shutter_speed`| VARCHAR(20) | | e.g. `"1/250"` |
+| `notes` | TEXT | | Meter summary or user notes |
+| `location_lat` | FLOAT | | GPS when logged |
+| `location_lng` | FLOAT | | GPS when logged |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | Log time (`logged_at` from client) or ingest time |

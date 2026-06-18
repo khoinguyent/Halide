@@ -139,7 +139,8 @@ class PurchaseService {
 
   /// Preferred for one-time / non-subscription products loaded via [getNonSubscriptionProducts].
   /// Consumables may not appear in [CustomerInfo.allPurchasedProductIdentifiers]; any non-cancelled
-  /// completion from RevenueCat is treated as success (backend reconciles via /billing/sync).
+  /// completion from RevenueCat is treated as success (backend updates via webhooks;
+  /// post-purchase `/billing/sync?force_remote=true` can reconcile if needed).
   Future<PurchaseResult> purchaseStoreProduct(StoreProduct product) async {
     try {
       await Purchases.purchaseStoreProduct(product);

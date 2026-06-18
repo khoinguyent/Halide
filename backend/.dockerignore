@@ -1,0 +1,3 @@
+# macOS AppleDouble / resource fork files (break Alembic if loaded as .py)
+**/._*
+.DS_Store

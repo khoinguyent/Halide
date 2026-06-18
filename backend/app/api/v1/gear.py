@@ -17,7 +17,7 @@ def update_user_lens(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    row = gear_service.update_user_lens(db, user_lens_id, current_user.id, body)
+    row = gear_service.update_user_lens(db, user_lens_id, current_user.id, body, user=current_user)
     if not row:
         raise HTTPException(status_code=404, detail="User lens not found")
     return row
@@ -48,7 +48,9 @@ def create_user_camera(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return gear_service.create_user_camera(db=db, user_camera=user_camera, user_id=current_user.id)
+    return gear_service.create_user_camera(
+        db=db, user_camera=user_camera, user_id=current_user.id, user=current_user
+    )
 
 @router.patch("/user_cameras/{user_camera_id}", response_model=UserCameraOut)
 def update_user_camera(
@@ -126,4 +128,6 @@ def create_user_lens(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    return gear_service.create_user_lens(db=db, user_lens=user_lens, user_id=current_user.id)
+    return gear_service.create_user_lens(
+        db=db, user_lens=user_lens, user_id=current_user.id, user=current_user
+    )

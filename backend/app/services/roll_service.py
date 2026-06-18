@@ -44,9 +44,8 @@ def _gallery_public_url_base() -> Optional[str]:
 
 
 def _tier_uses_public_object_urls(subscription_tier: Optional[str]) -> bool:
-    """Plus/Pro may use unauthenticated R2 public URLs when the bucket allows it."""
-    t = (subscription_tier or "free").lower()
-    return t in ("plus", "pro")
+    """Pro may use unauthenticated R2 public URLs when the bucket allows it."""
+    return (subscription_tier or "free").lower() == "pro"
 
 
 def public_http_url_for_storage_key(k: str) -> str:
@@ -301,6 +300,20 @@ def update_roll_status(db: Session, roll_id: str, new_status: RollStatusEnum, us
     db.add(db_roll)
     db.commit()
     db.refresh(db_roll)
+    return db_roll
+
+
+def pause_gyro_scan_session(db: Session, roll_id: str, user_id: str):
+    """Keep roll at lab while gyro scan is in progress or paused mid-roll."""
+    db_roll = get_roll(db, roll_id, user_id)
+    if not db_roll:
+        raise HTTPException(status_code=404, detail="Roll not found")
+
+    if db_roll.status == RollStatusEnum.scanned:
+        db_roll.status = RollStatusEnum.lab
+        db.add(db_roll)
+        db.commit()
+        db.refresh(db_roll)
     return db_roll
 
 

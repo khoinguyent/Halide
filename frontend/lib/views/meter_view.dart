@@ -1,4 +1,5 @@
 import 'dart:async' show Timer, unawaited;
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,9 @@ import '../config/app_config.dart';
 import '../core/models/notification_model.dart';
 import '../core/providers/notification_provider.dart';
 import '../features/meter/providers/meter_provider.dart';
+import '../features/meter/providers/advanced_spot_metering_provider.dart';
+import '../features/meter/presentation/widgets/advanced_spot_metering_overlay.dart';
+import '../features/meter/presentation/widgets/zone_overlay_painter.dart';
 import '../models/roll.dart';
 import '../models/roll_status.dart';
 import '../providers/auth_provider.dart';
@@ -25,6 +29,8 @@ import '../widgets/debug_log_sheet.dart';
 import '../widgets/guidance/lab_drive_sync_guidance.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
+import '../services/sensor_service.dart';
+import '../widgets/aperture_slider_control.dart';
 
 class MeterView extends ConsumerStatefulWidget {
   const MeterView({Key? key}) : super(key: key);
@@ -47,6 +53,15 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
   final GlobalKey _meterSpotKey = GlobalKey();
   final GlobalKey _meterLogToRollKey = GlobalKey();
   bool _meterIntroScheduled = false;
+  bool _exposureHudExpanded = true;
+
+  /// Reserve space above the bottom tab bar for the exposure HUD + optional zone legend below it.
+  static const double _navBarClearance = 40;
+  static const double _collapsedHudHeight = 64;
+  static const double _expandedHudHeight = 248;
+  static const double _spotRingSize = 52;
+  static const double _zoneLegendHeight = ZoneLegendHud.preferredHeight;
+  static const double _legendBelowHudGap = 10;
 
   @override
   void initState() {
@@ -255,6 +270,19 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         debugPrint('[MeterView] metadata poll: $e');
       }
     });
+  }
+
+  Future<void> _revertToCenterMetering() async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    try {
+      await _metadataChannel.invokeMethod('setupMeteringPoint');
+    } catch (e) {
+      MeterDebugLog.log('setupMeteringPoint (revert): $e');
+    }
+    try {
+      await c.setExposurePoint(const Offset(0.5, 0.5));
+    } catch (_) {}
   }
 
   void _handleLockToggle() {
@@ -489,50 +517,73 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
 
   Future<void> _showAperturePicker() async {
     final current = ref.read(meterProvider);
-    final stops = <double>[1.0, 1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0];
-    double selected = current.aperture;
+    final stops = SensorService.standardApertures;
     await showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
-      backgroundColor: const Color(0xFF09090B),
+      backgroundColor: const Color(0xFF0D0D0D),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        side: BorderSide(color: Colors.white10, width: 0.5),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+      builder: (ctx) {
+        final bottomPadding = MediaQuery.of(ctx).padding.bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(24, 12, 24, 24 + bottomPadding),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 44, height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(999),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'APERTURE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close, color: Colors.white54),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Drag to set f-stop. Tap the meter circle to return to aperture priority.',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.4),
+                  fontSize: 11,
+                  height: 1.35,
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('APERTURE',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 12)),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 10, runSpacing: 10,
-                children: stops.map((v) {
-                  final isSelected = v == selected;
-                  return InkWell(
-                    onTap: () {
-                      setSheet(() => selected = v);
-                      ref.read(meterProvider.notifier).updateAperture(v);
-                    },
-                    borderRadius: BorderRadius.circular(999),
-                    child: _pickerChip('f/${v.toStringAsFixed(v == 2.0 ? 0 : 1)}', isSelected),
-                  );
-                }).toList(),
+              ApertureSliderControl(
+                apertures: stops,
+                value: current.aperture,
+                onChanged: (v) {
+                  ref.read(meterProvider.notifier).updateAperture(v);
+                },
               ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -637,6 +688,19 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
     final meterState = ref.watch(meterProvider);
     final plan = ref.watch(userPlanProvider);
     final isPro = plan.isPro;
+    final spotState = ref.watch(advancedSpotMeteringProvider);
+
+    ref.listen<AdvancedSpotMeteringState>(advancedSpotMeteringProvider, (prev, next) {
+      if (next.multiSpotEnabled && prev?.multiSpotEnabled != true && _exposureHudExpanded) {
+        setState(() => _exposureHudExpanded = false);
+      }
+    });
+
+    final zoneLegendReserve = spotState.zoneOverlayEnabled
+        ? _zoneLegendHeight + _legendBelowHudGap
+        : 0.0;
+    final exposurePanelBottom = _navBarClearance + zoneLegendReserve;
+    final evTarget = meterState.isLocked ? meterState.ev : meterState.evBase;
 
     final showMeterDebug = AppConfig.showInAppDiagnostics;
 
@@ -697,161 +761,76 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
           if (!isPro)
             _MeterFreeOverlay(onUpgrade: () => context.push('/paywall'))
           else ...[
-            // Spot Metering Target — tap to re-meter and return to Aperture Priority
-            Align(
-              alignment: const Alignment(0, -0.3),
-              child: GestureDetector(
-                key: _meterSpotKey,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  ref.read(meterProvider.notifier).resetToAperturePriority();
-                },
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: meterState.isLocked
-                          ? Colors.orangeAccent
-                          : meterState.lastChanged == ExposureControl.shutter
-                              ? Colors.blueAccent.withOpacity(0.8)
-                              : Colors.white54,
-                      width: 1.5,
+            // Advanced Spot Metering (Zone overlay + Multi-spot pins)
+            if (_isCameraInitialized && _controller != null)
+              AdvancedSpotMeteringOverlay(
+                controller: _controller!,
+                formatShutter: _formatShutterSpeed,
+                onRevertToCenterMetering: _revertToCenterMetering,
+              ),
+
+            // Center spot ring — de-emphasized while multi-spot pins drive exposure.
+            if (!spotState.multiSpotEnabled || !spotState.hasPins)
+              Align(
+                alignment: const Alignment(0, -0.38),
+                child: GestureDetector(
+                  key: _meterSpotKey,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    ref.read(meterProvider.notifier).resetToAperturePriority();
+                  },
+                  child: Container(
+                    width: _spotRingSize,
+                    height: _spotRingSize,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: meterState.isLocked
+                            ? Colors.orangeAccent
+                            : meterState.lastChanged == ExposureControl.shutter
+                                ? Colors.blueAccent.withOpacity(0.8)
+                                : Colors.white54,
+                        width: 1.2,
+                      ),
+                      shape: BoxShape.circle,
                     ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 4,
-                      height: 4,
-                      decoration: const BoxDecoration(color: Colors.white54, shape: BoxShape.circle),
+                    child: Center(
+                      child: Container(
+                        width: 3,
+                        height: 3,
+                        decoration: const BoxDecoration(color: Colors.white54, shape: BoxShape.circle),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
 
-            // Bottom Overlay
+            // Zone legend — below exposure panel, just above the bottom tab bar.
+            if (spotState.zoneOverlayEnabled)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: _navBarClearance,
+                child: ZoneLegendHud(dockBelowExposurePanel: true),
+              ),
+
+            // Exposure HUD — collapsible so multi-spot pins can be placed underneath.
             Positioned(
-              bottom: 40,
+              bottom: exposurePanelBottom,
               left: 20,
               right: 20,
-              child: GlassPanel(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _infoColumn('LUX', '~${meterState.lux.toStringAsFixed(0)}'),
-                          _infoColumn('EV', meterState.ev.toStringAsFixed(1), onTap: _showEvPicker),
-                          _infoColumn('ISO', meterState.iso.toStringAsFixed(0), onTap: _showIsoPicker),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      // AE stability indicator
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: meterState.isLocked
-                                  ? Colors.orangeAccent
-                                  : meterState.isAeStable
-                                      ? const Color(0xFF4ADE80)
-                                      : Colors.white24,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            meterState.isLocked
-                                ? 'LOCKED'
-                                : meterState.isAeStable
-                                    ? 'STABLE'
-                                    : 'METERING…',
-                            style: TextStyle(
-                              color: meterState.isLocked
-                                  ? Colors.orangeAccent
-                                  : meterState.isAeStable
-                                      ? const Color(0xFF4ADE80)
-                                      : Colors.white38,
-                              fontSize: 9,
-                              letterSpacing: 1.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _valueColumn('f/', meterState.aperture.toStringAsFixed(1), onTap: _showAperturePicker),
-                          _valueColumn('SS', _formatShutterSpeed(meterState.shutterSpeed), onTap: _showShutterPicker),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _handleLockToggle,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: meterState.isLocked ? Colors.orangeAccent : Colors.white10,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        child: Text(
-                          meterState.isLocked ? 'UNLOCK' : 'LOCK EXPOSURE',
-                          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                            key: _meterLogToRollKey,
-                            onPressed: _showLogReadingToRollSheet,
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text(
-                              'LOG TO ROLL →',
-                              style: TextStyle(
-                                color: Colors.orange,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: _showLogReadingToRollSheet,
-                            icon: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                              ),
-                              child: const Icon(Icons.camera_rounded, color: Colors.orange, size: 20),
-                            ),
-                            tooltip: 'Log meter reading to roll',
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                    ],
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.bottomCenter,
+                child: GlassPanel(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      vertical: _exposureHudExpanded ? 8 : 12,
+                      horizontal: 20,
+                    ),
+                    child: _exposureHudExpanded
+                        ? _buildExpandedExposureHud(meterState, spotState)
+                        : _buildCollapsedExposureHud(meterState, spotState),
                   ),
                 ),
               ),
@@ -859,6 +838,283 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
           ],
         ],
       ),
+    );
+  }
+
+  void _toggleExposureHud({bool? expanded}) {
+    HapticFeedback.selectionClick();
+    setState(() => _exposureHudExpanded = expanded ?? !_exposureHudExpanded);
+  }
+
+  Widget _hudExpandCollapseButton({required bool expanded}) {
+    return IconButton(
+      onPressed: () => _toggleExposureHud(expanded: !expanded),
+      icon: Icon(
+        expanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+        color: Colors.white70,
+      ),
+      tooltip: expanded ? 'Collapse exposure panel' : 'Expand exposure panel',
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+    );
+  }
+
+  Widget _hudCollapseHandle() {
+    return GestureDetector(
+      onTap: () => _toggleExposureHud(expanded: false),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 40,
+        height: 4,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+
+  _ExposurePanelReading _exposurePanelReading(
+    MeterState meterState,
+    AdvancedSpotMeteringState spotState,
+  ) {
+    if (spotState.multiSpotEnabled && spotState.hasPins) {
+      final avg = spotState.averageEv;
+      if (avg != null) {
+        final evAtFilmIso = avg +
+            _log2(meterState.iso / 100) +
+            meterState.evComp;
+        final rawShutter = math.pow(meterState.aperture, 2) / math.pow(2, evAtFilmIso);
+        return _ExposurePanelReading(
+          ev: avg + meterState.evComp,
+          shutterSpeed: SensorService.snapShutterSpeed(rawShutter.toDouble()),
+          fromMultiSpot: true,
+          pinCount: spotState.pins.length,
+        );
+      }
+    }
+
+    return _ExposurePanelReading(
+      ev: meterState.ev,
+      shutterSpeed: meterState.shutterSpeed,
+      fromMultiSpot: spotState.multiSpotEnabled,
+      pinCount: spotState.pins.length,
+    );
+  }
+
+  static double _log2(double x) => math.log(x) / math.ln2;
+
+  Widget _buildCollapsedExposureHud(
+    MeterState meterState,
+    AdvancedSpotMeteringState spotState,
+  ) {
+    final reading = _exposurePanelReading(meterState, spotState);
+    final accent = reading.usesPinAverage
+        ? const Color(0xFFF97316)
+        : meterState.isLocked
+            ? Colors.orangeAccent
+            : meterState.isAeStable
+                ? const Color(0xFF4ADE80)
+                : Colors.white24;
+
+    return SizedBox(
+      height: _collapsedHudHeight - 24,
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => _toggleExposureHud(expanded: true),
+              borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  _collapsedMetric('f/${meterState.aperture.toStringAsFixed(1)}'),
+                  const SizedBox(width: 14),
+                  _collapsedMetric(_formatShutterSpeed(reading.shutterSpeed)),
+                  const SizedBox(width: 14),
+                  _collapsedMetric('EV ${reading.ev.toStringAsFixed(1)}'),
+                  if (reading.usesPinAverage) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '${reading.pinCount} pin${reading.pinCount == 1 ? '' : 's'}',
+                      style: TextStyle(
+                        color: accent.withValues(alpha: 0.85),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: accent),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          _hudExpandCollapseButton(expanded: false),
+        ],
+      ),
+    );
+  }
+
+  Widget _collapsedMetric(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
+      ),
+    );
+  }
+
+  Widget _buildExpandedExposureHud(
+    MeterState meterState,
+    AdvancedSpotMeteringState spotState,
+  ) {
+    final reading = _exposurePanelReading(meterState, spotState);
+    final multiSpotAccent = const Color(0xFFF97316);
+    final statusColor = reading.usesPinAverage
+        ? multiSpotAccent
+        : meterState.isLocked
+            ? Colors.orangeAccent
+            : meterState.isAeStable
+                ? const Color(0xFF4ADE80)
+                : Colors.white38;
+    final statusLabel = reading.usesPinAverage
+        ? 'MULTI-SPOT · ${reading.pinCount} PIN${reading.pinCount == 1 ? '' : 'S'}'
+        : spotState.multiSpotEnabled
+            ? 'MULTI-SPOT — TAP TO ADD PINS'
+            : meterState.isLocked
+                ? 'LOCKED'
+                : meterState.isAeStable
+                    ? 'STABLE'
+                    : 'METERING…';
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            const SizedBox(width: 36),
+            Expanded(child: Center(child: _hudCollapseHandle())),
+            _hudExpandCollapseButton(expanded: true),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            if (reading.usesPinAverage)
+              _infoColumn(
+                'PINS',
+                '${reading.pinCount}',
+                valueColor: multiSpotAccent,
+              )
+            else
+              _infoColumn('LUX', '~${meterState.lux.toStringAsFixed(0)}'),
+            _infoColumn('EV', reading.ev.toStringAsFixed(1), onTap: _showEvPicker),
+            _infoColumn('ISO', meterState.iso.toStringAsFixed(0), onTap: _showIsoPicker),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: statusColor),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              statusLabel,
+              style: TextStyle(
+                color: statusColor,
+                fontSize: 8,
+                letterSpacing: 1.4,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _valueColumn('f/', meterState.aperture.toStringAsFixed(1), onTap: _showAperturePicker),
+            _valueColumn(
+              'SS',
+              _formatShutterSpeed(reading.shutterSpeed),
+              onTap: _showShutterPicker,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 40,
+          child: ElevatedButton(
+            onPressed: _handleLockToggle,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: meterState.isLocked ? Colors.orangeAccent : Colors.white10,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            child: Text(
+              meterState.isLocked ? 'UNLOCK' : 'LOCK EXPOSURE',
+              style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8, fontSize: 12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton(
+              key: _meterLogToRollKey,
+              onPressed: _showLogReadingToRollSheet,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'LOG TO ROLL →',
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: _showLogReadingToRollSheet,
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: const Icon(Icons.camera_rounded, color: Colors.orange, size: 20),
+              ),
+              tooltip: 'Log meter reading to roll',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -887,11 +1143,18 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
     );
   }
 
-  Widget _infoColumn(String label, String value, {VoidCallback? onTap}) {
+  Widget _infoColumn(String label, String value, {VoidCallback? onTap, Color? valueColor}) {
     final child = Column(
       children: [
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, letterSpacing: 1)),
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w300)),
+        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+        Text(
+          value,
+          style: TextStyle(
+            color: valueColor ?? Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w300,
+          ),
+        ),
       ],
     );
     if (onTap == null) return child;
@@ -910,8 +1173,8 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Text(prefix, style: const TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w200)),
+        Text(prefix, style: const TextStyle(color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w200)),
       ],
     );
     if (onTap == null) return row;
@@ -1295,4 +1558,20 @@ class _MeterFreeOverlay extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ExposurePanelReading {
+  final double ev;
+  final double shutterSpeed;
+  final bool fromMultiSpot;
+  final int pinCount;
+
+  const _ExposurePanelReading({
+    required this.ev,
+    required this.shutterSpeed,
+    required this.fromMultiSpot,
+    required this.pinCount,
+  });
+
+  bool get usesPinAverage => fromMultiSpot && pinCount > 0;
 }
