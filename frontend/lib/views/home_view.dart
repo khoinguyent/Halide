@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import '../widgets/roll_card.dart';
 import '../providers/dashboard_provider.dart';
 import 'package:frontend/providers/rolls_provider.dart';
@@ -10,6 +15,7 @@ import 'package:frontend/features/rolls/presentation/widgets/add_roll_form.dart'
 import 'package:frontend/core/widgets/halide_dialog.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
+import '../core/theme/halide_colors.dart';
 import '../models/roll_status.dart';
 import '../models/roll.dart';
 import '../services/guidance_service.dart';
@@ -17,6 +23,11 @@ import '../providers/guidance_pending_provider.dart'
     show newRollGuidanceRollIdProvider, syncGuidanceRollIdProvider;
 import '../widgets/guidance/lab_drive_sync_guidance.dart';
 import '../widgets/guidance/guidance_tokens.dart';
+import 'package:frontend/providers/auth_provider.dart';
+import 'package:frontend/providers/profile_provider.dart';
+import '../widgets/sync_progress_banner.dart';
+import '../features/storage/presentation/providers/free_lab_drive_sync_provider.dart';
+import '../features/storage/presentation/providers/personal_drive_backup_provider.dart';
 
 class HomeView extends ConsumerStatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -39,14 +50,18 @@ int _guidanceRollsSignature(List<Roll> rolls) {
   );
 }
 
+/// Archive list filter — All (default, non-archived), In Progress, Archived.
+enum _ArchiveListFilter { all, inProgress, archived }
+
 class _HomeViewState extends ConsumerState<HomeView> {
-  RollStatus? _statusFilter;
+  _ArchiveListFilter _listFilter = _ArchiveListFilter.all;
 
   final GlobalKey _guidanceStatusKey = GlobalKey();
   final GlobalKey _guidanceLinkSyncKey = GlobalKey();
   final GlobalKey _shootingIntroStatusKey = GlobalKey();
   final GlobalKey _shootingIntroExifKey = GlobalKey();
   final GlobalKey _shootingIntroViewLogsKey = GlobalKey();
+  final GlobalKey _backupUploadKey = GlobalKey();
   final ScrollController _archiveListScrollController = ScrollController();
 
   Object? _guidanceSignature;
@@ -59,6 +74,43 @@ class _HomeViewState extends ConsumerState<HomeView> {
   String? _newRollGuidanceTargetRollId;
   bool _highlightStatusKey = false;
   bool _highlightLinkSyncKey = false;
+  /// Dismissible tip under filters for personal Drive backup.
+  bool _showBackupGuideTip = false;
+  bool _backupGuideTipLoaded = false;
+  bool _trialPaywallScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_ensureBackupGuideTipLoaded());
+  }
+
+  void _maybeShowTrialPaywall() {
+    if (_trialPaywallScheduled) return;
+    final profile = ref.read(userProfileProvider).value;
+    if (profile == null) return;
+    if (profile.hasSeenOnboarding) return;
+    if (profile.plan.isPro || ref.read(userPlanProvider).isPro) {
+      _trialPaywallScheduled = true;
+      unawaited(ref.read(profileServiceProvider).markOnboardingSeen());
+      return;
+    }
+    // Existing accounts never used this flag — don't spam them with a paywall.
+    final created = profile.createdAt;
+    if (created != null) {
+      final age = DateTime.now().toUtc().difference(created.toUtc());
+      if (age > const Duration(days: 1)) {
+        _trialPaywallScheduled = true;
+        unawaited(ref.read(profileServiceProvider).markOnboardingSeen());
+        return;
+      }
+    }
+    _trialPaywallScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.push('/paywall?trial=1');
+    });
+  }
 
   @override
   void dispose() {
@@ -75,7 +127,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
         child: AddRollForm(
           repository: ref.read(rollsRepositoryProvider),
           onRollAdded: () {
-            setState(() => _statusFilter = null);
+            setState(() => _listFilter = _ArchiveListFilter.all);
             ref.invalidate(dashboardRollsProvider);
           },
         ),
@@ -121,11 +173,12 @@ class _HomeViewState extends ConsumerState<HomeView> {
       await _ensureKeyVisible(_shootingIntroExifKey);
       if (!mounted) return;
       final coach = buildSingleStepArchiveGuidance(
+        context: context,
         targetKey: _shootingIntroExifKey,
         identify: 'new_roll_exif_log',
         contentAlign: ContentAlign.top,
         body:
-            'Tap the camera icon to log aperture, shutter, and location from a photo’s EXIF, or enter them manually in the sheet. You can also log from the Light Meter tab.',
+            context.l10n.guidanceNewRollExif,
         onCompleted: () => _showShootingIntroStep3(g),
         beforeFocus: (_) async {
           final c = _shootingIntroExifKey.currentContext;
@@ -149,11 +202,11 @@ class _HomeViewState extends ConsumerState<HomeView> {
       await _ensureKeyVisible(_shootingIntroViewLogsKey);
       if (!mounted) return;
       final coach = buildSingleStepArchiveGuidance(
+        context: context,
         targetKey: _shootingIntroViewLogsKey,
         identify: 'new_roll_view_shot_log',
         contentAlign: ContentAlign.top,
-        body:
-            'Tap VIEW LOGS to open this roll, then use the Shot Log tab to review every frame’s technical data while you’re shooting.',
+        body: context.l10n.guidanceNewRollViewLogs,
         onCompleted: () => _finishNewRollShootingIntro(g),
         beforeFocus: (_) async {
           final c = _shootingIntroViewLogsKey.currentContext;
@@ -201,10 +254,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
     if (!mounted) return;
 
     final coach = buildSingleStepArchiveGuidance(
+      context: context,
       targetKey: _shootingIntroStatusKey,
       identify: 'new_roll_change_status',
-      body:
-          'Tap the status badge to change where you are in the workflow—e.g. move to At lab when the film is at the lab, then Scanned when you have files.',
+      body: context.l10n.guidanceNewRollStatus,
       onCompleted: () => _showShootingIntroStep2(g),
       beforeFocus: (_) async {
         final c = _shootingIntroStatusKey.currentContext;
@@ -270,10 +323,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
     }
     if (!mounted) return;
     final coach = buildSingleStepArchiveGuidance(
+      context: context,
       targetKey: _guidanceLinkSyncKey,
       identify: 'sync_after_link',
-      body:
-          'Your Drive link is saved. Tap the highlighted cloud icon to download scans from Google Drive (you can tap again later to refresh).',
+      body: context.l10n.guidanceSyncAfterLink,
       onCompleted: () async {
         await g.setSyncAfterLinkGuidanceSeen();
         await g.setDriveUrlOnCardGuidanceSeen();
@@ -344,10 +397,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
         }
         if (!mounted) return;
         final coach = buildSingleStepArchiveGuidance(
+          context: context,
           targetKey: _guidanceStatusKey,
           identify: 'at_lab_badge',
-          body:
-              'AT LAB means your film is with the lab. When you get a Google Drive link, use the link or cloud icon on the right to add it and sync your scans.',
+          body: context.l10n.guidanceAtLabBadge,
           onCompleted: () async {
             await g.setAtLabGuidanceSeen();
             if (mounted) {
@@ -390,8 +443,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
         final ur = linkRowRoll;
         final hasUrl = _hasSavedDriveUrl(ur);
         final linkRowBody = hasUrl
-            ? 'The cloud icon downloads scans from your saved Drive link. Tap the link icon if you need to change the URL.'
-            : 'Tap the highlighted link icon (top right) to paste the Google Drive folder URL when your lab shares it. After saving, the icon becomes a cloud you can tap to download scans.';
+            ? context.l10n.guidanceDriveLinkWithUrl
+            : context.l10n.guidanceDriveLinkNoUrl;
         setState(() {
           _archiveGuidanceBusy = true;
           _guidanceTargetRollId = ur.id;
@@ -411,6 +464,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
         }
         if (!mounted) return;
         final coach = buildSingleStepArchiveGuidance(
+          context: context,
           targetKey: _guidanceLinkSyncKey,
           identify: 'drive_link_row_on_card',
           body: linkRowBody,
@@ -439,6 +493,66 @@ class _HomeViewState extends ConsumerState<HomeView> {
         coach.show(context: context);
       }
     }
+
+    // —— Priority 4: personal Drive backup (cloud upload in app bar) ——
+    if (!_archiveGuidanceBusy) {
+      await _schedulePersonalDriveBackupGuidance();
+    }
+  }
+
+  Future<void> _ensureBackupGuideTipLoaded() async {
+    if (_backupGuideTipLoaded) return;
+    _backupGuideTipLoaded = true;
+    final seen = await GuidanceService.instance.hasSeenPersonalDriveBackupGuidance;
+    if (!mounted) return;
+    setState(() => _showBackupGuideTip = !seen);
+  }
+
+  Future<void> _dismissBackupGuideTip({bool markSeen = true}) async {
+    if (!_showBackupGuideTip) return;
+    setState(() => _showBackupGuideTip = false);
+    if (markSeen) {
+      await GuidanceService.instance.setPersonalDriveBackupGuidanceSeen();
+    }
+  }
+
+  Future<void> _schedulePersonalDriveBackupGuidance() async {
+    if (!mounted || _archiveGuidanceBusy) return;
+    final g = GuidanceService.instance;
+    if (await g.hasSeenPersonalDriveBackupGuidance) return;
+
+    setState(() {
+      _archiveGuidanceBusy = true;
+      _showBackupGuideTip = true;
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    if (_backupUploadKey.currentContext == null) {
+      setState(() => _archiveGuidanceBusy = false);
+      return;
+    }
+
+    final coach = buildSingleStepArchiveGuidance(
+      context: context,
+      targetKey: _backupUploadKey,
+      identify: 'personal_drive_backup_upload',
+      contentAlign: ContentAlign.bottom,
+      contentPadding: const EdgeInsets.fromLTRB(20, 72, 20, 28),
+      radius: 22,
+      paddingFocus: 6,
+      body: context.l10n.guidancePersonalDriveBackup,
+      onCompleted: () async {
+        await g.setPersonalDriveBackupGuidanceSeen();
+        if (mounted) {
+          setState(() {
+            _archiveGuidanceBusy = false;
+            _showBackupGuideTip = false;
+            _guidanceEpoch++;
+          });
+        }
+      },
+    );
+    coach.show(context: context);
   }
 
   void _enqueueGuidance(List<Roll> rolls, List<Roll> visibleRolls) {
@@ -467,27 +581,41 @@ class _HomeViewState extends ConsumerState<HomeView> {
   @override
   Widget build(BuildContext context) {
     final rollsAsync = ref.watch(dashboardRollsProvider);
+    final l10n = context.l10n;
+    ref.listen(userProfileProvider, (prev, next) {
+      next.whenData((_) => _maybeShowTrialPaywall());
+    });
+    _maybeShowTrialPaywall();
 
     return HalideScaffold(
-      backgroundColor: GuidanceTokens.zinc950,
+      backgroundColor: GuidanceTokens.zinc950(context),
       appBar: AppBar(
-        title: const Text(
-          'THE ARCHIVE',
+        title: Text(
+          l10n.archiveTitle,
           style: TextStyle(
             letterSpacing: 2,
             fontWeight: FontWeight.w600,
             fontSize: 24,
-            color: Colors.white,
+            color: HalideColors.of(context).textPrimary,
           ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white, size: 26),
+        foregroundColor: HalideColors.of(context).textPrimary,
+        iconTheme: IconThemeData(color: HalideColors.of(context).textPrimary, size: 26),
         actions: [
           IconButton(
+            key: _backupUploadKey,
+            icon: const Icon(Icons.cloud_upload_outlined),
+            tooltip: 'Backup to Personal Drive',
+            onPressed: () {
+              unawaited(_dismissBackupGuideTip());
+              context.push('/personal-drive-backup');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.add_rounded),
-            tooltip: 'Add roll',
+            tooltip: l10n.openNewRoll,
             onPressed: _showAddRollDialog,
           ),
           IconButton(
@@ -502,22 +630,21 @@ class _HomeViewState extends ConsumerState<HomeView> {
       ),
       child: rollsAsync.when(
         data: (rolls) {
-          final filtered = _statusFilter == null
-              ? rolls.where((r) => r.status != RollStatus.archived).toList()
-              : rolls.where((r) => r.status == _statusFilter).toList();
+          final filtered = _sortRollsForDisplay(
+            _filterRolls(rolls, _listFilter),
+          );
 
           _enqueueGuidance(rolls, filtered);
 
           if (filtered.isEmpty) {
-            final emptyBody = _buildEmptyOrNoMatch(rolls.isEmpty || _statusFilter == null);
-            // Keep status filter chips visible when rolls exist but none match the filter.
+            final emptyBody = _buildEmptyOrNoMatch(rolls.isEmpty, l10n);
             if (rolls.isNotEmpty) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: _buildStatusFilter(),
+                    child: _buildStatusFilter(l10n),
                   ),
                   Expanded(child: emptyBody),
                 ],
@@ -531,7 +658,19 @@ class _HomeViewState extends ConsumerState<HomeView> {
               controller: _archiveListScrollController,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               children: [
-                _buildStatusFilter(),
+                _buildStatusFilter(l10n),
+                if (_showBackupGuideTip) ...[
+                  const SizedBox(height: 14),
+                  _BackupGuideTip(
+                    body: l10n.archiveBackupGuideBody,
+                    onDismiss: () => unawaited(_dismissBackupGuideTip()),
+                    onTap: () {
+                      unawaited(_dismissBackupGuideTip());
+                      context.push('/personal-drive-backup');
+                    },
+                  ),
+                ],
+                _buildActiveSyncBanner(),
                 const SizedBox(height: 16),
                 ...List.generate(filtered.length, (index) {
                   final roll = filtered[index];
@@ -563,8 +702,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
             ),
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+        loading: () => Center(
+          child: CircularProgressIndicator(color: HalideColors.of(context).slateTeal, strokeWidth: 2),
         ),
         error: (err, stack) => _ErrorState(
           error: err.toString(),
@@ -574,53 +713,216 @@ class _HomeViewState extends ConsumerState<HomeView> {
     );
   }
 
-  Widget _buildStatusFilter() {
+  List<Roll> _filterRolls(List<Roll> rolls, _ArchiveListFilter filter) {
+    switch (filter) {
+      case _ArchiveListFilter.all:
+        return rolls.where((r) => r.status != RollStatus.archived).toList();
+      case _ArchiveListFilter.inProgress:
+        return rolls
+            .where((r) =>
+                r.status == RollStatus.shooting ||
+                r.status == RollStatus.lab ||
+                r.status == RollStatus.syncing)
+            .toList();
+      case _ArchiveListFilter.archived:
+        return rolls.where((r) => r.status == RollStatus.archived).toList();
+    }
+  }
+
+  /// Scanned rolls with thumbnails first so the archive feels alive on open.
+  List<Roll> _sortRollsForDisplay(List<Roll> rolls) {
+    final sorted = List<Roll>.from(rolls);
+    sorted.sort((a, b) {
+      final visual = _rollVisualScore(b).compareTo(_rollVisualScore(a));
+      if (visual != 0) return visual;
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return sorted;
+  }
+
+  int _rollVisualScore(Roll roll) {
+    var score = roll.imageUrls.length * 10;
+    switch (roll.status) {
+      case RollStatus.scanned:
+        score += 5;
+        break;
+      case RollStatus.syncing:
+        score += 3;
+        break;
+      case RollStatus.lab:
+        score += 2;
+        break;
+      case RollStatus.shooting:
+        score += 1;
+        break;
+      case RollStatus.archived:
+        break;
+    }
+    return score;
+  }
+
+  Widget _buildStatusFilter(AppLocalizations l10n) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
           _FilterChip(
-            label: 'All',
-            selected: _statusFilter == null,
-            onTap: () => setState(() => _statusFilter = null),
+            label: l10n.filterAll,
+            selected: _listFilter == _ArchiveListFilter.all,
+            onTap: () => setState(() => _listFilter = _ArchiveListFilter.all),
           ),
           const SizedBox(width: 8),
-          ...RollStatus.values.map((status) => Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: _FilterChip(
-                  label: status.label,
-                  selected: _statusFilter == status,
-                  onTap: () => setState(() => _statusFilter = status),
-                ),
-              )),
+          _FilterChip(
+            label: l10n.filterInProgress,
+            selected: _listFilter == _ArchiveListFilter.inProgress,
+            onTap: () => setState(() => _listFilter = _ArchiveListFilter.inProgress),
+          ),
+          const SizedBox(width: 8),
+          _FilterChip(
+            label: l10n.filterArchived,
+            selected: _listFilter == _ArchiveListFilter.archived,
+            onTap: () => setState(() => _listFilter = _ArchiveListFilter.archived),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyOrNoMatch(bool noRollsAtAll) {
-    if (noRollsAtAll) {
-      return _EmptyState(onAddFirstRoll: _showAddRollDialog);
+  Widget _buildActiveSyncBanner() {
+    final freeSync = ref.watch(freeLabDriveSyncControllerProvider);
+    final backup = ref.watch(personalDriveBackupControllerProvider);
+
+    if (freeSync.isRunning) {
+      return SyncProgressBanner(
+        padding: const EdgeInsets.only(top: 14),
+        label: freeSync.progressLabel.isNotEmpty
+            ? freeSync.progressLabel
+            : 'Downloading lab scans…',
+        progress: freeSync.progress,
+        accentColor: Colors.blueAccent,
+        compact: true,
+      );
     }
+
+    if (backup.isRunning || backup.isStarting) {
+      final progress = backup.bannerProgress;
+      final label = backup.freeUploadingRollId != null && backup.freeFrameTotal > 0
+          ? 'Backing up — frame ${backup.freeFrameDone}/${backup.freeFrameTotal}'
+          : 'Backing up rolls to Google Drive…';
+      return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: GestureDetector(
+          onTap: () => context.push('/personal-drive-backup'),
+          child: SyncProgressBanner(
+            label: label,
+            progress: progress,
+            compact: true,
+          ),
+        ),
+      );
+    }
+
+    final rolls = ref.watch(dashboardRollsProvider).asData?.value;
+    final syncing = rolls?.any((r) => r.status == RollStatus.syncing) ?? false;
+    if (syncing) {
+      return const SyncProgressBanner(
+        padding: EdgeInsets.only(top: 14),
+        label: 'Syncing scans from Google Drive…',
+        progress: null,
+        accentColor: Colors.blueAccent,
+        compact: true,
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildEmptyOrNoMatch(bool noRollsAtAll, AppLocalizations l10n) {
+    if (noRollsAtAll) {
+      return _EmptyState(onAddFirstRoll: _showAddRollDialog, l10n: l10n);
+    }
+    final filterLabel = switch (_listFilter) {
+      _ArchiveListFilter.all => 'rolls',
+      _ArchiveListFilter.inProgress => 'in-progress',
+      _ArchiveListFilter.archived => 'archived',
+    };
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.filter_list_off, size: 48, color: Colors.white38),
-            const SizedBox(height: 16),
+            Icon(Icons.filter_list_off, size: 48, color: HalideColors.of(context).steel),
+            SizedBox(height: 16),
             Text(
-              'No rolls with status "${_statusFilter?.label ?? 'active'}"',
+              'No $filterLabel rolls',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
+              style: TextStyle(color: HalideColors.of(context).textMuted(), fontSize: 16),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             TextButton(
-              onPressed: () => setState(() => _statusFilter = null),
-              child: const Text('Clear filter', style: TextStyle(color: Colors.white70)),
+              onPressed: () => setState(() => _listFilter = _ArchiveListFilter.all),
+              child: Text(l10n.showAllRolls, style: TextStyle(color: HalideColors.of(context).textSecondary)),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BackupGuideTip extends StatelessWidget {
+  final String body;
+  final VoidCallback onDismiss;
+  final VoidCallback onTap;
+
+  const _BackupGuideTip({
+    required this.body,
+    required this.onDismiss,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = HalideColors.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          decoration: BoxDecoration(
+            color: colors.accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.accent.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.cloud_upload_outlined, color: colors.accent, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  body,
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 13.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: Icon(Icons.close, size: 18, color: colors.textSecondary),
+                tooltip: context.l10n.guidanceGotIt,
+                onPressed: onDismiss,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -647,18 +949,18 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? Colors.white.withOpacity(0.2)
-              : Colors.white.withOpacity(0.06),
+              ? HalideColors.of(context).slateTeal.withValues(alpha: 0.35)
+              : HalideColors.of(context).glassFill(0.06),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: selected ? Colors.white38 : Colors.white12,
+            color: selected ? HalideColors.of(context).sage.withValues(alpha: 0.5) : HalideColors.of(context).borderSubtle,
             width: 1,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : Colors.white70,
+            color: selected ? HalideColors.of(context).textPrimary : HalideColors.of(context).textSecondary,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             fontSize: 14,
           ),
@@ -670,8 +972,9 @@ class _FilterChip extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final VoidCallback onAddFirstRoll;
+  final AppLocalizations l10n;
 
-  const _EmptyState({Key? key, required this.onAddFirstRoll}) : super(key: key);
+  const _EmptyState({Key? key, required this.onAddFirstRoll, required this.l10n}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -682,32 +985,114 @@ class _EmptyState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.camera_roll_outlined, size: 64, color: Colors.white24),
-              const SizedBox(height: 20),
-              const Text(
-                'No rolls yet',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              Icon(Icons.camera_roll_outlined, size: 64, color: HalideColors.of(context).steel),
+              SizedBox(height: 20),
+              Text(
+                l10n.noRollsYet,
+                style: TextStyle(color: HalideColors.of(context).textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Add your first roll of film to start tracking your frames.',
+              SizedBox(height: 8),
+              Text(
+                'Track a roll from shoot to scan — log frames, sync lab scans, and browse your gallery.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: HalideColors.of(context).textSecondary),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
+              _LifecycleHintRow(l10n: l10n),
+              SizedBox(height: 24),
               ElevatedButton(
                 onPressed: onAddFirstRoll,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white.withOpacity(0.1),
-                  foregroundColor: Colors.white,
+                  backgroundColor: HalideColors.of(context).ash,
+                  foregroundColor: HalideColors.of(context).textOnLight,
+                  minimumSize: const Size(double.infinity, 48),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('ADD FIRST ROLL'),
+                child: Text(halideCaps(l10n.loadYourFirstRoll)),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _LifecycleHintRow extends StatelessWidget {
+  final AppLocalizations l10n;
+
+  const _LifecycleHintRow({required this.l10n});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = HalideColors.of(context);
+    final steps = [
+      _LifecycleStep(label: l10n.lifecycleShoot, color: colors.slateTeal),
+      _LifecycleStep(label: l10n.lifecycleLab, color: colors.sage),
+      _LifecycleStep(label: l10n.lifecycleScan, color: colors.ash),
+      _LifecycleStep(label: l10n.lifecycleArchive, color: colors.steel),
+    ];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < steps.length; i++) ...[
+          if (i > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Icon(
+                Icons.arrow_forward,
+                size: 14,
+                color: HalideColors.of(context).steel.withValues(alpha: 0.45),
+              ),
+            ),
+          steps[i],
+        ],
+      ],
+    );
+  }
+}
+
+class _LifecycleStep extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _LifecycleStep({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withOpacity(0.15),
+            border: Border.all(color: color.withOpacity(0.5)),
+          ),
+          child: Center(
+            child: Text(
+              label[0],
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: color.withOpacity(0.9),
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -720,6 +1105,7 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -729,9 +1115,9 @@ class _ErrorState extends StatelessWidget {
             children: [
               const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
               const SizedBox(height: 20),
-              const Text(
-                'Something went wrong',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                l10n.somethingWentWrong,
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
@@ -749,7 +1135,7 @@ class _ErrorState extends StatelessWidget {
                   foregroundColor: Colors.redAccent,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('RETRY'),
+                child: Text(halideCaps(l10n.retry)),
               ),
             ],
           ),

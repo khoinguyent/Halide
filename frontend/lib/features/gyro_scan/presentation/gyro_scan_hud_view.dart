@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 import '../../../models/roll.dart';
@@ -17,6 +20,8 @@ import '../../../providers/dashboard_provider.dart';
 import '../../../providers/roll_provider.dart';
 import '../../../services/guidance_service.dart';
 import '../../../widgets/guidance/lab_drive_sync_guidance.dart';
+import '../../../widgets/sync_progress_banner.dart';
+import '../logic/film_format.dart';
 import '../logic/gyro_scan_constants.dart';
 import '../logic/gyro_scan_controller.dart';
 import '../services/gyro_scan_cache_service.dart';
@@ -52,12 +57,24 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
   /// `true` = orange-mask inversion (positive); `false` = raw negative.
   bool _positiveViewEnabled = true;
 
-  bool _aeAfLocked = false;
+  /// Currently selected film format — governs frame-guide box + crop aspect.
+  FilmFormat _filmFormat = FilmFormat.mm35;
+  String? _rollFilmStockFormat;
+  bool _filmFormatInitialized = false;
+
   bool _capturing = false;
+  bool _processingCrop = false;
   bool _showCaptureFlash = false;
   bool _thumbsLoaded = false;
   bool _gyroScanIntroScheduled = false;
+
+  // Focus-settle tracking.
+  bool _focusRequested = false;
+  bool _focusSettled = false;
+  Timer? _focusSettleTimer;
   bool _endingScan = false;
+  int _uploadDone = 0;
+  int _uploadTotal = 0;
   bool _sessionPrepared = false;
 
   final GlobalKey _negativeViewKey = GlobalKey();
@@ -74,6 +91,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
 
   @override
   void dispose() {
+    _focusSettleTimer?.cancel();
     _gyro.removeListener(_onGyroUpdate);
     _gyro.dispose();
     _controller?.dispose();
@@ -159,45 +177,83 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
     setState(() {});
   }
 
-  Future<void> _lockAeAfIfNeeded(double theta) async {
+  /// Step 1 — phone is stable enough: request AF and start settle timer.
+  /// Does NOT lock immediately; the camera needs time to hunt on the negative.
+  Future<void> _requestFocusIfNeeded() async {
+    if (_focusRequested) return;
+    _focusRequested = true;
+    _focusSettled = false;
+
     final c = _controller;
-    if (c == null || !c.value.isInitialized || _aeAfLocked) return;
-    if (theta > gyroAeAfLockThetaDeg) return;
-    try {
-      await c.setExposurePoint(const Offset(0.5, 0.5));
-      await c.setFocusPoint(const Offset(0.5, 0.5));
-      await c.setExposureMode(ExposureMode.locked);
-      await c.setFocusMode(FocusMode.locked);
-      _aeAfLocked = true;
-    } catch (e) {
-      debugPrint('[GyroScan] AE/AF lock failed: $e');
+    if (c != null && c.value.isInitialized) {
+      try {
+        // Ensure continuous AF is running, then ask it to centre-focus.
+        await c.setFocusMode(FocusMode.auto);
+        await c.setExposureMode(ExposureMode.auto);
+        await c.setFocusPoint(const Offset(0.5, 0.5));
+        await c.setExposurePoint(const Offset(0.5, 0.5));
+      } catch (e) {
+        debugPrint('[GyroScan] focus request failed: $e');
+      }
     }
+
+    _focusSettleTimer?.cancel();
+    _focusSettleTimer = Timer(
+      const Duration(milliseconds: gyroFocusSettleMs),
+      _onFocusSettled,
+    );
   }
 
-  Future<void> _unlockAeAf() async {
+  /// Step 2 — settle timer fired: lock AE/AF now that the camera has had time
+  /// to focus on the film negative.
+  void _onFocusSettled() {
+    if (!mounted) return;
+    final c = _controller;
+    if (c != null && c.value.isInitialized) {
+      c.setExposureMode(ExposureMode.locked).catchError((_) {});
+      c.setFocusMode(FocusMode.locked).catchError((_) {});
+    }
+    if (mounted) setState(() => _focusSettled = true);
+  }
+
+  /// Reset focus state (e.g. phone drifted, or after a capture).
+  Future<void> _resetFocus() async {
+    _focusSettleTimer?.cancel();
+    _focusRequested = false;
+    _focusSettled = false;
+
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
     try {
       await c.setExposureMode(ExposureMode.auto);
       await c.setFocusMode(FocusMode.auto);
-      await c.setExposurePoint(const Offset(0.5, 0.5));
       await c.setFocusPoint(const Offset(0.5, 0.5));
+      await c.setExposurePoint(const Offset(0.5, 0.5));
     } catch (_) {}
-    _aeAfLocked = false;
   }
 
   void _handleAutoSnap(GyroScanSensorSnapshot snap) {
     if (_capturing || !_cameraReady || !_isLiveMode) return;
 
     if (snap.thetaDeg > gyroAeAfLockThetaDeg) {
-      if (_aeAfLocked) unawaited(_unlockAeAf());
+      // Phone drifted — reset so next stabilisation re-requests focus.
+      if (_focusRequested) unawaited(_resetFocus());
       return;
     }
 
-    unawaited(_lockAeAfIfNeeded(snap.thetaDeg));
+    // Phone stable enough — start focus hunt if not already underway.
+    if (!_focusRequested) unawaited(_requestFocusIfNeeded());
 
-    if (!snap.isAligned) return;
+    // Capture only when gyro AND focus are both ready.
+    if (!snap.isAligned || !_focusSettled) return;
     unawaited(_captureFrame());
+  }
+
+  FocusState get _currentFocusState {
+    final snap = _gyro.snapshot;
+    if (snap.thetaDeg > gyroAeAfLockThetaDeg) return FocusState.idle;
+    if (!_focusSettled) return FocusState.focusing;
+    return FocusState.settled;
   }
 
   int get _frameNumber => _currentFrameIndex + _shotOffset;
@@ -210,13 +266,35 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
     setState(() => _capturing = true);
     try {
       final file = await c.takePicture();
+
+      // Instant tactile + visual feedback — don't wait for crop to finish.
+      HapticFeedback.heavyImpact();
+      if (mounted) {
+        setState(() => _showCaptureFlash = true);
+        Future.delayed(const Duration(milliseconds: 180), () {
+          if (mounted) setState(() => _showCaptureFlash = false);
+        });
+      }
+
       final bytes = await file.readAsBytes();
+
+      // Deterministic crop + inversion in a worker isolate.
+      if (mounted) setState(() => _processingCrop = true);
+
+      final screen = MediaQuery.sizeOf(context);
+      final crop = _filmFormat.normalizedFrameGuideRect(screen);
 
       final paths = await GyroScanCacheService.instance.saveCapture(
         rollId: widget.rollId,
         frameNumber: _frameNumber,
         rawBytes: bytes,
+        cropTop: crop.top,
+        cropLeft: crop.left,
+        cropWidth: crop.width,
+        cropHeight: crop.height,
       );
+
+      if (mounted) setState(() => _processingCrop = false);
 
       await GyroScanSyncService.instance.enqueue(
         GyroScanSyncTask(
@@ -226,21 +304,15 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
         ),
       );
 
-      HapticFeedback.heavyImpact();
-
       if (mounted) {
         setState(() {
-          _showCaptureFlash = true;
           _capturedFrames.add(_currentFrameIndex);
           _frameThumbPaths[_currentFrameIndex] = paths.thumbPath;
-        });
-        Future.delayed(const Duration(milliseconds: 180), () {
-          if (mounted) setState(() => _showCaptureFlash = false);
         });
       }
 
       _gyro.resetAlignment();
-      await _unlockAeAf();
+      await _resetFocus();
 
       if (_currentFrameIndex < _maxFrames - 1 && mounted) {
         setState(() => _currentFrameIndex++);
@@ -250,7 +322,12 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
     } catch (e) {
       debugPrint('[GyroScan] capture failed: $e');
     } finally {
-      if (mounted) setState(() => _capturing = false);
+      if (mounted) {
+        setState(() {
+          _capturing = false;
+          _processingCrop = false;
+        });
+      }
     }
   }
 
@@ -263,7 +340,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
       } else {
         _isLiveMode = true;
         _gyro.resetAlignment();
-        unawaited(_unlockAeAf());
+        unawaited(_resetFocus());
       }
     });
   }
@@ -273,7 +350,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
       _isLiveMode = true;
       _gyro.resetAlignment();
     });
-    unawaited(_unlockAeAf());
+    unawaited(_resetFocus());
   }
 
   /// Flush uploads, mark roll scanned when frames exist, return to roll detail gallery.
@@ -285,9 +362,22 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
       return;
     }
 
-    setState(() => _endingScan = true);
+    setState(() {
+      _endingScan = true;
+      _uploadDone = 0;
+      _uploadTotal = 0;
+    });
     try {
-      await GyroScanSyncService.instance.processQueueForRoll(widget.rollId);
+      await GyroScanSyncService.instance.processQueueForRoll(
+        widget.rollId,
+        onProgress: (done, total) {
+          if (!mounted) return;
+          setState(() {
+            _uploadDone = done;
+            _uploadTotal = total;
+          });
+        },
+      );
 
       final user = ref.read(userProvider);
       final token = await user?.getIdToken();
@@ -307,7 +397,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
 
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-              'SCANNING COMPLETE — ${_capturedFrames.length} FRAME(S)',
+              halideCaps(context.l10n.scanningCompleteFrames(_capturedFrames.length)),
               type: NotificationType.success,
             );
         context.pop();
@@ -316,7 +406,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
       debugPrint('[GyroScan] end scanning failed: $e');
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-              'COULD NOT FINISH SCANNING. TRY AGAIN.',
+              halideCaps(context.l10n.couldNotFinishScanning),
               type: NotificationType.error,
             );
       }
@@ -342,6 +432,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
       data: (roll) {
         _shotOffset = roll.shotOffset;
         _maxFrames = roll.maxFrames > 0 ? roll.maxFrames : 36;
+        _applyFilmFormatFromRoll(roll);
         if (!_sessionPrepared) {
           _sessionPrepared = true;
           unawaited(_prepareScanSession(roll));
@@ -355,7 +446,15 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
     );
   }
 
+  void _applyFilmFormatFromRoll(Roll roll) {
+    _rollFilmStockFormat = roll.filmFormat;
+    if (_filmFormatInitialized) return;
+    _filmFormatInitialized = true;
+    _filmFormat = FilmFormat.fromFilmStockFormat(roll.filmFormat);
+  }
+
   Widget _buildHud(BuildContext context, Roll roll) {
+    final l10n = context.l10n;
     final snap = _gyro.snapshot;
     final showLiveFilter = _isLiveMode && _positiveViewEnabled;
 
@@ -369,10 +468,12 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
           else
             _buildReviewViewport(),
           if (_isLiveMode)
-            GyroHudOverlay(
+            FilmFrameOverlay(
+              format: _filmFormat,
               feedback: snap.feedback,
               dotOffset: snap.dotOffset,
               snapToCenter: snap.snapToCenter,
+              focusState: _currentFocusState,
             ),
           if (_showCaptureFlash)
             IgnorePointer(
@@ -389,17 +490,56 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
                 ),
               ),
             ),
+          if (_processingCrop)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 12,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: IgnorePointer(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          l10n.processing,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           SafeArea(
             child: Column(
               children: [
                 _buildTopBar(context, roll, snap),
                 const Spacer(),
-                if (!_isLiveMode) _buildReviewBanner(),
+                if (!_isLiveMode) _buildReviewBanner(l10n),
                 _buildFrameCarousel(),
                 const SizedBox(height: 10),
-                _buildFinishBar(),
+                _buildFinishBar(l10n),
                 const SizedBox(height: 8),
-                _buildBottomHint(snap),
+                _buildBottomHint(snap, l10n),
                 const SizedBox(height: 8),
               ],
             ),
@@ -410,15 +550,16 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
   }
 
   Widget _buildLiveViewport(bool applyFilter) {
+    final l10n = context.l10n;
     final c = _controller;
     if (!_cameraReady || c == null || !c.value.isInitialized) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(color: Colors.white54),
+            const CircularProgressIndicator(color: Colors.white54),
             SizedBox(height: 16),
-            Text('Starting camera…', style: TextStyle(color: Colors.white54)),
+            Text(l10n.startingCamera, style: TextStyle(color: Colors.white54)),
           ],
         ),
       );
@@ -436,6 +577,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
   }
 
   Widget _buildReviewViewport() {
+    final l10n = context.l10n;
     final thumbPath = _frameThumbPaths[_currentFrameIndex];
     if (thumbPath == null || !File(thumbPath).existsSync()) {
       return Center(
@@ -445,7 +587,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
             Icon(Icons.photo_outlined, size: 48, color: Colors.white.withValues(alpha: 0.35)),
             const SizedBox(height: 12),
             Text(
-              'Frame ${(_currentFrameIndex + _shotOffset + 1).toString().padLeft(2, '0')}',
+              l10n.frameNumber((_currentFrameIndex + _shotOffset + 1).toString().padLeft(2, '0')),
               style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
             ),
           ],
@@ -465,7 +607,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
     );
   }
 
-  Widget _buildReviewBanner() {
+  Widget _buildReviewBanner(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Material(
@@ -482,7 +624,9 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
                 const Icon(Icons.videocam_rounded, color: Colors.orange, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Reviewing frame ${(_currentFrameIndex + _shotOffset + 1).toString().padLeft(2, '0')} — tap to scan live',
+                  l10n.reviewingFrameTapLive(
+                    (_currentFrameIndex + _shotOffset + 1).toString().padLeft(2, '0'),
+                  ),
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
@@ -494,6 +638,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
   }
 
   Widget _buildTopBar(BuildContext context, Roll roll, GyroScanSensorSnapshot snap) {
+    final l10n = context.l10n;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
@@ -501,7 +646,7 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
           IconButton(
             onPressed: _endingScan ? null : () => context.pop(),
             icon: const Icon(Icons.close_rounded, color: Colors.white),
-            tooltip: 'Pause and return',
+            tooltip: l10n.pauseAndReturn,
           ),
           Expanded(
             child: Column(
@@ -524,14 +669,105 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
               ],
             ),
           ),
-          if (_isLiveMode) _buildViewToggle(),
+          if (_isLiveMode) ...[
+            _buildFormatBadge(),
+            const SizedBox(width: 4),
+            _buildViewToggle(),
+          ],
           const SizedBox(width: 8),
         ],
       ),
     );
   }
 
+  /// Small tappable badge showing the current film format — opens the picker.
+  Widget _buildFormatBadge() {
+    final canPickSubformat = FilmFormat.isMediumFilmStock(_rollFilmStockFormat);
+
+    return GestureDetector(
+      onTap: canPickSubformat ? _showFormatPicker : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.55), width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.crop_rounded, size: 13, color: Colors.orange),
+            const SizedBox(width: 4),
+            Text(
+              _filmFormat.shortName,
+              style: const TextStyle(
+                color: Colors.orange,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+              ),
+            ),
+            if (canPickSubformat) ...[
+              const SizedBox(width: 2),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 14,
+                color: Colors.orange.withValues(alpha: 0.8),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFormatPicker() {
+    final options = FilmFormat.optionsForFilmStock(_rollFilmStockFormat);
+    if (options.length <= 1) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111111),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final l10n = ctx.l10n;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.filmFormatSection,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...options.map((fmt) => _FormatOption(
+                      format: fmt,
+                      selected: _filmFormat == fmt,
+                      onTap: () {
+                        setState(() => _filmFormat = fmt);
+                        Navigator.of(ctx).pop();
+                      },
+                    )),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildViewToggle() {
+    final l10n = context.l10n;
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.45),
@@ -544,14 +780,14 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
           _ToggleChip(
             key: _negativeViewKey,
             icon: Icons.filter_frames_outlined,
-            tooltip: 'Negative (raw)',
+            tooltip: l10n.negativeRawTooltip,
             selected: !_positiveViewEnabled,
             onTap: () => setState(() => _positiveViewEnabled = false),
           ),
           _ToggleChip(
             key: _positiveViewKey,
             icon: Icons.invert_colors_outlined,
-            tooltip: 'Positive (inverted)',
+            tooltip: l10n.positiveInvertedTooltip,
             selected: _positiveViewEnabled,
             onTap: () => setState(() => _positiveViewEnabled = true),
           ),
@@ -599,14 +835,13 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
       await _resumeCameraPreviewIfNeeded();
       if (!mounted) return;
       final coach = buildSingleStepArchiveGuidance(
+        context: context,
         targetKey: _negativeViewKey,
         identify: 'gyro_scan_negative_preview',
         contentAlign: ContentAlign.bottom,
         paddingFocus: 6,
         radius: 18,
-        body:
-            'Raw negative shows the film as it sits on the light table — orange base, no processing. '
-            'Use this to check alignment and framing.',
+        body: context.l10n.guidanceGyroNegativePreview,
         onCompleted: () {
           unawaited(_resumeCameraPreviewIfNeeded());
           Future<void>.delayed(const Duration(milliseconds: 200), () {
@@ -624,14 +859,13 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
       await _resumeCameraPreviewIfNeeded();
       if (!mounted) return;
       final coach = buildSingleStepArchiveGuidance(
+        context: context,
         targetKey: _positiveViewKey,
         identify: 'gyro_scan_positive_preview',
         contentAlign: ContentAlign.bottom,
         paddingFocus: 6,
         radius: 18,
-        body:
-            'Positive preview inverts the orange mask live so the scan looks like a finished print. '
-            'This is the default for judging exposure while auto-capture runs.',
+        body: context.l10n.guidanceGyroPositivePreview,
         onCompleted: () {
           unawaited(GuidanceService.instance.setGyroScanIntroSeen());
           unawaited(_resumeCameraPreviewIfNeeded());
@@ -711,73 +945,96 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
     );
   }
 
-  Widget _buildFinishBar() {
+  Widget _buildFinishBar(AppLocalizations l10n) {
     final count = _capturedFrames.length;
+    final uploadProgress =
+        _endingScan && _uploadTotal > 0 ? (_uploadDone / _uploadTotal).clamp(0.0, 1.0) : null;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Text(
-              count == 0
-                  ? 'Capture frames to finish'
-                  : '$count / $_maxFrames captured',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+          if (_endingScan) ...[
+            SyncProgressBanner(
+              label: _uploadTotal > 0
+                  ? 'Uploading frames $_uploadDone of $_uploadTotal…'
+                  : 'Finishing scan — uploading frames…',
+              progress: uploadProgress,
+              accentColor: Colors.orange,
+              compact: true,
             ),
-          ),
-          const SizedBox(width: 12),
-          FilledButton(
-            onPressed: _endingScan || count == 0 ? null : _endScanning,
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.black,
-              disabledBackgroundColor: Colors.white.withValues(alpha: 0.12),
-              disabledForegroundColor: Colors.white38,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            ),
-            child: _endingScan
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                  )
-                : const Text(
-                    'Finish scanning',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            const SizedBox(height: 10),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  count == 0
+                      ? l10n.captureFramesToFinish
+                      : l10n.framesCapturedProgress(count, _maxFrames),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: _endingScan || count == 0 ? null : _endScanning,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.black,
+                  disabledBackgroundColor: Colors.white.withValues(alpha: 0.12),
+                  disabledForegroundColor: Colors.white38,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                ),
+                child: _endingScan
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                      )
+                    : Text(
+                        l10n.finishScanning,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                      ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomHint(GyroScanSensorSnapshot snap) {
+  Widget _buildBottomHint(GyroScanSensorSnapshot snap, AppLocalizations l10n) {
     if (!_isLiveMode) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Text(
-          'Historical frame — live color filter disabled',
+          l10n.historicalFramePositive,
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
         ),
       );
     }
 
-    String hint;
+    final String hint;
     switch (snap.feedback) {
       case GyroFeedback.locked:
-        hint = 'Level the phone over the light table';
+        hint = l10n.levelPhoneOverTable;
       case GyroFeedback.guiding:
-        hint = 'Almost level — hold steady';
+        hint = l10n.almostLevelHoldSteady;
       case GyroFeedback.ready:
-        hint = _positiveViewEnabled
-            ? 'Hold steady — auto-capturing (positive view)'
-            : 'Hold steady — auto-capturing (negative view)';
+        if (!_focusSettled) {
+          hint = l10n.leveledFocusingNegative;
+        } else {
+          hint = _positiveViewEnabled
+              ? l10n.focusedCapturingPositive
+              : l10n.focusedCapturingNegative;
+        }
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -789,6 +1046,96 @@ class _GyroScanHudViewState extends ConsumerState<GyroScanHudView> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Film format option row shown in the bottom-sheet picker.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FormatOption extends StatelessWidget {
+  final FilmFormat format;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FormatOption({
+    required this.format,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final ar = format.frameAspect;
+    // Miniature frame preview: fixed height 32, width scaled to aspect ratio.
+    const previewH = 32.0;
+    final previewW = (ar >= 1.0 ? previewH * ar : previewH * ar)
+        .clamp(20.0, 56.0);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            // Mini frame preview.
+            Container(
+              width: 60,
+              alignment: Alignment.center,
+              child: Container(
+                width: previewW,
+                height: previewH,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: selected ? Colors.orange : Colors.white38,
+                    width: selected ? 2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(2),
+                  color: selected
+                      ? Colors.orange.withValues(alpha: 0.10)
+                      : Colors.white.withValues(alpha: 0.04),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    format.displayName,
+                    style: TextStyle(
+                      color: selected ? Colors.orange : Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    format.isMediumFormat
+                        ? l10n.mediumFormatDimensions(_dimensionLabel(format))
+                        : l10n.format35mmDimensions(_dimensionLabel(format)),
+                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check_rounded, color: Colors.orange, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _dimensionLabel(FilmFormat fmt) => switch (fmt) {
+        FilmFormat.mm35      => '36 × 24 mm',
+        FilmFormat.mm120_645 => '60 × 45 mm',
+        FilmFormat.mm120_66  => '60 × 60 mm',
+        FilmFormat.mm120_67  => '60 × 70 mm',
+      };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ToggleChip extends StatelessWidget {
   final IconData icon;

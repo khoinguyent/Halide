@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 
 import '../../logic/light_table_color.dart';
 
@@ -21,6 +22,7 @@ class LightTableControlBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -43,7 +45,7 @@ class LightTableControlBar extends StatelessWidget {
           Row(
             children: [
               Text(
-                '${kelvin.round()} K',
+                l10n.kelvinValue(kelvin.round()),
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.92),
                   fontSize: 13,
@@ -88,14 +90,14 @@ class LightTableControlBar extends StatelessWidget {
           Row(
             children: [
               _ControlChip(
-                label: gridVisible ? 'Grid: On' : 'Grid: Off',
+                label: gridVisible ? l10n.gridOn : l10n.gridOff,
                 icon: Icons.grid_on_rounded,
                 selected: gridVisible,
                 onTap: onToggleGrid,
               ),
               const SizedBox(width: 10),
               _ControlChip(
-                label: 'Lock Screen',
+                label: l10n.lightTableLockScreen,
                 icon: Icons.lock_outline_rounded,
                 selected: false,
                 onTap: onLockScreen,

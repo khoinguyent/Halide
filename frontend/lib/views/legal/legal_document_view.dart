@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/l10n/l10n_extension.dart';
 import '../../core/widgets/glass_panel.dart';
 import '../../core/widgets/halide_scaffold.dart';
 
@@ -52,6 +53,7 @@ class LegalDocumentView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return HalideScaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -96,7 +98,7 @@ class LegalDocumentView extends StatelessWidget {
               const Divider(height: 1, color: Colors.white12),
               const SizedBox(height: 16),
               Text(
-                'Last updated: $lastUpdated',
+                l10n.lastUpdated(lastUpdated),
                 style: _footerStyle,
               ),
             ],

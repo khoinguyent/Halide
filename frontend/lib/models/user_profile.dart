@@ -31,6 +31,10 @@ class UserProfile {
   final bool hasSeenOnboarding;
   final bool hasSeenRollGuide;
   final bool hasSeenLabGuide;
+  /// IANA timezone from backend (e.g. Asia/Bangkok). Used for analytics golden-hour math.
+  final String? timezone;
+  /// App UI language from backend: `system`, `en`, `vi`, or null if never set.
+  final String? preferredLocale;
   /// From GET /api/v1/me (System Cloud quota). Null if older backend responses omit fields.
   final int? storageUsedBytes;
   final int? additionalStorageBytes;
@@ -48,6 +52,8 @@ class UserProfile {
     this.hasSeenOnboarding = false,
     this.hasSeenRollGuide = false,
     this.hasSeenLabGuide = false,
+    this.timezone,
+    this.preferredLocale,
     this.storageUsedBytes,
     this.additionalStorageBytes,
     this.totalStorageLimitBytes,
@@ -75,6 +81,8 @@ class UserProfile {
       hasSeenOnboarding: json['has_seen_onboarding'] as bool? ?? false,
       hasSeenRollGuide: json['has_seen_roll_guide'] as bool? ?? false,
       hasSeenLabGuide: json['has_seen_lab_guide'] as bool? ?? false,
+      timezone: json['timezone'] as String?,
+      preferredLocale: json['preferred_locale'] as String?,
       storageUsedBytes: _parseInt(json['storage_used_bytes']),
       additionalStorageBytes: _parseInt(json['additional_storage_bytes']),
       totalStorageLimitBytes: _parseInt(json['total_storage_limit']),

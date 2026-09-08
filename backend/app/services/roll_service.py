@@ -127,6 +127,7 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
     film = db.query(FilmStock).filter(FilmStock.id == r.film_stock_id).first()
     brand = film.brand if film else ""
     name = film.name if film else ""
+    film_format = film.format.name if film and film.format else None
     color = _FILM_COLOR.get(brand, _FILM_COLOR["default"])
     camera_name = None
     if r.user_camera_id:
@@ -213,6 +214,7 @@ def _build_roll_dashboard(r: Roll, db: Session) -> RollOutDashboard:
         brand=brand,
         name=name,
         color=color,
+        film_format=film_format,
         status=r.status.value,
         image_urls=image_urls,
         shots=shots_out,

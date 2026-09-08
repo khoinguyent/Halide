@@ -2,7 +2,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/models/notification_model.dart';
 import '../../providers/auth_provider.dart';
@@ -19,7 +21,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _showOTPField = false;
   String? _verificationId;
@@ -93,6 +95,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
   }
 
   Future<void> _verifyPhone() async {
+    final l10n = context.l10n;
     setState(() => _isLoading = true);
     try {
       await ref.read(authServiceProvider).verifyPhoneNumber(
@@ -101,7 +104,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
           await ref.read(authServiceProvider).signInWithCredential(credential);
           await ref.read(authServiceProvider).syncWithBackend();
         },
-        verificationFailed: (e) => _showError(e.message ?? 'Phone verification failed'),
+        verificationFailed: (e) => _showError(e.message ?? l10n.phoneVerificationFailed),
         codeSent: (verificationId, resendToken) {
           setState(() {
             _verificationId = verificationId;
@@ -133,6 +136,8 @@ class _LoginViewState extends ConsumerState<LoginView> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -164,21 +169,21 @@ class _LoginViewState extends ConsumerState<LoginView> {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   children: [
-                    _buildLogoHeader(),
+                    _buildLogoHeader(l10n),
                     const SizedBox(height: 48),
                     if (!_showOTPField) ...[
-                      _buildAuthButton('Login with Email', Icons.email_outlined, _showEmailDialog),
+                      _buildAuthButton(l10n.loginWithEmail, Icons.email_outlined, _showEmailDialog),
                       const SizedBox(height: 16),
-                      _buildAuthButton('Login with Phone', Icons.phone_android_outlined, _showPhoneInput),
+                      _buildAuthButton(l10n.loginWithPhone, Icons.phone_android_outlined, _showPhoneInput),
                       const SizedBox(height: 16),
-                      _buildAuthButton('Login with Google', Icons.g_mobiledata_rounded, _loginWithGoogle),
+                      _buildAuthButton(l10n.loginWithGoogle, Icons.g_mobiledata_rounded, _loginWithGoogle),
                       const SizedBox(height: 16),
-                      _buildAuthButton('Login with Apple', Icons.apple_rounded, _loginWithApple),
+                      _buildAuthButton(l10n.loginWithApple, Icons.apple_rounded, _loginWithApple),
                     ] else ...[
-                      _buildOTPView(),
+                      _buildOTPView(l10n),
                     ],
                     const SizedBox(height: 32),
-                    _buildFooter(),
+                    _buildFooter(l10n),
                   ],
                 ),
               ),
@@ -200,7 +205,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
     );
   }
 
-  Widget _buildLogoHeader() {
+  Widget _buildLogoHeader(AppLocalizations l10n) {
     return Column(
       children: [
         ClipRRect(
@@ -213,9 +218,9 @@ class _LoginViewState extends ConsumerState<LoginView> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'HALIDE',
-          style: TextStyle(
+        Text(
+          l10n.appTitle.toUpperCase(),
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 48,
             fontWeight: FontWeight.w900,
@@ -223,7 +228,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
           ),
         ),
         Text(
-          'Analog heart, Digital Brain',
+          l10n.appTagline,
           style: TextStyle(
             color: Colors.white.withOpacity(0.5),
             fontSize: 12,
@@ -269,31 +274,31 @@ class _LoginViewState extends ConsumerState<LoginView> {
     );
   }
 
-  Widget _buildOTPView() {
+  Widget _buildOTPView(AppLocalizations l10n) {
     return HalideModalContainer(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'VERIFY PHONE',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 2),
+          Text(
+            l10n.verifyPhone.toUpperCase(),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 2),
           ),
           const SizedBox(height: 32),
           HalideTextField(
             controller: _otpController,
-            label: 'VERIFICATION CODE',
+            label: l10n.verificationCode.toUpperCase(),
             prefixIcon: Icons.sms_outlined,
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 32),
           HalideActionButton(
-            text: 'VERIFY & LOGIN',
+            text: l10n.verifyAndLogin.toUpperCase(),
             onPressed: _signInWithOTP,
           ),
           TextButton(
             onPressed: () => setState(() => _showOTPField = false),
             child: Text(
-              'BACK TO OPTIONS'.toUpperCase(), 
+              l10n.backToOptions.toUpperCase(),
               style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.bold),
             ),
           ),
@@ -302,15 +307,18 @@ class _LoginViewState extends ConsumerState<LoginView> {
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(AppLocalizations l10n) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('NEW HERE? '.toUpperCase(), style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11, fontWeight: FontWeight.bold)),
+        Text(
+          '${l10n.newHere} '.toUpperCase(),
+          style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11, fontWeight: FontWeight.bold),
+        ),
         GestureDetector(
           onTap: () => context.push('/register'),
           child: Text(
-            'CREATE ACCOUNT'.toUpperCase(), 
+            l10n.createAccount.toUpperCase(),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1),
           ),
         ),
@@ -319,6 +327,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
   }
 
   void _showEmailDialog() {
+    final l10n = context.l10n;
     showHalideDialog(
       context: context,
       builder: (context) => HalideModalContainer(
@@ -326,28 +335,28 @@ class _LoginViewState extends ConsumerState<LoginView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'EMAIL SIGN IN',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2),
+            Text(
+              l10n.emailSignIn.toUpperCase(),
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
             HalideTextField(
               controller: _emailController,
-              label: 'EMAIL',
+              label: l10n.email.toUpperCase(),
               prefixIcon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 16),
             HalideTextField(
               controller: _passwordController,
-              label: 'PASSWORD',
+              label: l10n.password.toUpperCase(),
               prefixIcon: Icons.lock_outline,
               obscureText: true,
             ),
             const SizedBox(height: 40),
             HalideActionButton(
-              text: 'LOGIN',
+              text: l10n.login.toUpperCase(),
               onPressed: () {
                 Navigator.pop(context);
                 _loginWithEmail();
@@ -357,7 +366,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(
-                'CANCEL'.toUpperCase(), 
+                l10n.cancel.toUpperCase(),
                 style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
@@ -368,6 +377,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
   }
 
   void _showPhoneInput() {
+    final l10n = context.l10n;
     showHalideDialog(
       context: context,
       builder: (context) => HalideModalContainer(
@@ -375,27 +385,27 @@ class _LoginViewState extends ConsumerState<LoginView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'PHONE SIGN IN',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2),
+              Text(
+                l10n.phoneSignIn.toUpperCase(),
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               Text(
-                'WE WILL SEND A CODE TO YOUR NUMBER'.toUpperCase(),
+                l10n.phoneSignInHint.toUpperCase(),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
               ),
               const SizedBox(height: 32),
               HalideTextField(
                 controller: _phoneController,
-                label: 'PHONE NUMBER',
+                label: l10n.phoneNumber.toUpperCase(),
                 prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 40),
               HalideActionButton(
-                text: 'SEND CODE',
+                text: l10n.sendCode.toUpperCase(),
                 onPressed: () {
                   Navigator.pop(context);
                   _verifyPhone();
@@ -405,7 +415,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
-                  'CANCEL'.toUpperCase(), 
+                  l10n.cancel.toUpperCase(),
                   style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.bold),
                 ),
               ),

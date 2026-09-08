@@ -63,23 +63,111 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(http_be
         raise credentials_exception
 
     user = db.query(User).filter(User.id == uid).first()
-    if not user:
-        email = decoded_token.get("email")
-        display_name = decoded_token.get("name") or (email.split("@")[0] if email else "New User")
-        user = User(id=uid, email=email, display_name=display_name)
-        try:
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-        except Exception as e:
-            db.rollback()
-            # If it was an IntegrityError (race condition), the user should exist now
-            user = db.query(User).filter(User.id == uid).first()
-            if not user:
-                logger.error("get_current_user: Failed to create/retrieve user %s: %s", uid, e)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Error during user initialization"
+    if user:
+        return user
+
+    email = decoded_token.get("email")
+    # Same email, different Firebase UID (account recreated / provider change).
+    # Reattach to the existing row so rolls/gear/subscription stay intact.
+    if email:
+        existing_by_email = db.query(User).filter(User.email == email).first()
+        if existing_by_email:
+            old_id = existing_by_email.id
+            if old_id != uid:
+                logger.warning(
+                    "get_current_user: remapping user id %s -> %s for email %s",
+                    old_id,
+                    uid,
+                    email,
                 )
-    
+                try:
+                    _remap_user_id(db, old_id, uid)
+                    db.commit()
+                except Exception as e:
+                    db.rollback()
+                    logger.error(
+                        "get_current_user: failed remapping user %s -> %s: %s",
+                        old_id,
+                        uid,
+                        e,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Error during user remapping",
+                    )
+            user = db.query(User).filter(User.id == uid).first()
+            if user:
+                return user
+
+    display_name = decoded_token.get("name") or (email.split("@")[0] if email else "New User")
+    user = User(id=uid, email=email, display_name=display_name)
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        # Race / email unique: prefer existing by uid, then by email
+        user = db.query(User).filter(User.id == uid).first()
+        if not user and email:
+            user = db.query(User).filter(User.email == email).first()
+        if not user:
+            logger.error("get_current_user: Failed to create/retrieve user %s: %s", uid, e)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error during user initialization",
+            )
+
     return user
+
+
+def _remap_user_id(db: Session, old_id: str, new_id: str) -> None:
+    """Clone user under the new Firebase UID, retarget FKs, remove the old row."""
+    from sqlalchemy import text
+
+    # Free the unique email on the old row, then clone.
+    db.execute(
+        text("UPDATE users SET email = email || '.migrating' WHERE id = :old_id"),
+        {"old_id": old_id},
+    )
+    db.execute(
+        text(
+            """
+            INSERT INTO users (
+                id, email, display_name, avatar_url, professional_nickname, bio,
+                subscription_tier, storage_used_bytes, storage_limit_bytes,
+                additional_storage_bytes, has_seen_onboarding, has_seen_roll_guide,
+                has_seen_lab_guide, timezone, preferred_locale, created_at
+            )
+            SELECT
+                :new_id,
+                REPLACE(email, '.migrating', ''),
+                display_name, avatar_url, professional_nickname, bio,
+                subscription_tier, storage_used_bytes, storage_limit_bytes,
+                additional_storage_bytes, has_seen_onboarding, has_seen_roll_guide,
+                has_seen_lab_guide, timezone, preferred_locale, created_at
+            FROM users
+            WHERE id = :old_id
+            """
+        ),
+        {"new_id": new_id, "old_id": old_id},
+    )
+    for table, column in (
+        ("storage_credentials", "user_id"),
+        ("user_cameras", "user_id"),
+        ("user_lenses", "user_id"),
+        ("rolls", "user_id"),
+    ):
+        db.execute(
+            text(f"UPDATE {table} SET {column} = :new_id WHERE {column} = :old_id"),
+            {"new_id": new_id, "old_id": old_id},
+        )
+    # purchase_history has user_id but no FK — still retarget for billing history.
+    db.execute(
+        text(
+            "UPDATE purchase_history SET user_id = :new_id WHERE user_id = :old_id"
+        ),
+        {"new_id": new_id, "old_id": old_id},
+    )
+    db.execute(text("DELETE FROM users WHERE id = :old_id"), {"old_id": old_id})
+

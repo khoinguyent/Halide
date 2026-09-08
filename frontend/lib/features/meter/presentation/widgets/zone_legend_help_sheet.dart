@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 
 import '../../../../core/widgets/glass_panel.dart';
 import '../../logic/advanced_spot_metering_engine.dart';
@@ -11,6 +13,8 @@ void showZoneOverlayHelpSheet(BuildContext context) {
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (ctx) {
+      final l10n = ctx.l10n;
+      final zoneHelp = _zoneHelpRows(l10n);
       return Padding(
         padding: EdgeInsets.fromLTRB(
           16,
@@ -36,10 +40,10 @@ void showZoneOverlayHelpSheet(BuildContext context) {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'ZONE OVERLAY',
+              Text(
+                l10n.zoneOverlayTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 2,
@@ -48,8 +52,7 @@ void showZoneOverlayHelpSheet(BuildContext context) {
               ),
               const SizedBox(height: 10),
               Text(
-                'Colors show how bright each part of the scene is compared to your EV target. '
-                'Green (Zone V) is middle gray at that exposure.',
+                l10n.zoneOverlayIntro,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.72),
@@ -65,11 +68,11 @@ void showZoneOverlayHelpSheet(BuildContext context) {
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      for (var i = 0; i < _zoneHelp.length; i++)
+                      for (var i = 0; i < zoneHelp.length; i++)
                         _ZoneHelpRow(
                           color: AdvancedSpotMeteringEngine.zoneColors[i],
-                          label: _zoneHelp[i].$1,
-                          meaning: _zoneHelp[i].$2,
+                          label: zoneHelp[i].$1,
+                          meaning: zoneHelp[i].$2,
                         ),
                     ],
                   ),
@@ -77,7 +80,7 @@ void showZoneOverlayHelpSheet(BuildContext context) {
               ),
               const SizedBox(height: 12),
               Text(
-                'Tip: Lock exposure, then scan the frame — keep important tones out of deep violet (Zone 0) and bright red (Zone X) unless you want blocked shadows or blown highlights.',
+                l10n.zoneOverlayTip,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.45),
                   fontSize: 11,
@@ -92,19 +95,19 @@ void showZoneOverlayHelpSheet(BuildContext context) {
   );
 }
 
-const _zoneHelp = <(String, String)>[
-  ('0', 'Pure black — no detail'),
-  ('I', 'Very deep shadow'),
-  ('II', 'Deep shadow, slight texture'),
-  ('III', 'Dark tones with clear texture'),
-  ('IV', 'Dark foliage, shadow skin'),
-  ('V', 'Middle gray — your EV target'),
-  ('VI', 'Light skin, light stone'),
-  ('VII', 'Very light skin, bright snow'),
-  ('VIII', 'Bright snow, white objects'),
-  ('IX', 'Near paper white'),
-  ('X', 'Specular highlights, pure white'),
-];
+List<(String, String)> _zoneHelpRows(AppLocalizations l10n) => [
+      ('0', l10n.zone0Meaning),
+      ('I', l10n.zoneIMeaning),
+      ('II', l10n.zoneIIMeaning),
+      ('III', l10n.zoneIIIMeaning),
+      ('IV', l10n.zoneIVMeaning),
+      ('V', l10n.zoneVMeaning),
+      ('VI', l10n.zoneVIMeaning),
+      ('VII', l10n.zoneVIIMeaning),
+      ('VIII', l10n.zoneVIIIMeaning),
+      ('IX', l10n.zoneIXMeaning),
+      ('X', l10n.zoneXMeaning),
+    ];
 
 class _ZoneHelpRow extends StatelessWidget {
   final Color color;

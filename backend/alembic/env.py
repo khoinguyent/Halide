@@ -21,7 +21,15 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.db.base import Base
-from app.db.models import user, film_stock, camera, roll, image, storage_credential  # noqa: F401 - register all models for migrations
+from app.db.models import (  # noqa: F401 - register all models for migrations
+    user,
+    film_stock,
+    camera,
+    roll,
+    image,
+    shared_print,
+    storage_credential,
+)
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

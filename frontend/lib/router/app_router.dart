@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../config/app_config.dart';
 import '../providers/dashboard_provider.dart';
 import '../features/shell/presentation/widgets/halide_scaffold.dart';
 import '../views/home_view.dart';
@@ -20,8 +21,12 @@ import '../views/legal/terms_conditions_view.dart';
 import '../features/storage/presentation/views/storage_account_list_view.dart';
 import '../features/storage/presentation/views/storage_strategy_view.dart';
 import '../features/storage/presentation/views/storage_capacity_purchase_view.dart';
+import '../features/storage/presentation/views/personal_drive_backup_view.dart';
 import '../views/edit_profile_view.dart';
 import '../views/support_view.dart';
+import '../views/theme_settings_view.dart';
+import '../views/shooting_analytics_view.dart';
+import '../views/language_settings_view.dart';
 import '../views/subscription_view.dart';
 import '../providers/ui_state_provider.dart';
 
@@ -69,6 +74,13 @@ final appRouter = GoRouter(
     if (user != null && loggingIn) {
       return '/';
     }
+    if (!AppConfig.enableLightTable && state.matchedLocation == '/light-table') {
+      return '/';
+    }
+    if (!AppConfig.enableGyroScan && state.uri.path.contains('/gyro-scan')) {
+      final rollId = state.pathParameters['id'];
+      return rollId != null ? '/roll/$rollId' : '/';
+    }
     return null;
   },
   routes: [
@@ -82,11 +94,19 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/paywall',
-      builder: (context, state) => const SubscriptionView(),
+      builder: (context, state) {
+        final forceTrial = state.uri.queryParameters['trial'] == '1';
+        return SubscriptionView(forceTrialChoice: forceTrial);
+      },
     ),
     GoRoute(
       path: '/light-table',
       builder: (context, state) => const LightTableView(),
+    ),
+    GoRoute(
+      path: '/personal-drive-backup',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const PersonalDriveBackupView(),
     ),
     GoRoute(
       path: '/roll/:id',
@@ -118,7 +138,9 @@ final appRouter = GoRouter(
               // Using go for top-level tabs ensures state preservation in the shell
               context.go(branchPaths[index]);
             },
-            onLightTableTap: () => context.push('/light-table'),
+            onLightTableTap: AppConfig.enableLightTable
+                ? () => context.push('/light-table')
+                : () {},
             child: navigationShell,
           ),
         );
@@ -188,6 +210,18 @@ final appRouter = GoRouter(
                       builder: (context, state) => const StorageCapacityPurchaseView(),
                     ),
                   ],
+                ),
+                GoRoute(
+                  path: 'theme',
+                  builder: (context, state) => const ThemeSettingsView(),
+                ),
+                GoRoute(
+                  path: 'language',
+                  builder: (context, state) => const LanguageSettingsView(),
+                ),
+                GoRoute(
+                  path: 'analytics',
+                  builder: (context, state) => const ShootingAnalyticsView(),
                 ),
                 GoRoute(
                   path: 'edit',

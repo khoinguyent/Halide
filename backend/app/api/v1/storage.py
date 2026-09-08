@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, BackgroundTasks
 from fastapi.responses import Response
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 import uuid
@@ -48,8 +48,14 @@ _GOOGLE_DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
 
 
 def _tier_uses_cloud_drive_r2_sync(tier: Optional[str]) -> bool:
-    """Pro: server downloads Drive and persists to R2. Free: on-device import only."""
+    """Pro: server downloads Drive and persists to R2. Free: device photos only (no Drive URL sync)."""
     return (tier or "free").lower() == "pro"
+
+
+_DRIVE_LAB_SYNC_PRO_ONLY = (
+    "Syncing lab scans from a Drive URL requires Halide Pro. "
+    "On Free, add photos from this device."
+)
 
 
 @router.get("/storage/providers", response_model=List[StorageProviderMetadata])
@@ -100,6 +106,18 @@ async def upload_roll_images(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Upload roll photos to Halide cloud (R2). Pro / premium subscription only.
+
+    Free users must keep scans on-device (`POST /rolls/{id}/local-images`) —
+    they must not write roll bytes to R2.
+    """
+    if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Cloud photo upload requires a premium subscription. "
+            "On Free, add photos from this device.",
+        )
+
     # Verify roll ownership
     roll = db.query(Roll).filter(Roll.id == roll_id).first()
     if not roll:
@@ -121,7 +139,7 @@ async def upload_roll_images(
         # but we can check the current usage first
         pass
 
-    if current_user.storage_used_bytes >= current_user.storage_limit_bytes:
+    if current_user.storage_used_bytes >= current_user.total_storage_limit:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Storage limit reached. Please upgrade your plan."
@@ -146,20 +164,28 @@ async def upload_roll_images(
         file_content = b"".join(chunks)
         
         # Check if this file exceeds the remaining storage
-        if current_user.storage_used_bytes + len(file_content) > current_user.storage_limit_bytes:
+        if current_user.storage_used_bytes + len(file_content) > current_user.total_storage_limit:
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
                 detail=f"Uploading {file.filename} would exceed your storage limit. Please upgrade your plan."
             )
         
         image_id = str(uuid.uuid4())
-        
+
         # Determine Strategy
         primary_cred = db.query(StorageCredential).filter(
             StorageCredential.user_id == current_user.id,
             StorageCredential.is_primary == True
         ).first()
         strategy = "PERSONAL_CLOUD" if primary_cred else "SYSTEM_CLOUD"
+
+        # Insert (flush, not commit) the Image row before transferring so
+        # PersonalDriveImageSync.image_id — a real FK to images.id — has a row to
+        # point at even though the outer transaction hasn't committed yet
+        # (Postgres sees own-transaction writes immediately after flush).
+        db_image = Image(id=image_id, roll_id=roll_id)
+        db.add(db_image)
+        db.flush()
 
         # Upload to Storage via TransferService
         from ...services.transfer_service import transfer_service
@@ -171,15 +197,9 @@ async def upload_roll_images(
             file_content=file_content,
             strategy=strategy
         )
-        
-        # Save to DB
-        # Note: In a real scenario we might derive URL from key or store key
-        # Here we follow the model's image_url field
-        db_image = Image(
-            roll_id=roll_id,
-            image_url=key,  # Storing the key as the URL for now
-            # frame_number, aperture, shutter_speed could be extracted from EXIF in later sprints
-        )
+
+        # frame_number, aperture, shutter_speed could be extracted from EXIF in later sprints
+        db_image.image_url = key  # Storing the key as the URL for now
         db.add(db_image)
         uploaded_images.append(db_image)
         
@@ -293,7 +313,14 @@ async def replace_roll_image(
     """
     Replace an existing roll frame in object storage (same key).
     Used when Pro users rotate/edit an image so the cloud copy stays in sync.
+    Pro / premium subscription only — Free must not write to R2.
     """
+    if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Cloud image replace requires a premium subscription.",
+        )
+
     try:
         rid = uuid.UUID(roll_id)
         iid = uuid.UUID(image_id)
@@ -457,6 +484,33 @@ def _finalize_roll_after_drive_ingest(db: Session, roll: Roll) -> None:
     db.add(roll)
 
 
+def _maybe_queue_personal_drive_archive(user_id: str, roll_id: str) -> None:
+    """
+    After lab ingest lands on R2, mirror the roll into Agxel Vault when the user
+    has a primary/archive Google Drive connection. Enqueues a one-roll job on the
+    async queue rather than syncing inline, so this stays cheap even when called
+    from a request's BackgroundTasks.
+    """
+    try:
+        from ...services.personal_drive_sync_service import get_personal_gdrive_credential
+        from ...services.personal_drive_sync_queue import (
+            enqueue_personal_drive_sync_job,
+            run_job_in_background,
+        )
+        from ...db.session import SessionLocal
+
+        db = SessionLocal()
+        try:
+            if not get_personal_gdrive_credential(db, user_id):
+                return
+            job = enqueue_personal_drive_sync_job(db, user_id=user_id, roll_ids=[str(roll_id)])
+        finally:
+            db.close()
+        run_job_in_background(str(job.id))
+    except Exception as e:
+        logger.warning("Personal Drive archive sync skipped for roll %s: %s", roll_id, e)
+
+
 @router.post("/connect", response_model=StorageCredentialOut)
 def connect_storage(
     data: StorageCredentialCreate,
@@ -524,6 +578,13 @@ def connect_storage(
                 status_code=400,
                 detail=f"Google Drive connect failed: {e}",
             )
+
+    if data.is_primary:
+        db.query(StorageCredential).filter(
+            StorageCredential.user_id == current_user.id,
+            StorageCredential.is_primary == True,  # noqa: E712
+        ).update({"is_primary": False})
+
     encrypted_data = encrypt_credential(auth_data_to_store)
     cred = StorageCredential(
         user_id=current_user.id,
@@ -740,60 +801,13 @@ def free_folder_manifest(
     db: Session = Depends(get_db),
 ):
     """
-    Free tier: ordered image file IDs in a Drive folder for client-side download.
-    Does not write to R2 or create Image rows.
+    Formerly Free-tier client-side Drive folder download. Lab Drive URL sync is
+    Pro-only now (see sync_images_from_url). Kept as a stub so old clients get a clear error.
     """
-    if _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
-        raise HTTPException(
-            status_code=400,
-            detail="Halide Pro should use cloud sync.",
-        )
-    roll = (
-        db.query(Roll)
-        .filter(Roll.id == payload.roll_id, Roll.user_id == current_user.id)
-        .first()
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=_DRIVE_LAB_SYNC_PRO_ONLY,
     )
-    if not roll:
-        raise HTTPException(status_code=404, detail="Roll not found")
-
-    cred = (
-        db.query(StorageCredential)
-        .filter(
-            StorageCredential.user_id == current_user.id,
-            StorageCredential.provider == StorageProviderEnum.gdrive,
-        )
-        .order_by(StorageCredential.is_primary.desc())
-        .first()
-    )
-    if not cred:
-        raise HTTPException(status_code=400, detail="Google Drive is not connected for this user")
-
-    if not is_gdrive_oauth_configured():
-        raise HTTPException(
-            status_code=503,
-            detail="Google Drive OAuth is not configured on this server (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in backend/.env).",
-        )
-
-    tokens_json = decrypt_credential(cred.encrypted_auth_data)
-    if not tokens_json:
-        raise HTTPException(status_code=400, detail="Failed to decrypt Google Drive credentials")
-
-    try:
-        tokens = json.loads(tokens_json)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid Google Drive credentials payload")
-
-    try:
-        folder_id = extract_drive_folder_id(payload.folder_url_or_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    try:
-        files, _ = _list_leaf_files_with_drive_retry(db, cred, tokens, folder_id)
-    except RefreshError as e:
-        _raise_gdrive_refresh_http_exception(tokens, e)
-
-    return GDriveFreeFolderManifestOut(file_ids=_ordered_image_file_ids_from_leaf_list(files))
 
 
 @router.get("/storage/gdrive/free_file/{file_id}")
@@ -803,48 +817,13 @@ def download_gdrive_file_for_free_local_sync(
     db: Session = Depends(get_db),
 ):
     """
-    Free tier: return one Google Drive file's bytes. No R2. Authenticated users only.
+    Formerly Free-tier Drive file proxy for on-device lab import. Disabled —
+    Free adds photos from the device; Pro uses cloud Drive sync.
     """
-    if _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
-        raise HTTPException(
-            status_code=400,
-            detail="Halide Pro should use cloud sync.",
-        )
-
-    cred = (
-        db.query(StorageCredential)
-        .filter(
-            StorageCredential.user_id == current_user.id,
-            StorageCredential.provider == StorageProviderEnum.gdrive,
-        )
-        .order_by(StorageCredential.is_primary.desc())
-        .first()
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=_DRIVE_LAB_SYNC_PRO_ONLY,
     )
-    if not cred:
-        raise HTTPException(status_code=400, detail="Google Drive is not connected for this user")
-
-    tokens_json = decrypt_credential(cred.encrypted_auth_data)
-    if not tokens_json:
-        raise HTTPException(status_code=400, detail="Failed to decrypt Google Drive credentials")
-
-    try:
-        tokens = json.loads(tokens_json)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid Google Drive credentials payload")
-
-    try:
-        credentials, refreshed = refresh_google_credentials(tokens)
-        _persist_gdrive_tokens(db, cred, tokens, refreshed)
-    except RefreshError as e:
-        _raise_gdrive_refresh_http_exception(tokens, e)
-
-    try:
-        content, mime = download_file_bytes(credentials, file_id)
-    except Exception as e:
-        logger.exception("GDrive free_file download failed: %s", e)
-        raise HTTPException(status_code=400, detail="Failed to download file from Google Drive")
-
-    return Response(content=content, media_type=mime or "application/octet-stream")
 
 
 @router.post("/storage/gdrive/sync_leaf_files")
@@ -871,7 +850,7 @@ def sync_gdrive_leaf_files(
     if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
         raise HTTPException(
             status_code=402,
-            detail="Cloud scan backup requires Halide Pro. Free saves scans on this device only.",
+            detail=_DRIVE_LAB_SYNC_PRO_ONLY,
         )
 
     # Pick the primary gdrive connection if available, else first connection.
@@ -1014,6 +993,12 @@ def sync_gdrive_leaf_files(
 
     _finalize_roll_after_drive_ingest(db, roll)
     db.commit()
+
+    # Mirror to Agxel Vault when personal Drive is connected (best-effort).
+    try:
+        _maybe_queue_personal_drive_archive(str(current_user.id), str(roll.id))
+    except Exception as e:
+        logger.warning("Post-ingest personal Drive sync failed: %s", e)
 
     return {
         "synced_count": synced_count,
@@ -1286,6 +1271,11 @@ def sync_gdrive_zip_images(
             _finalize_roll_after_drive_ingest(db, roll)
             db.commit()
 
+            try:
+                _maybe_queue_personal_drive_archive(str(current_user.id), str(roll.id))
+            except Exception as e:
+                logger.warning("Post-ingest personal Drive sync failed: %s", e)
+
             return {
                 "synced_count": synced_count,
                 "skipped_existing": skipped_existing,
@@ -1483,8 +1473,8 @@ async def sync_images_from_url(
     """
     if not _tier_uses_cloud_drive_r2_sync(current_user.subscription_tier):
         raise HTTPException(
-            status_code=402,
-            detail="Cloud scan backup requires Halide Pro. Free saves scans on this device only.",
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=_DRIVE_LAB_SYNC_PRO_ONLY,
         )
 
     raw = (payload.gdrive_url_or_id or "").strip()
@@ -1500,3 +1490,139 @@ async def sync_images_from_url(
 
     background_tasks.add_task(_perform_gdrive_sync, current_user.id, payload.roll_id, payload.gdrive_url_or_id)
     return {"detail": "Sync started in background"}
+
+
+class PersonalDriveRollSyncRequest(BaseModel):
+    roll_id: str
+
+
+class PersonalDriveBatchSyncRequest(BaseModel):
+    # Omit or leave empty to sync every roll that still needs it (skips rolls whose
+    # frames already match what's on Drive, tracked via PersonalDriveRollSync/ImageSync).
+    roll_ids: Optional[List[str]] = None
+    # Force re-upload even for rolls/frames already marked synced.
+    force: bool = False
+
+
+class PersonalDriveSyncJobOut(BaseModel):
+    id: str
+    status: str
+    total_rolls: int
+    completed_rolls: int
+    failed_rolls: int
+    skipped_rolls: int
+    result: Optional[List[Dict[str, Any]]] = None
+    error: Optional[str] = None
+
+
+def _job_to_out(job) -> "PersonalDriveSyncJobOut":
+    return PersonalDriveSyncJobOut(
+        id=str(job.id),
+        status=job.status.value if hasattr(job.status, "value") else str(job.status),
+        total_rolls=job.total_rolls or 0,
+        completed_rolls=job.completed_rolls or 0,
+        failed_rolls=job.failed_rolls or 0,
+        skipped_rolls=job.skipped_rolls or 0,
+        result=job.result,
+        error=job.error,
+    )
+
+
+@router.post("/storage/gdrive/sync_roll_to_personal", response_model=PersonalDriveSyncJobOut)
+def sync_roll_to_personal_drive(
+    payload: PersonalDriveRollSyncRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Push one roll to the user's personal Google Drive under Agxel Vault/{roll title}/
+    with README.txt (description, film, ISO) and full-quality frames.
+
+    Requires a connected Google Drive account marked primary or archive.
+    Available to Free and Pro — this is BYO personal cloud, not Halide R2.
+    """
+    from ...services.personal_drive_sync_service import get_personal_gdrive_credential
+    from ...services.personal_drive_sync_queue import enqueue_personal_drive_sync_job, run_job_in_background
+
+    roll = (
+        db.query(Roll)
+        .filter(Roll.id == payload.roll_id, Roll.user_id == current_user.id)
+        .first()
+    )
+    if not roll:
+        raise HTTPException(status_code=404, detail="Roll not found")
+
+    if not get_personal_gdrive_credential(db, current_user.id):
+        raise HTTPException(
+            status_code=400,
+            detail="Connect Google Drive as your personal cloud (primary or archive) first.",
+        )
+
+    job = enqueue_personal_drive_sync_job(db, user_id=current_user.id, roll_ids=[str(roll.id)])
+    background_tasks.add_task(run_job_in_background, str(job.id))
+    return _job_to_out(job)
+
+
+@router.post("/storage/gdrive/sync_rolls_to_personal", response_model=PersonalDriveSyncJobOut)
+def sync_rolls_to_personal_drive(
+    payload: PersonalDriveBatchSyncRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Sync many rolls to Agxel Vault in one request. Returns immediately with a job id;
+    poll ``GET /storage/gdrive/personal_sync_jobs/{job_id}`` for progress.
+
+    - ``roll_ids`` omitted/empty: syncs every roll that still needs it (rolls/frames
+      already mirrored — by content hash — are skipped, so repeated calls are cheap).
+    - ``roll_ids`` provided: syncs exactly those rolls (still skips unchanged frames
+      unless ``force`` is set).
+
+    Rolls are processed concurrently (bounded) via an async queue so N rolls don't
+    serialize behind one Drive API call at a time.
+    """
+    from ...services.personal_drive_sync_service import get_personal_gdrive_credential
+    from ...services.personal_drive_sync_queue import enqueue_personal_drive_sync_job, run_job_in_background
+
+    if not get_personal_gdrive_credential(db, current_user.id):
+        raise HTTPException(
+            status_code=400,
+            detail="Connect Google Drive as your personal cloud (primary or archive) first.",
+        )
+
+    roll_ids = payload.roll_ids or None
+    if roll_ids:
+        owned_count = (
+            db.query(Roll)
+            .filter(Roll.user_id == current_user.id, Roll.id.in_(roll_ids))
+            .count()
+        )
+        if owned_count == 0:
+            raise HTTPException(status_code=404, detail="No matching rolls found for this user")
+
+    job = enqueue_personal_drive_sync_job(
+        db, user_id=current_user.id, roll_ids=roll_ids, force=payload.force
+    )
+    background_tasks.add_task(run_job_in_background, str(job.id))
+    return _job_to_out(job)
+
+
+@router.get("/storage/gdrive/personal_sync_jobs/{job_id}", response_model=PersonalDriveSyncJobOut)
+def get_personal_drive_sync_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Poll progress/result of a batch or single-roll personal Drive sync job."""
+    from ...db.models.personal_drive_sync import PersonalDriveSyncJob
+
+    job = (
+        db.query(PersonalDriveSyncJob)
+        .filter(PersonalDriveSyncJob.id == job_id, PersonalDriveSyncJob.user_id == current_user.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Sync job not found")
+    return _job_to_out(job)

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../../core/theme/halide_colors.dart';
 
-/// Interactive metering pin — 28px diameter, orange hair-cross, draggable.
+/// Interactive metering pin — 28px diameter, hair-cross, draggable.
 class MeteringPinWidget extends StatelessWidget {
   static const double pinDiameter = 28.0;
-  static const Color accentColor = Color(0xFFF97316);
 
   final double ev;
   final bool isDragging;
@@ -19,10 +19,10 @@ class MeteringPinWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = HalideColors.of(context).accent;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // EV readout label
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
@@ -51,7 +51,7 @@ class MeteringPinWidget extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: accentColor,
+                color: accent,
                 width: isDragging ? 2.5 : 1.5,
               ),
               boxShadow: [
@@ -68,7 +68,7 @@ class MeteringPinWidget extends StatelessWidget {
               ],
             ),
             child: CustomPaint(
-              painter: _HairCrossPainter(),
+              painter: _HairCrossPainter(accent),
             ),
           ),
         ),
@@ -78,10 +78,14 @@ class MeteringPinWidget extends StatelessWidget {
 }
 
 class _HairCrossPainter extends CustomPainter {
+  _HairCrossPainter(this.accent);
+
+  final Color accent;
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = MeteringPinWidget.accentColor
+      ..color = accent
       ..strokeWidth = 0.75
       ..style = PaintingStyle.stroke;
 
@@ -94,5 +98,6 @@ class _HairCrossPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _HairCrossPainter oldDelegate) =>
+      oldDelegate.accent != accent;
 }

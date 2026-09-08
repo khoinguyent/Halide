@@ -34,12 +34,16 @@ class ApiService {
   }
 
   /// Binary body (e.g. Google Drive file bytes for free-tier on-device import).
-  Future<Uint8List> getBytes(String path) async {
+  Future<Uint8List> getBytes(
+    String path, {
+    Duration receiveTimeout = const Duration(seconds: 180),
+  }) async {
     final r = await _dio.get<List<int>>(
       path,
       options: Options(
         responseType: ResponseType.bytes,
-        receiveTimeout: const Duration(seconds: 180),
+        receiveTimeout: receiveTimeout,
+        sendTimeout: receiveTimeout,
       ),
     );
     final list = r.data;

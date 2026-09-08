@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/config/app_config.dart';
 import 'package:frontend/features/shell/presentation/widgets/halide_scaffold.dart';
 import 'package:frontend/features/light_table/logic/light_table_color.dart';
 import 'package:frontend/features/shell/presentation/widgets/glass_navigation_dock.dart';
@@ -89,7 +90,13 @@ void main() {
 
     // Verify GlassNavigationDock
     expect(find.byType(GlassNavigationDock), findsOneWidget);
-    expect(find.byIcon(LightTableTokens.navIcon), findsOneWidget);
+    if (AppConfig.enableLightTable) {
+      expect(find.byIcon(LightTableTokens.navIcon), findsOneWidget);
+      expect(find.byIcon(Icons.person_outline), findsNothing);
+    } else {
+      expect(find.byIcon(Icons.person_outline), findsOneWidget);
+      expect(find.byIcon(LightTableTokens.navIcon), findsNothing);
+    }
 
     // Verify FAB
     expect(find.byType(FloatingActionButton), findsOneWidget);

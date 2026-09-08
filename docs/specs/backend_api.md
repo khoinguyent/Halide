@@ -322,6 +322,57 @@ Follows the same pattern as cameras.
 **GET** `/api/v1/lab-imports/{id}`  
 - **Description**: Get status and metrics for a batch.
 
+### 4.10 Shooting Analytics
+
+**GET** `/api/v1/analytics/shooting-matrix`  
+- **Description**: Aggregated shooting dashboard for the authenticated user over the last **365 days**. Reads from the `mv_user_shooting_shots` materialized view (refreshed after shot writes and on dashboard load).
+- **Query params**:
+  - `timezone` (optional) — device IANA timezone override for this request.
+  - `sync_timezone` (optional, default `false`) — when `true` and `timezone` is set, persist it on the user profile.
+- **Timezone resolution**: `timezone` query param → `users.timezone` → `UTC`.
+- **Response** (`ShootingMatrixResponse`):
+```json
+{
+  "matrix": [{ "date": "2026-06-15", "count": 18 }],
+  "streaks": { "current_streak": 12, "longest_streak": 28 },
+  "top_emulsion": {
+    "name": "Kodak Portra 400",
+    "brand": "Kodak",
+    "count": 142,
+    "percentage": 42.0
+  },
+  "top_hardware": {
+    "name": "Canon 50mm f/1.4",
+    "count": 98,
+    "percentage": 37.0
+  },
+  "emulsion_breakdown": [
+    { "name": "Kodak Portra 400", "count": 142, "percentage": 42.0 }
+  ],
+  "hardware_breakdown": [
+    { "name": "Canon 50mm f/1.4", "count": 98, "percentage": 37.0 }
+  ],
+  "lighting_insight": {
+    "golden_hour_percentage": 64.0,
+    "golden_hour_shots": 88,
+    "total_shots": 138
+  },
+  "totals": { "total_shots": 338, "active_days": 142, "period_days": 365 },
+  "timezone": "UTC"
+}
+```
+- **Notes**:
+  - `matrix` includes every calendar day in the window (missing days have `count: 0`). Days are grouped in the user's resolved local timezone.
+  - Source data: materialized view `mv_user_shooting_shots` (365-day rolling window of denormalized shot facts).
+  - `top_hardware` uses the roll's `user_lens_id` at shot time; rolls without a lens are excluded from hardware stats.
+  - `current_streak` counts consecutive local days with `count > 0` ending today.
+  - Golden hour: 4:00 PM–6:00 PM in the resolved timezone.
+
+**PATCH** `/api/v1/user/timezone`  
+- **Description**: Persist the user's IANA timezone (typically synced from the device on app launch).
+- **Body**: `{ "timezone": "Asia/Bangkok" }`
+- **Response**: `UserOut` (includes `timezone`).
+
 ---
 
 ## 5. GraphQL Schema

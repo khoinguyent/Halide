@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -9,26 +10,35 @@ import 'package:purchases_flutter/purchases_flutter.dart' as rc;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/app_config.dart';
+import '../core/l10n/l10n_extension.dart';
 import '../core/models/notification_model.dart';
+import '../l10n/app_localizations.dart';
 import '../core/providers/notification_provider.dart';
 import '../core/utils/subscription_trial_text.dart';
 import '../features/billing/presentation/bloc/billing_bloc.dart';
 import '../providers/auth_provider.dart';
+import '../providers/profile_provider.dart';
+import '../services/api_service.dart';
 import '../services/purchase_service.dart';
 
 class SubscriptionView extends ConsumerStatefulWidget {
-  const SubscriptionView({Key? key}) : super(key: key);
+  /// When true (first launch / trial gate): hide Free plan, default Pro,
+  /// require monthly/annual choice before starting the intro trial.
+  final bool forceTrialChoice;
+
+  const SubscriptionView({Key? key, this.forceTrialChoice = false}) : super(key: key);
 
   @override
   ConsumerState<SubscriptionView> createState() => _SubscriptionViewState();
 }
 
 class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
-  bool _isAnnual = true;
-  int _selectedPlanIndex = 1; // Default to Pro Plan
+  late bool _isAnnual;
+  late int _selectedPlanIndex;
   rc.Offerings? _cachedOfferings;
   bool _isPurchasing = false;
   bool _isRestoring = false;
+  bool _markedOnboarding = false;
   late final BillingBloc _billingBloc;
 
   // Branding / review compliance palette
@@ -45,29 +55,53 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
   String? _productQueryError;
   Map<String, ProductDetails> _productDetailsById = const {};
 
-  /// Index 0 = Free (The Archive), 1 = Halide Pro. Plus-tier perks live in Free.
-  final Map<int, List<String>> _planFeatures = {
-    0: [
-      'Roll & frame logging (aperture, shutter, location)',
-      'Shooting → Lab → Scanned → Archived workflow',
-      'Up to 3 cameras (1 lens each) & unlimited rolls',
-      'Fetch images from Lab Drive',
-      'Personal cloud sync (Google Drive, NAS)',
-      'Standard EXIF logging',
-    ],
-    1: [
-      'Everything in Free',
-      'Halide Cloud Storage (hosted System Cloud)',
-      'Professional light meter (spot metering & EV)',
-      'Advanced exposure guidance',
-      'Priority support',
-    ],
-  };
+  List<String> _planFeatures(AppLocalizations l10n, int planIndex) {
+    if (planIndex == 0) {
+      return [
+        l10n.freeFeature1,
+        l10n.freeFeature2,
+        l10n.freeFeature3,
+        l10n.freeFeature4,
+        l10n.freeFeature5,
+        l10n.freeFeature6,
+      ];
+    }
+    return [
+      l10n.proFeature1,
+      l10n.proFeature2,
+      l10n.proFeature3,
+      l10n.proFeature4,
+      l10n.proFeature5,
+    ];
+  }
 
   @override
   void initState() {
     super.initState();
+    // Trial gate: Pro + monthly only (3-day intro lives on monthly in ASC).
+    // Normal paywall defaults to Pro + annual.
+    _selectedPlanIndex = 1;
+    _isAnnual = !widget.forceTrialChoice;
     _billingBloc = BillingBloc()..add(LoadOfferings());
+  }
+
+  /// First-launch trial always purchases monthly, regardless of UI state.
+  bool get _purchaseAnnual => widget.forceTrialChoice ? false : _isAnnual;
+
+  Future<void> _markOnboardingSeenIfNeeded() async {
+    if (_markedOnboarding || !widget.forceTrialChoice) return;
+    _markedOnboarding = true;
+    try {
+      await ref.read(profileServiceProvider).markOnboardingSeen();
+      ref.invalidate(userProfileProvider);
+    } catch (_) {
+      // Best-effort; user can still use the app.
+    }
+  }
+
+  Future<void> _dismissPaywall() async {
+    await _markOnboardingSeenIfNeeded();
+    if (mounted) context.pop();
   }
 
   @override
@@ -81,12 +115,14 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
       ref.read(notificationProvider.notifier).show(
-            'Could not open link.',
+            context.l10n.couldNotOpenLink,
             type: NotificationType.error,
           );
     }
   }
 
+  /// Restore StoreKit/Play purchases via RevenueCat, then reconcile Postgres
+  /// (`POST /billing/sync?force_remote=true`) so Drive sync and other Pro gates match the SDK.
   Future<void> _restorePurchases() async {
     if (_isRestoring) return;
     setState(() => _isRestoring = true);
@@ -98,16 +134,64 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
         }
       }
       final info = await PurchaseService().restorePurchases();
-      final restored = info.entitlements.active.isNotEmpty;
-      ref.read(notificationProvider.notifier).show(
-            restored ? 'Restored successfully.' : 'No previous purchases found.',
-            type: restored ? NotificationType.success : NotificationType.info,
+      final activeIds = info.entitlements.active.keys.toList();
+      final restoredLocally = activeIds.isNotEmpty;
+
+      ref
+          .read(localEntitlementPlanProvider.notifier)
+          .updateFromActiveEntitlementIds(activeIds);
+
+      // Push RevenueCat REST → Postgres (same path as post-purchase).
+      String? syncedTier;
+      Object? syncError;
+      final api = ApiService();
+      for (var attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          await Future<void>.delayed(
+            Duration(milliseconds: attempt == 1 ? 700 : 900),
           );
+        }
+        try {
+          final res = await api.post('/api/v1/billing/sync?force_remote=true');
+          final data = res.data;
+          if (data is Map) {
+            syncedTier = data['tier']?.toString();
+          }
+          syncError = null;
+          break;
+        } catch (e) {
+          syncError = e;
+          // ignore: avoid_print
+          print('[Subscription] billing/sync after restore attempt ${attempt + 1}: $e');
+        }
+      }
+
+      ref.invalidate(userProfileProvider);
+
+      if (!mounted) return;
+      final l10n = context.l10n;
+      final backendPro = (syncedTier ?? '').toLowerCase() == 'pro';
+      if (restoredLocally || backendPro) {
+        ref.read(notificationProvider.notifier).show(
+              l10n.restoredSuccessfully,
+              type: NotificationType.success,
+            );
+      } else if (syncError != null && !restoredLocally) {
+        ref.read(notificationProvider.notifier).show(
+              l10n.restoreFailed,
+              type: NotificationType.error,
+            );
+      } else {
+        ref.read(notificationProvider.notifier).show(
+              l10n.noPreviousPurchases,
+              type: NotificationType.info,
+            );
+      }
       _billingBloc.add(LoadOfferings());
     } catch (e) {
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-              'Restore could not be completed. Please try again.',
+              context.l10n.restoreFailed,
               type: NotificationType.error,
             );
       }
@@ -118,6 +202,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
 
   Future<void> _queryProductDetailsForOfferings(rc.Offerings offerings) async {
     if (!Platform.isIOS && !Platform.isAndroid) return;
+    final l10n = context.l10n;
 
     final proOff = proOfferingFrom(offerings);
     final annualId = proOff?.annual?.storeProduct.identifier;
@@ -139,7 +224,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
       final available = await iap.isAvailable();
       if (!available) {
         setState(() {
-          _productQueryError = 'Store is not available.';
+          _productQueryError = l10n.storeNotAvailable;
           _productDetailsById = const {};
         });
         return;
@@ -176,7 +261,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
     final offerings = _cachedOfferings;
     if (offerings != null) {
       final proOff = proOfferingFrom(offerings);
-      final pkg = _isAnnual ? proOff?.annual : proOff?.monthly;
+      final pkg = _purchaseAnnual ? proOff?.annual : proOff?.monthly;
       final id = pkg?.storeProduct.identifier;
       final pd = id == null ? null : _productDetailsById[id];
       if (pd != null) return pd.price;
@@ -187,18 +272,14 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
     return r'$--';
   }
 
-  Widget _subscriptionDisclosureBlock() {
+  Widget _subscriptionDisclosureBlock(AppLocalizations l10n) {
     final price = _selectedPriceForDisclosure();
-    final suffix = _isAnnual ? '/yr' : '/month';
-    const text =
-        'A [PRICE] subscription will be applied to your iTunes account on confirmation. '
-        'Subscriptions will automatically renew unless canceled within 24-hours before the end of the current period. '
-        'Manage anytime in iTunes settings. Any unused portion of a free trial will be forfeited if you purchase a subscription.';
+    final suffix = _purchaseAnnual ? l10n.perYearShort : l10n.perMonthShort;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 4, 32, 0),
       child: Text(
-        text.replaceFirst('[PRICE]', '$price$suffix'),
+        l10n.subscriptionDisclosure('$price$suffix'),
         textAlign: TextAlign.center,
         style: TextStyle(
           color: _zinc500.withValues(alpha: 0.9),
@@ -210,7 +291,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
     );
   }
 
-  Widget _legalFooter() {
+  Widget _legalFooter(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
       child: Wrap(
@@ -228,7 +309,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: Text(
-              'Privacy Policy',
+              l10n.privacyPolicyLink,
               style: TextStyle(
                 color: _zinc500,
                 fontSize: 12,
@@ -248,7 +329,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: Text(
-              'Terms of Use',
+              l10n.termsOfUse,
               style: TextStyle(
                 color: _zinc500,
                 fontSize: 12,
@@ -267,19 +348,19 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
   String? _proTrialFooterLine() {
     final offerings = _cachedOfferings;
     if (offerings == null) return null;
-    final pkg = proPackageForSelection(offerings, annual: _isAnnual);
+    final pkg = proPackageForSelection(offerings, annual: _purchaseAnnual);
     if (pkg == null) return null;
     return introOfferShortLabel(pkg.storeProduct);
   }
 
-  String _subscribeButtonLabel(rc.Offerings? offerings) {
+  String _subscribeButtonLabel(AppLocalizations l10n, rc.Offerings? offerings) {
     final pkg = offerings == null
         ? null
-        : proPackageForSelection(offerings, annual: _isAnnual);
+        : proPackageForSelection(offerings, annual: _purchaseAnnual);
     final intro = pkg?.storeProduct.introductoryPrice;
     final freeTrial = intro != null && intro.price <= 0.001;
-    if (freeTrial) return 'Start free trial';
-    return 'Get Halide Pro';
+    if (freeTrial || widget.forceTrialChoice) return l10n.startFreeTrial;
+    return l10n.getHalidePro;
   }
 
   @override
@@ -290,6 +371,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
         backgroundColor: _zinc950,
         body: BlocConsumer<BillingBloc, BillingState>(
           listener: (context, state) {
+            final l10n = context.l10n;
             if (state is OfferingsLoaded) {
               _cachedOfferings = state.offerings;
               _isPurchasing = false;
@@ -299,13 +381,18 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
               if (_isPurchasing) {
                 _isPurchasing = false;
                 ref.read(notificationProvider.notifier).show(
-                  'Welcome to Halide Pro! Your plan is now active.',
+                  l10n.welcomeToHalidePro,
                   type: NotificationType.success,
                 );
               }
+              unawaited(_markOnboardingSeenIfNeeded());
               ref.invalidate(userProfileProvider);
               // Navigate to profile instead of just popping
               context.go('/profile');
+            } else if (state is RestoreCompleted) {
+              _isPurchasing = false;
+              _isRestoring = false;
+              ref.invalidate(userProfileProvider);
             } else if (state is PurchaseCancelled) {
               // User cancelled the purchase sheet. This is not an error.
               _isPurchasing = false;
@@ -313,7 +400,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
             } else if (state is PurchaseFailed) {
               _isPurchasing = false;
               ref.read(notificationProvider.notifier).show(
-                'Purchase could not be completed. Please try again.',
+                l10n.purchaseFailedRetry,
                 type: NotificationType.error,
               );
               // Re-load offerings so button stays functional
@@ -321,7 +408,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
             } else if (state is OfferingsLoadFailed) {
               _isPurchasing = false;
               ref.read(notificationProvider.notifier).show(
-                'Unable to load subscription options. Please try again.',
+                l10n.unableToLoadSubscription,
                 type: NotificationType.error,
               );
             } else if (state is BillingLoading) {
@@ -332,7 +419,8 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
             }
           },
           builder: (context, state) {
-            final activeFeatures = _planFeatures[_selectedPlanIndex] ?? [];
+            final l10n = context.l10n;
+            final activeFeatures = _planFeatures(l10n, _selectedPlanIndex);
             final bool offeringsLoading =
                 _cachedOfferings == null && (state is BillingLoading || state is BillingInitial);
             final bool showProductSpinner = offeringsLoading || _isQueryingProducts;
@@ -383,15 +471,15 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                                   padding: const EdgeInsets.all(8.0),
                                   child: IconButton(
                                     icon: const Icon(Icons.close, color: Colors.white, size: 24),
-                                    onPressed: () => context.pop(),
+                                    onPressed: () => unawaited(_dismissPaywall()),
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 4),
                               // Header
-                              const Text(
-                                'Choose Your Plan',
-                                style: TextStyle(
+                              Text(
+                                l10n.chooseYourPlan,
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 26,
                                   fontWeight: FontWeight.w900,
@@ -401,7 +489,9 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 28),
                                 child: Text(
-                                  'Pro adds Halide Cloud Storage and the professional light meter',
+                                  widget.forceTrialChoice
+                                      ? '${l10n.startFreeTrial} · ${l10n.monthlyBilling}'
+                                      : l10n.paywallSubtitle,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.7),
@@ -410,10 +500,12 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                                 ),
                               ),
                               const SizedBox(height: 14),
-                              // Billing Toggle + Plans
-                              _buildBillingToggle(),
-                              const SizedBox(height: 14),
-                              _buildPlanSelector(),
+                              // Trial gate: monthly only (no annual toggle).
+                              if (!widget.forceTrialChoice) ...[
+                                _buildBillingToggle(l10n),
+                                const SizedBox(height: 14),
+                              ],
+                              _buildPlanSelector(l10n),
                               const SizedBox(height: 14),
                               // Features Checklist
                               Expanded(
@@ -430,10 +522,10 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                               ),
                               const SizedBox(height: 12),
                               // Subscribe Button
-                              _buildSubscribeButton(),
+                              _buildSubscribeButton(l10n),
                               if (_selectedPlanIndex != 0) ...[
                                 const SizedBox(height: 10),
-                                _subscriptionDisclosureBlock(),
+                                _subscriptionDisclosureBlock(l10n),
                                 if (productEmptyAfterAttempt)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 8),
@@ -442,15 +534,15 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                                         final o = _cachedOfferings;
                                         if (o != null) _queryProductDetailsForOfferings(o);
                                       },
-                                      child: const Text(
-                                        'Retry',
+                                      child: Text(
+                                        l10n.retry,
                                         style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
                                       ),
                                     ),
                                   ),
                               ],
-                              _buildRestoreRow(),
-                              _legalFooter(),
+                              _buildRestoreRow(l10n),
+                              _legalFooter(l10n),
                               const SizedBox(height: 10),
                             ],
                           ),
@@ -476,7 +568,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
     );
   }
 
-  Widget _buildRestoreRow() {
+  Widget _buildRestoreRow(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -494,7 +586,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                     ),
                   )
                 : Text(
-                    'Restore Purchases',
+                    l10n.restorePurchases,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.75),
                       fontWeight: FontWeight.w700,
@@ -505,7 +597,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text(
-              'You may be asked to sign in with your Apple ID to restore purchases.',
+              l10n.restoreAppleIdHint,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: _zinc500,
@@ -520,69 +612,94 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
     );
   }
 
-  Widget _buildBillingToggle() {
+  Widget _buildBillingToggle(AppLocalizations l10n) {
     // Hide toggle for Free plan
     if (_selectedPlanIndex == 0) {
       return const SizedBox(height: 50);
     }
 
-    return Container(
-      width: 280,
-      height: 50,
-      decoration: BoxDecoration(
-        color: _zinc950.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: _blue400.withOpacity(0.35)),
-      ),
-      child: Stack(
-        children: [
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            alignment: _isAnnual ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              width: 140,
-              height: 50,
-              decoration: BoxDecoration(
-                color: _blue600.withOpacity(0.85),
-                borderRadius: BorderRadius.circular(25),
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final toggleWidth = constraints.maxWidth > 0
+            ? constraints.maxWidth.clamp(280.0, 340.0)
+            : 300.0;
+        final segmentWidth = toggleWidth / 2;
+
+        return Container(
+          width: toggleWidth,
+          height: 50,
+          decoration: BoxDecoration(
+            color: _zinc950.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: _blue400.withOpacity(0.35)),
           ),
-          Row(
+          child: Stack(
             children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _isAnnual = false),
-                  child: Center(
-                    child: Text(
-                      'Monthly billing',
-                      style: TextStyle(
-                        color: _isAnnual ? Colors.white70 : Colors.white,
-                        fontWeight: _isAnnual ? FontWeight.normal : FontWeight.bold,
-                      ),
-                    ),
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                alignment: _isAnnual ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: segmentWidth,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: _blue600.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(25),
                   ),
                 ),
               ),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _isAnnual = true),
-                  child: Center(
-                    child: Text(
-                      'Annual billing',
-                      style: TextStyle(
-                        color: _isAnnual ? Colors.white : Colors.white70,
-                        fontWeight: _isAnnual ? FontWeight.bold : FontWeight.normal,
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isAnnual = false),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(
+                            l10n.monthly,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _isAnnual ? Colors.white70 : Colors.white,
+                              fontSize: 12,
+                              fontWeight: _isAnnual ? FontWeight.normal : FontWeight.bold,
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isAnnual = true),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(
+                            l10n.annual,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _isAnnual ? Colors.white : Colors.white70,
+                              fontSize: 12,
+                              fontWeight: _isAnnual ? FontWeight.bold : FontWeight.normal,
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -604,7 +721,12 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
           Expanded(
             child: Text(
               feature,
-              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+              ),
             ),
           ),
         ],
@@ -624,32 +746,36 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
     return annual ? r'$59.99' : r'$5.99';
   }
 
-  Widget _buildPlanSelector() {
+  Widget _buildPlanSelector(AppLocalizations l10n) {
     final plans = [
-      {'name': 'Free', 'monthly': '0', 'annual': '0'},
+      if (!widget.forceTrialChoice)
+        {'name': l10n.freePlanName, 'monthly': '0', 'annual': '0'},
       {
-        'name': 'Pro',
+        'name': l10n.proPlanName,
         'monthly': _proPriceLabel(annual: false),
         'annual': _proPriceLabel(annual: true),
       },
     ];
+    // When Free is hidden, Pro is at index 0 in [plans] but [_selectedPlanIndex] stays 1.
+    final planUiIndexOffset = widget.forceTrialChoice ? 1 : 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(plans.length, (index) {
-          final isSelected = _selectedPlanIndex == index;
+          final planIndex = index + planUiIndexOffset;
+          final isSelected = _selectedPlanIndex == planIndex;
           final plan = plans[index];
           
-          String displayPrice = _isAnnual ? plan['annual']! : plan['monthly']!;
-          String duration = _isAnnual ? '/yr' : '/mo';
-          if (index == 0) duration = '';
+          String displayPrice = _purchaseAnnual ? plan['annual']! : plan['monthly']!;
+          String duration = _purchaseAnnual ? l10n.perYearShort : l10n.perMonthShort;
+          if (planIndex == 0) duration = '';
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: GestureDetector(
-              onTap: () => setState(() => _selectedPlanIndex = index),
+              onTap: () => setState(() => _selectedPlanIndex = planIndex),
               child: Container(
                 width: 150,
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -663,7 +789,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                 ),
                 child: Column(
                   children: [
-                    if (_isAnnual && index > 0)
+                    if (_purchaseAnnual && planIndex > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         margin: const EdgeInsets.only(bottom: 4),
@@ -671,8 +797,8 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                           color: _blue600.withOpacity(0.85),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
-                          'SAVE 20%',
+                        child: Text(
+                          l10n.save20Percent,
                           style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -688,10 +814,10 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          index == 0 ? 'Free' : displayPrice,
+                          planIndex == 0 ? l10n.free : displayPrice,
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: index == 0 ? 17 : 15,
+                            fontSize: planIndex == 0 ? 17 : 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -700,9 +826,9 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      index == 0
-                          ? 'Forever'
-                          : (_proTrialFooterLine() ?? 'Free trial where eligible'),
+                      planIndex == 0
+                          ? l10n.forever
+                          : (_proTrialFooterLine() ?? l10n.freeTrialWhereEligible),
                       style: const TextStyle(color: Colors.white54, fontSize: 9),
                       textAlign: TextAlign.center,
                       maxLines: 2,
@@ -717,7 +843,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
     );
   }
 
-  Widget _buildSubscribeButton() {
+  Widget _buildSubscribeButton(AppLocalizations l10n) {
     if (_selectedPlanIndex == 0) return const SizedBox(height: 60);
 
     final offerings = _cachedOfferings;
@@ -747,20 +873,25 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
           child: ElevatedButton(
             onPressed: isReady
                 ? () {
-                    debugPrint('[Subscription] Purchase attempt: index=$_selectedPlanIndex, annual=$_isAnnual');
+                    debugPrint(
+                      '[Subscription] Purchase attempt: index=$_selectedPlanIndex, annual=$_purchaseAnnual, forceTrial=${widget.forceTrialChoice}',
+                    );
                     final specificOffering = offerings.all.values.firstWhere(
                       (o) => o.identifier.toLowerCase().contains('pro'),
                       orElse: () => offerings.current!,
                     );
 
-                    final package = _isAnnual ? specificOffering.annual : specificOffering.monthly;
+                    final package =
+                        _purchaseAnnual ? specificOffering.annual : specificOffering.monthly;
                     if (package != null) {
                       debugPrint('[Subscription] Purchasing package: ${package.identifier}');
                       _billingBloc.add(PurchasePackage(package));
                     } else {
-                      debugPrint('[Subscription] No ${_isAnnual ? "annual" : "monthly"} package found for pro');
+                      debugPrint(
+                        '[Subscription] No ${_purchaseAnnual ? "annual" : "monthly"} package found for pro',
+                      );
                       ref.read(notificationProvider.notifier).show(
-                        'This plan is not available yet. Please try another option.',
+                        l10n.planNotAvailable,
                         type: NotificationType.warning,
                       );
                     }
@@ -775,7 +906,7 @@ class _SubscriptionViewState extends ConsumerState<SubscriptionView> {
             child: _isPurchasing
                 ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
                 : Text(
-                    _subscribeButtonLabel(offerings),
+                    _subscribeButtonLabel(l10n, offerings),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,

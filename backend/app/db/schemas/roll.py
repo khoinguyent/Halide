@@ -47,6 +47,7 @@ class RollOutDashboard(BaseModel):
     brand: str
     name: str
     color: str  # hex e.g. #FFCC33
+    film_format: Optional[str] = None  # film stock FormatEnum name, e.g. format_135
     status: str
     image_urls: List[str] = []
     shots: List[ImageOut] = []

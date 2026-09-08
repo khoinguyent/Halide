@@ -95,7 +95,7 @@ class _ImageUrlDiagnosticsBodyState extends State<_ImageUrlDiagnosticsBody> {
       setState(() {
         _localPath = null;
         _downloadNote =
-            'Download did not save a file (see HALIDE DEBUG LOG → Sync). '
+            'Download did not save a file (see AGXEL DEBUG LOG → Sync). '
             'Common causes: HTTP 403/404, HTML error page instead of JPEG, or offline.';
         _loading = false;
       });
@@ -227,7 +227,6 @@ Widget _section(String label, String value) {
           style: const TextStyle(
             color: Color(0xFF86EFAC),
             fontSize: 11,
-            fontFamily: 'Courier',
             height: 1.35,
           ),
         ),

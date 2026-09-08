@@ -1,0 +1,1101 @@
+{
+  "@@locale": "ja",
+  "appTitle": "AgXel",
+  "appTagline": "アナログの心、デジタルの頭脳",
+  "ok": "OK",
+  "cancel": "キャンセル",
+  "save": "保存",
+  "saveChanges": "変更を保存する",
+  "delete": "削除",
+  "retry": "リトライ",
+  "back": "戻る",
+  "close": "閉じる",
+  "clear": "クリア",
+  "more": "もっと",
+  "less": "少ない",
+  "status": "状態",
+  "loading": "読み込み中…",
+  "somethingWentWrong": "何か問題が発生しました",
+  "couldNotOpenLink": "リンクを開けませんでした。",
+  "tryAgain": "もう一度やり直してください",
+  "lastUpdated": "最終更新: {date}",
+  "languageSettingsTitle": "言語",
+  "languageSystemDefault": "システムのデフォルト",
+  "languageEnglish": "英語",
+  "languageVietnamese": "ベトナム語",
+  "languageDescription": "アプリの優先言語を選択します。",
+  "profileTitle": "プロフィール",
+  "filmEnthusiast": "フィルム愛好家",
+  "halidePremium": "AgXel",
+  "editProfile": "プロフィールの編集",
+  "storageStrategy": "ストレージ戦略",
+  "themes": "テーマ",
+  "shootingAnalytics": "撮影分析",
+  "support": "サポート",
+  "privacyPolicy": "プライバシーポリシー",
+  "termsAndConditions": "利用規約",
+  "deleteAccount": "アカウントの削除",
+  "signOut": "サインアウト",
+  "deleteAccountTitle": "アカウントを削除しますか?",
+  "deleteAccountBody": "このアクションは永続的です。すべてのフィルム ロール、EXIF ログ、クラウド同期画像は当社のサーバーから直ちに消去されます。",
+  "planPro": "PRO",
+  "planFree": "FREE",
+  "loginWithEmail": "メールでログイン",
+  "loginWithPhone": "電話でログイン",
+  "loginWithGoogle": "Googleでログイン",
+  "loginWithApple": "Appleでログイン",
+  "verifyPhone": "電話番号を確認する",
+  "verificationCode": "検証コード",
+  "verifyAndLogin": "認証してログイン",
+  "backToOptions": "オプションに戻る",
+  "newHere": "初めてですか？",
+  "createAccount": "アカウントを作成する",
+  "emailSignIn": "メールでサインイン",
+  "email": "メール",
+  "password": "パスワード",
+  "login": "ログイン",
+  "phoneSignIn": "電話番号でサインイン",
+  "phoneSignInHint": "あなたの番号にコードを送信します",
+  "phoneNumber": "電話番号",
+  "sendCode": "コードを送信する",
+  "phoneVerificationFailed": "電話認証に失敗しました",
+  "welcomeSignIn": "AgXel へようこそ。サインインしてください。",
+  "welcomeSignUp": "AgXel へようこそ。サインアップしてください。",
+  "registerTitle": "アカウント作成",
+  "alreadyHaveAccount": "すでにアカウントをお持ちですか?",
+  "signIn": "サインイン",
+  "archiveTitle": "アーカイブ",
+  "openNewRoll": "新しいロールを開く",
+  "loadYourFirstRoll": "最初のロールを読み込む",
+  "showAllRolls": "すべてのロールを表示",
+  "filterAll": "全て",
+  "filterInProgress": "進行中",
+  "filterArchived": "アーカイブ済み",
+  "lifecycleShoot": "撮影",
+  "lifecycleLab": "現像",
+  "lifecycleScan": "スキャン",
+  "lifecycleArchive": "アーカイブ",
+  "rollStatusShooting": "撮影中",
+  "rollStatusLab": "現像中",
+  "rollStatusSyncing": "同期中…",
+  "rollStatusScanned": "スキャン済み",
+  "rollStatusArchived": "アーカイブ済み",
+  "addRollStep1": "ザ・ロール",
+  "addRollStep2": "詳細",
+  "totalFrames": "合計フレーム数 (例: 12、24、36)",
+  "title": "タイトル",
+  "description": "説明",
+  "iso": "ISO",
+  "expiredYear": "有効期限が切れた年",
+  "driveUrlOptional": "ドライブの URL (オプション)",
+  "shotNotesLabel": "メモ",
+  "shotNotesHint": "任意 — 最大500文字",
+  "startRoll": "スタートロール",
+  "next": "次",
+  "filmStock": "フィルムストック(*)",
+  "gear": "ギヤ",
+  "logShot": "ログショット",
+  "openRoll": "オープンロール",
+  "driveLink": "ドライブリンク",
+  "saveAndSync": "保存と同期",
+  "recordShot": "レコードショット",
+  "shutterSpeed": "シャッタースピード",
+  "aperture": "絞り",
+  "logShotTitle": "ログショット",
+  "manualAddFree": "手動追加（無料）",
+  "submitAndSync": "送信して同期",
+  "reset": "リセット",
+  "photos": "写真",
+  "shotLog": "ショットログ",
+  "lockerTitle": "歯車",
+  "addGear": "ギアを追加する",
+  "addFirstGear": "1速ギアを追加する",
+  "nickname": "ニックネーム",
+  "manufacturer": "メーカー",
+  "model": "モデル",
+  "serialNumber": "シリアルナンバー",
+  "saveGear": "保存{gearType}",
+  "camera": "カメラ",
+  "lens": "レンズ",
+  "cameraNotFound": "カメラが見つかりません",
+  "editGear": "ギアを編集する",
+  "editGearImages": "ギア画像を編集する",
+  "createAndMount": "作成とマウント",
+  "createNewLens": "新しいレンズを作成する",
+  "createMountLensHint": "このボディに新しいレンズを作成して取り付けます。",
+  "newLensDetails": "新しいレンズの詳細",
+  "selectLensToMount": "マウントするレンズを選択してください",
+  "noLensesAvailable": "使用可能なレンズがありません",
+  "gearStatusActive": "アクティブ",
+  "gearStatusRepair": "修理中",
+  "gearStatusSold": "販売済み",
+  "gearStatusArchived": "アーカイブ済み",
+  "meterTitle": "メーター",
+  "startingCamera": "カメラを起動中…",
+  "logToRoll": "ログからロールまで",
+  "zoneOverlay": "ゾーンオーバーレイ",
+  "multiSpot": "マルチスポット",
+  "lockExposure": "ロック",
+  "changesUpdateEv": "変更により EV と計算された露出が更新されます。",
+  "subscriptionTitle": "AgXel",
+  "restorePurchases": "購入を復元する",
+  "restoredSuccessfully": "正常に復元されました。",
+  "noPreviousPurchases": "以前の購入は見つかりませんでした。",
+  "restoreFailed": "復元を完了できませんでした。もう一度試してください。",
+  "privacyPolicyLink": "プライバシーポリシー",
+  "termsOfUse": "利用規約",
+  "subscribe": "購読する",
+  "freePlanName": "アーカイブ",
+  "proPlanName": "AgXel",
+  "annual": "年間",
+  "monthly": "毎月",
+  "freeFeature1": "ロール＆フレームロギング（絞り、シャッター、位置）",
+  "freeFeature2": "撮影→ラボ→スキャン→アーカイブのワークフロー",
+  "freeFeature3": "最大 3 台のカメラ (各レンズ 1 台) と無制限のロール",
+  "freeFeature4": "Lab Drive から画像を取得する",
+  "freeFeature5": "パーソナルクラウド同期 (Google ドライブ、NAS)",
+  "freeFeature6": "標準の EXIF ログ",
+  "proFeature1": "すべてが無料",
+  "proFeature2": "AgXel クラウド ストレージ (ホスト型システム クラウド)",
+  "proFeature3": "プロフェッショナル露出計（スポット測光＆EV）",
+  "proFeature4": "高度な露出ガイダンス",
+  "proFeature5": "優先サポート",
+  "storageLocal": "ローカルデバイス",
+  "storagePersonalCloud": "パーソナルクラウド",
+  "storageSystemCloud": "システムクラウド",
+  "localStorage": "ローカルストレージ",
+  "systemCloud": "システムクラウド",
+  "systemCloudConnections": "システムクラウド接続",
+  "localAccounts": "ローカルアカウント",
+  "connectGoogle": "Google に接続する",
+  "connectNas": "NASを接続する",
+  "host": "ホスト",
+  "username": "ユーザー名",
+  "passwordField": "パスワード",
+  "connectionFailed": "接続に失敗しました",
+  "archiveStorage": "アーカイブストレージ",
+  "labScanSync": "ラボスキャン同期",
+  "addStorage": "ストレージの追加",
+  "supportTitle": "サポート",
+  "supportHeadline": "私たちはすべてのメッセージを読みます。",
+  "supportDescription": "フィードバック、バグレポート、機能リクエストを以下に送信してください。{email}。",
+  "contactSupport": "サポートに連絡する",
+  "sendFeedback": "フィードバックを送信する",
+  "supportTip": "ヒント: スクリーンショットは非常に役立ちます。",
+  "unableToOpenEmail": "メールアプリを開けません。",
+  "supportEmailSubject": "ハロゲン化物のサポート",
+  "feedbackEmailSubject": "ハロゲン化物フィードバック",
+  "themesTitle": "テーマ",
+  "themeDeepHarbor": "ディープハーバー",
+  "themeMistyForest": "霧の森",
+  "themeOceanRoot": "オーシャンルート",
+  "themeBlueBell": "ブルーベル",
+  "themeCherryBlossom": "桜",
+  "themeMorningFrost": "朝の霜",
+  "themeCarbonNight": "カーボンナイト",
+  "themeHarvestTable": "収穫テーブル",
+  "themeSpaceIndigo": "スペースインディゴ",
+  "analyticsTitle": "射撃分析",
+  "exposureMatrix": "露出マトリックス",
+  "favoriteEmulsion": "お気に入りのエマルジョン",
+  "activeHardware": "アクティブなハードウェア",
+  "streak": "ストリーク",
+  "current": "現在",
+  "best": "最高",
+  "longestStreak": "最長連続記録",
+  "total": "合計",
+  "shotsFired": "発砲された",
+  "active": "アクティブ",
+  "activeDays": "活動的な日々",
+  "privacyTitle": "プライバシー",
+  "termsTitle": "条項",
+  "privacyDocumentLabel": "プライバシーポリシー",
+  "termsDocumentLabel": "利用規約",
+  "editProfileTitle": "プロフィールの編集",
+  "displayName": "表示名",
+  "professionalNickname": "職業上のニックネーム",
+  "bio": "バイオ",
+  "profileUpdated": "プロフィールを更新しました。",
+  "profileUpdateFailed": "プロフィールを更新できませんでした。",
+  "rollDetailTitle": "ロール",
+  "labDigitalSync": "ラボデジタル同期",
+  "labDigitalSyncSubtitle": "ラボから Google ドライブ フォルダーまたは ZIP リンクを貼り付けます。",
+  "driveUrlHint": "https://drive.google.com/...",
+  "atLabNoDriveUrlHint": "Driveリンクがない場合は、ステータスをスキャン済みに変更（上の「次へ：スキャン済みにする」）して、この端末から写真を追加できます。",
+  "atLabAddFromDevice": "端末から追加",
+  "atLabAddFromDeviceSubtitle": "無料プランではスキャンをこの端末に保存します。ライブラリから写真を選んでください。",
+  "chooseLabImportMethodFree": "この端末からスキャン写真を追加します。",
+  "driveLabSyncProOnly": "Driveリンクからのスキャン同期には Halide Pro が必要です。代わりに端末から写真を追加してください。",
+  "scannedDriveSyncedHint": "写真はラボのDriveリンクから取り込みました。更新するにはDriveフォルダを再同期してください。コマ順を保つため手動追加はできません。",
+  "addMorePhotos": "写真を追加",
+  "cameraScanning": "カメラスキャン",
+  "cameraScanningSubtitle": "ライトテーブル上でのハンズフリーのジャイロ支援スキャン。",
+  "scanNegatives": "スキャンネガ（ライトテーブル）",
+  "addImages": "画像の追加",
+  "addMore": "さらに追加",
+  "uploading": "アップロード中…",
+  "uploadingProgress": "アップロード中{done} / {total}…",
+  "tapToSelectPhotos": "タップして写真を選択します",
+  "tapToSelectUpTo": "タップして最大まで選択します{count}写真",
+  "addPhotosLeft": "写真を追加 ({count}左）",
+  "share": "共有",
+  "sendAsPrint": "Send as postcard",
+  "printComposeTitle": "Send postcard",
+  "printSend": "Send",
+  "printNoteLabel": "Note on the back",
+  "printNoteHint": "A little love, the old-fashioned way…",
+  "printNoteRequired": "Add a note before sending.",
+  "printFontLabel": "Font",
+  "printFontHand": "Handwriting",
+  "printFontType": "Type",
+  "printSizeLabel": "Size",
+  "printPaperLabel": "Paper",
+  "printRecipientsLabel": "Friend emails",
+  "printRecipientsHint": "friend@email.com, other@email.com",
+  "printRecipientsRequired": "Add at least one email address.",
+  "printFromLabel": "From",
+  "printFromHint": "Your name",
+  "printFromRequired": "Add your name so they know who sent it.",
+  "printExpireLabel": "Link expires",
+  "printExpireDays": "{days} days",
+  "@printExpireDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "printPrivacyHint": "Anyone with the link can open the postcard (up to 30 days). Downloads include the photo and a text file of the note.",
+  "printTapBack": "Tap to flip · love note on the back",
+  "printTapFront": "Tap to see the photo",
+  "printTapToWrite": "Tap anywhere to write",
+  "printStampHint": "Drag stamp · pinch size · double-tap to lock QR",
+  "printStampLocked": "QR stamp locked",
+  "printStampRequired": "Double-tap the stamp to lock a QR image before sending.",
+  "printStampSizeHint": "Suggested stamp size · {percent}%",
+  "@printStampSizeHint": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "printVersoHint": "Back",
+  "printNeedsCloudScan": "This photo isn't on AgXel Cloud yet. Only paid plans can upload and send postcards.",
+  "printSentSuccess": "Postcard sent to {count} · link expires in {days} days",
+  "@printSentSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "printShareSubject": "A postcard for you",
+  "saveToPhotos": "写真に保存",
+  "couldNotRotateImage": "画像を回転できませんでした。",
+  "couldNotUploadRotated": "回転した写真をクラウドにアップロードできませんでした。それらはまだこの携帯電話に保存されています。ロールを開いて、もう一度試してください。",
+  "editsLocalOnlyHint": "編集内容はこのデバイスに保存されます。 Pro にアップグレードすると、回転した画像をクラウドに同期できます。",
+  "unsavedCloudChanges": "保存されていないクラウドの変更:{count}— アップロードを AgXel Cloud に残します。",
+  "scannedDate": "スキャン済み:{date}",
+  "isoValue": "ISO{iso}",
+  "apertureMissing": "---",
+  "retryDownload": "ダウンロードを再試行します",
+  "copyAll": "すべてコピー",
+  "lightTableLockScreen": "ロック画面",
+  "freeTierCameraLimit": "無料には以下が含まれます{count}カメラ。 AgXel にアップグレードすると、無制限のギアが利用できます。",
+  "freeTierLensLimit": "無料にはカメラごとに 1 つのレンズが含まれます。さらにマウントするには、AgXel にアップグレードしてください。",
+  "freeTierStandaloneLens": "Free では、カメラのマウント画面からレンズを追加します (ボディごとに 1 つのレンズ)。",
+  "couldNotUpdateStatus": "ステータスを更新できませんでした。もう一度試してください。",
+  "savedPhotosOnDevice": "保存されました{count}このデバイス上の写真。",
+  "guidanceGotIt": "わかった",
+  "guidanceNewRollStatus": "ステータス バッジをタップして、ワークフロー内の位置を変更します。フィルムがラボにある場合は「ラボ」に移動し、ファイルがある場合は「スキャン」します。",
+  "guidanceNewRollExif": "カメラアイコンをタップして、写真のEXIFから絞り、シャッター、位置を記録するか、シートに手動で入力します。 [ライトメーター]タブからログを記録することもできます。",
+  "guidanceNewRollViewLogs": "このロールカードをタップして開き、[ショット ログ] タブで撮影中の各フレームの技術データを確認できます。",
+  "guidancePersonalDriveBackup": "右上のクラウドアップロードアイコンをタップすると、フル品質のスキャンを個人の Google Drive の Agxel Vault フォルダにバックアップできます。",
+  "archiveBackupGuideBody": "スキャン済みロールはいつでも個人の Google Drive にバックアップできます — 上のクラウドアップロードアイコンをタップしてください。",
+  "guidanceSyncAfterLink": "ドライブのリンクが保存されました。強調表示されたクラウド アイコンをタップして、Google ドライブからスキャンをダウンロードします (後でもう一度タップして更新できます)。",
+  "guidanceAtLabBadge": "AT LAB は、あなたのフィルムがラボにあることを意味します。 Google ドライブのリンクを取得したら、右側のリンクまたはクラウド アイコンを使用して追加し、スキャンを同期します。",
+  "guidanceDriveLinkWithUrl": "クラウド アイコンは、保存されたドライブ リンクからスキャンをダウンロードします。 URLを変更する必要がある場合は、リンクアイコンをタップします。",
+  "guidanceDriveLinkNoUrl": "ラボで共有する場合は、強調表示されたリンク アイコン (右上) をタップして、Google ドライブ フォルダーの URL を貼り付けます。保存後、アイコンは雲になり、タップしてスキャンをダウンロードできるようになります。",
+  "guidanceMeterSpotIntro": "円をタップして中心をスポット測光し、絞り優先に戻ります。 f/ または SS をタップして露出を設定し、EV または ISO で補正してから、LOCK をタップして構図を決めている間露出を保持します。",
+  "guidanceMeterLogToRoll": "「LOG TO ROLL」をタップすると、絞り、シャッター、メーターの詳細を撮影時のロールに保存します。エントリは、アーカイブ EXIF ログとともにショット ログに表示されます。",
+  "guidancePrintStampIntro": "Drag this stamp over the part of the photo you want on the QR. Pinch to resize, then double-tap to lock before you send.",
+  "guidanceGyroNegativePreview": "生のネガは、ライト テーブル上に置かれたフィルムを示しています。オレンジ色のベースで、処理は行われていません。アライメントやフレームの確認に使用します。",
+  "guidanceGyroPositivePreview": "ポジティブ プレビューでは、オレンジ マスクがライブで反転されるため、スキャンが完成したプリントのように見えます。これは、自動キャプチャの実行中に露出を判断するためのデフォルトです。",
+  "gyroScanTitle": "ジャイロスキャン",
+  "gyroFormat35mm": "35mm",
+  "gyroFormat120": "120",
+  "noRollsYet": "まだロールがありません",
+  "errorLoadingRolls": "ロールの読み込みエラー",
+  "errorLoadingGear": "ギアの読み込みエラー",
+  "rollNotFound": "ロールが見つかりません",
+  "storageLimitReached": "ストレージ制限に達しました。プランをアップグレードしてください。",
+  "purchaseComplete": "購入完了！",
+  "purchaseFailed": "購入を完了できませんでした。",
+  "syncComplete": "同期が完了しました。",
+  "syncFailed": "同期に失敗しました。もう一度試してください。",
+  "downloadComplete": "ダウンロードが完了しました。",
+  "downloadFailed": "ダウンロードに失敗しました。",
+  "connectDriveFirst": "まずストレージ設定で Google ドライブを接続します。",
+  "savedSuccessfully": "正常に保存されました。",
+  "imageCount": "{current} / {max}",
+  "updateRollStatus": "ロールステータスの更新",
+  "statusDescShooting": "フィルムをロードしました - 撮影中にショットをログに記録します",
+  "statusDescLab": "フィルムはラボにあります - ドライブのリンクを追加するかスキャンします",
+  "statusDescScanned": "スキャンが含まれています — ギャラリーを参照してください",
+  "statusDescArchived": "完了 — アクティブリストから非表示",
+  "statusDescSyncing": "ドライブからスキャンをダウンロード中…",
+  "alreadyPassed": "すでに合格しました",
+  "lifecycleDone": "終わり",
+  "lifecycleSync": "同期",
+  "appTheme": "アプリのテーマ",
+  "language": "言語",
+  "archive": "アーカイブ",
+  "emptyGearTitle": "あなたのロッカーは空です",
+  "emptyGearSubtitle": "最初のカメラを追加してロールの記録を開始します。",
+  "locationPermissionDenied": "位置情報の許可が拒否されました。",
+  "locationUnavailable": "場所が利用できません。",
+  "logExifTitle": "EXIF をログに記録する",
+  "confirm": "確認する",
+  "driveUrl": "ドライブの URL",
+  "noPhotosYet": "写真はまだありません",
+  "noShotsLogged": "まだショットが記録されていません",
+  "selectRoll": "選択ロール",
+  "meterEv": "EV",
+  "meterIso": "ISO",
+  "meterAperture": "絞り",
+  "meterShutter": "シャッター",
+  "meterCompensation": "補償",
+  "meterSpot": "スポット",
+  "meterPriorityAperture": "絞り優先",
+  "meterPriorityShutter": "シャッター優先",
+  "meterNoRolls": "アクティブなロールがありません",
+  "continueButton": "続く",
+  "upgradeToPro": "プロにアップグレード",
+  "currentPlan": "現在の計画",
+  "perYear": "年間",
+  "perMonth": "月あたり",
+  "free": "無料",
+  "manageSubscription": "サブスクリプションの管理",
+  "productsUnavailable": "利用できない製品",
+  "checkingStore": "ストアを確認中…",
+  "legalAppleEula": "Apple 標準 EULA",
+  "legalAppleEulaDescription": "ライセンスされたアプリケーションには、Apple の標準 EULA も適用されます。",
+  "viewAppleEula": "Apple 標準 EULA を表示する",
+  "chooseYourPlan": "プランを選択してください",
+  "paywallSubtitle": "Pro には、AgXel Cloud Storage とプロ仕様の露出計が追加されています",
+  "monthlyBilling": "月額課金",
+  "annualBilling": "年間請求",
+  "welcomeToHalidePro": "AgXelへようこそ！プランは現在有効です。",
+  "purchaseFailedRetry": "購入を完了できませんでした。もう一度試してください。",
+  "unableToLoadSubscription": "サブスクリプション オプションを読み込めません。もう一度試してください。",
+  "storeNotAvailable": "ストアは利用できません。",
+  "restoreAppleIdHint": "購入を復元するには、Apple ID でサインインするよう求められる場合があります。",
+  "startFreeTrial": "無料トライアルを開始する",
+  "getHalidePro": "AgXelを入手",
+  "save20Percent": "20% 節約",
+  "forever": "永遠に",
+  "freeTrialWhereEligible": "対象となる場合は無料トライアル",
+  "planNotAvailable": "このプランはまだご利用いただけません。別のオプションを試してください。",
+  "subscriptionDisclosure": "あ{price}サブスクリプションは確認時に iTunes アカウントに適用されます。現在の期間が終了する 24 時間以内にキャンセルしない限り、サブスクリプションは自動的に更新されます。 iTunes の設定でいつでも管理できます。サブスクリプションを購入すると、無料トライアルの未使用部分は失われます。",
+  "perYearShort": "/年",
+  "perMonthShort": "/月",
+  "storageStrategyTitle": "ストレージ戦略",
+  "systemCloudQuota": "システムクラウドクォータ",
+  "storageUsedOf": "{used}使われた{cap}",
+  "addonStorageFromPurchases": "+{amount}追加購入から",
+  "systemCloudRequiresPro": "System Cloud には Pro 機能が必要です。プロフェッショナルな同期は、個々のクラウド アカウントに限定されます。",
+  "upgradeProStorageHint": "Pro ストレージを入手するには、上記をアップグレードしてください。各アカウントにはデフォルトで 5 ～ 10 GB が含まれています。",
+  "storageManagement": "ストレージ管理",
+  "manageStorageAccountsSubtitle": "クラウドおよびローカル ストレージ アカウントを管理する",
+  "systemCloudAfterUpgradeHint": "Pro ストレージを入手するには、上記をアップグレードしてください。アップグレード後、アカウントがここに表示されます。",
+  "primaryBadge": "主要な",
+  "setAsPrimary": "プライマリとして設定",
+  "primaryTooltip": "主要な",
+  "storageUsage": "ストレージの使用量",
+  "addMoreStorage": "ストレージを追加する",
+  "tierBadgeByo": "BYO",
+  "cloudProvidersTitle": "クラウドプロバイダー",
+  "cloudProvidersSubtitle": "独自のクラウドまたはネットワーク ストレージを追加します。接続するプロバイダーをタップします。",
+  "connectedCount": "{count}接続済み",
+  "addAction": "追加",
+  "archiveStorageDescription": "ギアとロールをこのアカウントにバックアップします。",
+  "labScanSyncDescription": "ドライブ URL 経由でフィルム スキャンを自動同期します。",
+  "priBadge": "PRI",
+  "fillAllFields": "すべてのフィールドに入力してください",
+  "nasConfigurationTitle": "NASの構成",
+  "nasConfigSubtitle": "NAS の詳細を入力してストレージを設定します",
+  "googleDrive": "Googleドライブ",
+  "nasProvider": "NAS",
+  "addStorageTitle": "ストレージの追加",
+  "storagePurchaseIntro": "必要な追加のクラウド スペースの量を選択します。価格は現地通貨で表示されます。同じサイズを複数回購入できます。購入するたびに合計金額が加算されます。",
+  "storagePurchaseFooter": "各パックは保管庫の合計に追加されます。いつでも同じサイズを再度購入できます。支払いにはこのデバイスの方法が使用されます。通常、余分なスペースは数秒以内に表示されます。",
+  "buyTier": "買う{tier} — {price}",
+  "buyTierNoPrice": "買う{tier}",
+  "refreshPrices": "価格を更新する",
+  "storageUpdated": "ストレージが更新されました。新しいクォータは有効です。",
+  "purchaseCancelled": "購入はキャンセルされました。",
+  "couldNotRefreshPrices": "価格を更新できませんでした。しばらくしてからもう一度お試しください。",
+  "couldNotLoadStorageOptions": "ストレージ オプションを読み込めませんでした。接続を確認して、もう一度試してください。",
+  "stackable": "積み重ね可能",
+  "connectGoogleDriveTitle": "Googleドライブを接続する",
+  "connectGoogleDriveBody": "共有ドライブ リンクから写真をインポートするには、AgXel は Google アカウント (読み取り専用) にアクセスする必要があります。 [設定] で一度接続するか、下の [接続] をタップします。",
+  "connectGoogleUpper": "Googleに接続する",
+  "cancelUpper": "キャンセル",
+  "googleDriveConnected": "Googleドライブが接続されました。",
+  "couldNotConnectGoogleDrive": "Googleドライブに接続できませんでした。",
+  "downloadFolderFailed": "フォルダーをダウンロードできませんでした。ドライブへのアクセスを確認して、再試行してください。",
+  "couldNotRetrievePhotos": "写真を取得できませんでした。ドライブのリンクを確認してください。",
+  "fetchPhotosError": "写真の取得中に問題が発生しました。",
+  "privacyLastUpdatedDate": "2026 年 4 月 6 日",
+  "termsLastUpdatedDate": "2026 年 4 月 20 日",
+  "joinHalide": "AgXelに参加する",
+  "registerSubtitle": "アナログな旅を記録する",
+  "confirmPassword": "パスワードを認証する",
+  "passwordsDoNotMatch": "パスワードが一致しません",
+  "signInTermsFooter": "サインインすると、利用規約に同意したことになります。",
+  "displayNameHint": "あなたの表示名",
+  "nicknameHint": "例えばフィルムシューター",
+  "bioHint": "プロフィールの短い自己紹介",
+  "tapToUploadPhoto": "タップして写真をアップロード",
+  "photoSavedTapSaveChanges": "このデバイスに保存された写真。 「変更を保存」をタップしてプロフィールを更新します。",
+  "couldNotSavePhoto": "写真を保存できませんでした。もう一度試してください。",
+  "emailGreeting": "こんにちは、AgXelチームです。",
+  "supportEmailBodyPlaceholder": "(何が起こったのか/何が必要なのか説明してください)",
+  "feedbackEmailBodyPlaceholder": "(気に入った点/改善してほしい点を教えてください)",
+  "emailBodySeparator": "—",
+  "emailAccountLine": "アカウント：{email}",
+  "emailUserIdLine": "ユーザーID：{uid}",
+  "moveToArchiveTitle": "アーカイブに移動しますか?",
+  "moveToArchiveBody": "このロールはアクティブなリストから残ります。ホームの [アーカイブ] タブからいつでも開くことができます。",
+  "archiveAction": "アーカイブ",
+  "uploadedImages": "アップロードされた画像",
+  "rollInfoSection": "ロール情報",
+  "rollInfoUpdated": "ロール情報更新しました！",
+  "couldNotUpdateRollInfo": "ロール情報を更新できませんでした。",
+  "atLabSection": "アットラボ",
+  "chooseLabImportMethod": "スキャンをこのロールに取り込む方法を選択します。",
+  "nextStepLabel": "次：{action}",
+  "sendToLab": "ラボに送信",
+  "markScanned": "スキャン済みとしてマークを付ける",
+  "scansComplete": "スキャンが完了しました",
+  "moveToArchiveLink": "アーカイブに移動",
+  "technicalDataCount": "技術データ ({count}）",
+  "noTechnicalLogs": "このロールに関して記録された技術ログはありません。",
+  "alignmentCalibration": "アライメントのキャリブレーション",
+  "framesOffset": "{count}フレームオフセット",
+  "alignmentCalibrationHint": "スキャンが空の読み込みフレームから始まるかどうかを調整します。",
+  "importOptions": "インポートオプション",
+  "driveUrlLabel": "共有ドライブの URL (フォルダーまたは ZIP)",
+  "fetchFiles": "ファイルをフェッチする",
+  "foundFilesAtLeaf": "見つかった{count}リーフレベルのファイル。",
+  "pasteDriveLinkError": "共有の Google ドライブ フォルダーまたは ZIP リンクを貼り付けます。",
+  "signInToSyncDrive": "ドライブから同期するにはログインします。",
+  "driveLinkSavedSyncing": "ドライブ リンクが保存されました — 同期中…",
+  "syncStartedInBackground": "バックグラウンドで同期が開始されました。",
+  "importedPhotosFromDrive": "輸入品{count}ドライブからの写真。",
+  "couldNotSyncFromDrive": "ドライブから同期できませんでした。",
+  "addedLocalImageReferences": "ローカル画像参照を追加しました (無料枠)。",
+  "couldNotAddImageReferences": "画像参照を追加できませんでした。もう一度試してください。",
+  "successfullyUploadedCount": "正常にアップロードされました{count}画像！",
+  "pleasePasteDriveUrl": "共有ドライブの URL (フォルダーまたは ZIP) を貼り付けてください。",
+  "mustSignInDriveSync": "ドライブから同期するにはログインする必要があります。",
+  "tryingCloudSync": "クラウド同期を試行しています…",
+  "zipDetectedSyncing": "ZIP が検出されました。写真を抽出して同期しています...",
+  "foundPhotosImporting": "見つかった{count}写真。ロールにインポート中...",
+  "unexpectedDriveResponse": "ドライブからの予期しない応答。",
+  "backendErrorDetail": "バックエンドエラー{status}: {detail}",
+  "syncFailedVerifyDrive": "同期に失敗しました。ドライブのリンクと権限を確認してください。",
+  "somethingWrongDuringSync": "同期中に問題が発生しました。",
+  "successfullyImportedNewPhotos": "正常にインポートされました{count}新しい写真！",
+  "couldNotImportFolderDevice": "デバイスにフォルダーをインポートできませんでした。ドライブへのアクセスを確認します。",
+  "continueGyroScan": "ジャイロスキャンを続行",
+  "continueGyroScanHint": "さらにフレームを追加し、完了したら「スキャンを終了」をタップします。",
+  "premiumGyroScanResumeHint": "プレミアム — ジャイロ HUD を使用してネガをスキャンします。",
+  "premiumGyroScanFeatureHint": "プレミアム機能 — ジャイロ HUD を使用してスキャンするようにアップグレードします。",
+  "precisionMeterTitle": "精密計器",
+  "collapseExposurePanel": "露出パネルを折りたたむ",
+  "expandExposurePanel": "露出パネルを拡張する",
+  "unlockExposure": "ロックを解除する",
+  "lockExposureUpper": "ロック露出",
+  "lockedStatus": "ロック済み",
+  "stableStatus": "安定した",
+  "meteringStatus": "測光…",
+  "multiSpotPinStatus": "マルチスポット・{count}ピン{plural}",
+  "multiSpotTapAddPins": "マルチスポット — タップしてピンを追加",
+  "pinsLabel": "ピン",
+  "pinCountShort": "{count}ピン{plural}",
+  "logToRollArrow": "ログトゥロール→",
+  "logMeterReadingTitle": "ログメーターの測定値",
+  "logMeterReadingHint": "撮影ステータスでロールを選択します。絞り、シャッター、メーターの詳細をショットログに保存します。",
+  "couldNotLoadRolls": "ロールをロードできませんでした。",
+  "noRollsInShooting": "射撃ステータスでロールがありません。\nアーカイブからロールを開始します。",
+  "meterReadingLogged": "メーターの測定値が記録されました",
+  "couldNotLogReading": "読み取りのログを記録できませんでした。もう一度やり直してください。",
+  "untitledRoll": "無題のロール",
+  "noCamera": "カメラなし",
+  "proFeatureBadge": "プロの機能",
+  "precisionMeterProTitle": "AgXel には高精度の測光機能が搭載されています。",
+  "precisionMeterProSubtitle": "アップグレードすると、スポット測光、EV 補正、マニュアル露出、ロールへのログのロックが解除されます。",
+  "viewPlans": "プランを見る",
+  "logMeterReadingTooltip": "ログメーターの測定値をロールアップする",
+  "aperturePickerHint": "ドラッグして F 値を設定します。メーターの円をタップすると絞り優先に戻ります。",
+  "shutterPickerHint": "シャッタースピードを選択するとシャッター優先に切り替わります。\nメーターの円をタップすると絞り優先に戻ります。",
+  "evCompensationValue": "補償：{value}",
+  "driveUrlChip": "ドライブの URL",
+  "nicknameLabel": "ニックネーム",
+  "brandLabel": "ブランド",
+  "modelLabel": "モデル",
+  "gallerySection": "ギャラリー",
+  "noGearImagesYet": "ギアの画像はまだありません",
+  "opticsSection": "光学",
+  "mountAction": "マウント",
+  "noOpticsMounted": "光学系は搭載されていません",
+  "createNewLensUpper": "新しいレンズの作成",
+  "brandAndModelRequired": "ブランドとモデルは必須です。",
+  "couldNotCreateLens": "レンズを作ることができませんでした。もう一度試してください。",
+  "signInSaveGearPhotos": "ギアの写真を保存するにはサインインしてください。",
+  "uploadFailedCheckConnection": "アップロードに失敗しました。接続またはストレージを確認してください。",
+  "gearNotFoundRefresh": "このアカウントのギアが見つかりません。ロッカーを開け、引いて更新してから、もう一度試してください。",
+  "storageLimitFreeSpace": "ストレージ制限に達しました。スペースを解放するか、プランをアップグレードしてください。",
+  "uploadRejectedFormat": "アップロードが拒否されました。ファイルサイズ (最大 15 MB) と形式を確認してください。",
+  "brandFieldHint": "ブランド (例: ライカ)",
+  "modelFieldHint": "モデル (例: 35mm f/2 Summicron)",
+  "serialNumberOptional": "シリアル番号 (オプション)",
+  "nicknameFieldHint": "ニックネーム (例: 私のお気に入り)",
+  "optionalField": "オプション",
+  "formatLabel": "形式",
+  "errorWithMessage": "エラー：{message}",
+  "couldNotLoadAnalytics": "分析を読み込めませんでした",
+  "noShotsLoggedYear": "昨年はまだショットが記録されていません。メーターまたはロールの詳細からフレームをログに記録して、露出マップの構築を開始します。",
+  "shotsCount": "{count}ショット",
+  "last365Days": "過去 365 日",
+  "periodRange": "{start} – {end}",
+  "lightingHabit": "照明の習慣",
+  "goldenHour": "ゴールデンアワー",
+  "goldenHourBiasStrong": "あなたは強いゴールデンアワーバイアスを持っています。セッションの大部分は午後 4 時から午後 6 時の間にあります。多くの場合、露出はこの期間中に最高のスコアを獲得します。",
+  "goldenHourBiasModerate": "ゴールデンアワーは撮影リズムの重要な部分を占めます。音域を広げるために夜明けのセッションに傾くことを検討してください。",
+  "goldenHourBiasLow": "ほとんどのセッションはゴールデンアワー以外に行われます。一貫した正午の光または屋内の設定を好む場合があります。",
+  "goldenHourShotsSummary": "{golden}の{total}現地時間の午後 4 時から 6 時までのショット",
+  "refreshTooltip": "リフレッシュ",
+  "daysUnit": "日",
+  "periodDaysOf": "/ {days}",
+  "gridOn": "グリッド: オン",
+  "gridOff": "グリッド: オフ",
+  "kelvinValue": "{kelvin}K",
+  "guidanceGotItUpper": "わかった",
+  "sessionFullRoll": "フルロール",
+  "sessionHeavy": "重い",
+  "sessionActive": "アクティブ",
+  "sessionLight": "ライト",
+  "sessionNoShots": "ショットはありません",
+  "heatLess": "少ない",
+  "heatMore": "もっと",
+  "noExposuresRecorded": "露出は記録されていません",
+  "exposureCount": "{count, plural, =1{1回の露出} other{{count}回の露出}}",
+  "tapCellToInspect": "任意のセルをタップしてその日を確認します",
+  "halideDialogBarrier": "AgXelダイアログバリア",
+  "halideBottomSheetBarrier": "ハロゲン化物ボトムシートバリア",
+  "archivedCannotModify": "画像はアーカイブされ、変更できなくなります。",
+  "fileMissed": "ファイルが見つかりませんでした",
+  "uploadAllCount": "すべてアップロード ({count}）",
+  "uploadedSuccessfullyCount": "アップロードされました{count}画像が正常に取得されました。",
+  "maxImagesAllowed": "最大値{max}ギアアイテムごとに許可される画像。",
+  "onlyAddedRemainingImages": "追加のみ{count}画像は制限内に収める必要があります{max}。",
+  "signInUploadGearPhotos": "ギアの写真をアップロードするにはサインインしてください。",
+  "successfullyUploadedGearImages": "正常にアップロードされました{count}画像！",
+  "gearReady": "あなたの{gearType}準備ができています！",
+  "couldNotAddGear": "あなたを追加できませんでした{gearType}。もう一度試してください。",
+  "addGearTypeTitle": "追加{gearType}",
+  "saveGearType": "保存{gearType}",
+  "clearPinsCount": "クリアピン ({count}）",
+  "zoneOverlayTitle": "ゾーンオーバーレイ",
+  "zoneOverlayIntro": "色は、シーンの各部分が EV ターゲットと比較してどれだけ明るいかを示します。緑 (ゾーン V) は、その露出では中間の灰色です。",
+  "zoneOverlayTip": "ヒント: 露出をロックしてからフレームをスキャンします。影をブロックしたり、ハイライトを飛ばしたりしない限り、重要なトーンを深い紫 (ゾーン 0) や明るい赤 (ゾーン X) から遠ざけてください。",
+  "zone0Meaning": "純粋な黒 - 詳細なし",
+  "zoneIMeaning": "とても深い影",
+  "zoneIIMeaning": "深い影、わずかなテクスチャー",
+  "zoneIIIMeaning": "ダークトーンとクリアな質感",
+  "zoneIVMeaning": "濃い葉、影のある肌",
+  "zoneVMeaning": "中間のグレー — EV ターゲット",
+  "zoneVIMeaning": "軽い肌、軽い石",
+  "zoneVIIMeaning": "とても明るい肌、明るい雪",
+  "zoneVIIIMeaning": "明るい雪、白い物体",
+  "zoneIXMeaning": "ペーパーホワイトに近い",
+  "zoneXMeaning": "鏡面ハイライト、純白",
+  "zone0Short": "ゾーン0",
+  "zoneVShort": "ゾーン V",
+  "zoneXShort": "ゾーンX",
+  "scanningCompleteFrames": "スキャン完了 —{count}フレーム",
+  "couldNotFinishScanning": "スキャンを完了できませんでした。もう一度やり直してください。",
+  "processing": "処理…",
+  "frameNumber": "フレーム{number}",
+  "reviewingFrameTapLive": "検討フレーム{number}— タップしてライブスキャンします",
+  "pauseAndReturn": "一時停止して戻る",
+  "filmFormatSection": "フィルムフォーマット",
+  "negativeRawTooltip": "ネガティブ（生）",
+  "positiveInvertedTooltip": "正（反転）",
+  "captureFramesToFinish": "フレームをキャプチャして終了する",
+  "finishScanning": "スキャンを終了する",
+  "historicalFramePositive": "履歴フレーム — ポジティブ プレビューとして保存",
+  "levelPhoneOverTable": "携帯電話をライトテーブルの上に水平に置きます",
+  "almostLevelHoldSteady": "ほぼ水平 — 安定した状態を保つ",
+  "leveledFocusingNegative": "平準化 — ネガティブな部分に焦点を当てる…",
+  "focusedCapturingPositive": "集中 — 捕捉 (肯定的な見方)",
+  "focusedCapturingNegative": "集中 — 捉える（否定的な見方）",
+  "mediumFormatDimensions": "中判・{dimensions}",
+  "imageNotAvailableOffline": "画像はまだオフラインでは利用できません。ダウンロードを待つか、接続を確認してください。",
+  "couldNotShareImage": "画像を共有できませんでした。",
+  "photosAccessDenied": "写真ライブラリへのアクセスが拒否されました。設定で有効にします。",
+  "savedToPhotos": "写真に保存されました。",
+  "couldNotSaveToPhotos": "写真に保存できませんでした。",
+  "cannotRotateImageType": "この画像タイプは回転できません。",
+  "monthJan": "1月",
+  "monthFeb": "2月",
+  "monthMar": "3月",
+  "monthApr": "4月",
+  "monthMay": "5月",
+  "monthJun": "ジュン",
+  "monthJul": "7月",
+  "monthAug": "8月",
+  "monthSep": "9月",
+  "monthOct": "10月",
+  "monthNov": "11月",
+  "monthDec": "12月",
+  "dowSun": "S",
+  "dowMon": "M",
+  "dowTue": "T",
+  "dowWed": "W",
+  "dowThu": "T",
+  "dowFri": "F",
+  "dowSat": "S",
+  "toggleOn": "の上",
+  "toggleOff": "オフ",
+  "framesCapturedProgress": "{captured} / {max}捕らえられた",
+  "format35mmDimensions": "35mm・{dimensions}",
+  "rotate90CounterClockwise": "反時計回りに 90°",
+  "rotate90Clockwise": "時計回りに90°",
+  "languageChooseTitle": "言語を選択してください",
+  "languageChooseSubtitle": "AgXel で使う言語を選んでください。",
+  "@lastUpdated": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@saveGear": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@supportDescription": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "@uploadingProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@tapToSelectUpTo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@addPhotosLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@unsavedCloudChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@scannedDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@isoValue": {
+    "placeholders": {
+      "iso": {
+        "type": "String"
+      }
+    }
+  },
+  "@freeTierCameraLimit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@savedPhotosOnDevice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@imageCount": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "@subscriptionDisclosure": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageUsedOf": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "cap": {
+        "type": "String"
+      }
+    }
+  },
+  "@addonStorageFromPurchases": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@connectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@buyTier": {
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      },
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "@buyTierNoPrice": {
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "@emailAccountLine": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "@emailUserIdLine": {
+    "placeholders": {
+      "uid": {
+        "type": "String"
+      }
+    }
+  },
+  "@nextStepLabel": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "@technicalDataCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@framesOffset": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@foundFilesAtLeaf": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@importedPhotosFromDrive": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "@successfullyUploadedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@foundPhotosImporting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backendErrorDetail": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "@successfullyImportedNewPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "@multiSpotPinStatus": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "plural": {
+        "type": "String"
+      }
+    }
+  },
+  "@pinCountShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "plural": {
+        "type": "String"
+      }
+    }
+  },
+  "@evCompensationValue": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "@errorWithMessage": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@shotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@periodRange": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "@goldenHourShotsSummary": {
+    "placeholders": {
+      "golden": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@periodDaysOf": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@kelvinValue": {
+    "placeholders": {
+      "kelvin": {
+        "type": "int"
+      }
+    }
+  },
+  "@exposureCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@uploadAllCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@uploadedSuccessfullyCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@maxImagesAllowed": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "@onlyAddedRemainingImages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "@successfullyUploadedGearImages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@gearReady": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@couldNotAddGear": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@addGearTypeTitle": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@saveGearType": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@clearPinsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@scanningCompleteFrames": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@frameNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "@reviewingFrameTapLive": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "@mediumFormatDimensions": {
+    "placeholders": {
+      "dimensions": {
+        "type": "String"
+      }
+    }
+  },
+  "@framesCapturedProgress": {
+    "placeholders": {
+      "captured": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "@format35mmDimensions": {
+    "placeholders": {
+      "dimensions": {
+        "type": "String"
+      }
+    }
+  }
+}

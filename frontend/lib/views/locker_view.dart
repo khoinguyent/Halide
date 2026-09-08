@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 import '../providers/gear_provider.dart';
@@ -9,7 +12,6 @@ import '../models/camera.dart';
 import '../models/gear_status.dart';
 import '../models/lens.dart';
 import '../widgets/gear_status_selector.dart';
-import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../core/constants/free_tier_limits.dart';
 import '../core/models/notification_model.dart';
@@ -23,12 +25,13 @@ class LockerView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gearAsync = ref.watch(userGearProvider);
     final plan = ref.watch(userPlanProvider);
+    final l10n = context.l10n;
 
     void onAddGear() {
       final cameras = gearAsync.value;
       if (cameras != null && !canAddCameraOnPlan(plan, cameras.length)) {
         ref.read(notificationProvider.notifier).show(
-              freeTierCameraLimitMessage(),
+              freeTierCameraLimitMessage(l10n),
               type: NotificationType.warning,
             );
         return;
@@ -38,9 +41,9 @@ class LockerView extends ConsumerWidget {
 
     return HalideScaffold(
       appBar: AppBar(
-        title: const Text(
-          'THE GEARS',
-          style: TextStyle(
+        title: Text(
+          l10n.lockerTitle,
+          style: const TextStyle(
             letterSpacing: 2,
             fontWeight: FontWeight.w600,
             fontSize: 24,
@@ -54,7 +57,7 @@ class LockerView extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_rounded),
-            tooltip: 'Add gear',
+            tooltip: l10n.addGear,
             onPressed: onAddGear,
           ),
           IconButton(
@@ -72,6 +75,7 @@ class LockerView extends ConsumerWidget {
           if (cameras.isEmpty) {
             return _EmptyState(
               onAddFirstGear: onAddGear,
+              l10n: l10n,
             );
           }
           return RefreshIndicator(
@@ -104,14 +108,14 @@ class LockerView extends ConsumerWidget {
                 const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
                 const SizedBox(height: 16),
                 Text(
-                  'Error: $err',
+                  '${l10n.errorLoadingGear}: $err',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.white70),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => ref.refresh(userGearProvider),
-                  child: const Text('RETRY', style: TextStyle(color: Colors.white70)),
+                  child: Text(halideCaps(l10n.retry), style: const TextStyle(color: Colors.white70)),
                 ),
               ],
             ),
@@ -146,8 +150,9 @@ class LockerView extends ConsumerWidget {
 
 class _EmptyState extends StatelessWidget {
   final VoidCallback onAddFirstGear;
+  final AppLocalizations l10n;
 
-  const _EmptyState({Key? key, required this.onAddFirstGear}) : super(key: key);
+  const _EmptyState({Key? key, required this.onAddFirstGear, required this.l10n}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -160,15 +165,15 @@ class _EmptyState extends StatelessWidget {
             children: [
               const Icon(Icons.camera_alt_outlined, size: 64, color: Colors.white24),
               const SizedBox(height: 20),
-              const Text(
-                'No gear yet',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                l10n.emptyGearTitle,
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Add your first camera or lens to start building your gear locker.',
+              Text(
+                l10n.emptyGearSubtitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70),
+                style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
@@ -178,7 +183,7 @@ class _EmptyState extends StatelessWidget {
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('ADD FIRST GEAR'),
+                child: Text(halideCaps(l10n.addFirstGear)),
               ),
             ],
           ),
@@ -276,11 +281,10 @@ class _GearCard extends StatelessWidget {
                       if (camera.serialNumber != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          'S/N: ${camera.serialNumber}',
+                          '${context.l10n.serialNumber}: ${camera.serialNumber}',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.3),
                             fontSize: 11,
-                            fontFamily: 'Courier',
                           ),
                         ),
                       ],
@@ -359,6 +363,7 @@ class _GearStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     Color color;
     switch (status) {
       case GearStatus.active:
@@ -385,7 +390,7 @@ class _GearStatusChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            status.label,
+            status.localizedLabel(l10n),
             style: TextStyle(
               color: color,
               fontSize: 11,

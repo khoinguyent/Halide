@@ -4,6 +4,7 @@ import 'package:firebase_ui_oauth_facebook/firebase_ui_oauth_facebook.dart';
 import 'package:firebase_ui_oauth_apple/firebase_ui_oauth_apple.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import '../services/auth_service.dart';
 
 class AuthView extends StatelessWidget {
@@ -11,6 +12,7 @@ class AuthView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final providers = <AuthProvider>[
       EmailAuthProvider(),
       GoogleProvider(clientId: 'dummy-google-id'),
@@ -45,16 +47,16 @@ class AuthView extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: action == AuthAction.signIn
-              ? const Text('Welcome to Halide, please sign in!')
-              : const Text('Welcome to Halide, please sign up!'),
+              ? Text(l10n.welcomeSignIn)
+              : Text(l10n.welcomeSignUp),
         );
       },
       footerBuilder: (context, action) {
-        return const Padding(
-          padding: EdgeInsets.only(top: 16),
+        return Padding(
+          padding: const EdgeInsets.only(top: 16),
           child: Text(
-            'By signing in, you agree to our terms and conditions.',
-            style: TextStyle(color: Colors.grey),
+            l10n.signInTermsFooter,
+            style: const TextStyle(color: Colors.grey),
           ),
         );
       },

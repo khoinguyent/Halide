@@ -1,28 +1,46 @@
-import io
-import re
+import json
+import time
+import random
 from sqlalchemy.orm import Session
 from ..db.session import SessionLocal
 from ..db.models.user import User
 from ..db.models.storage_credential import StorageCredential, StorageProviderEnum
-from ..db.models.roll import Roll, RollStatusEnum
 from ..db.models.image import Image
+from ..db.models.personal_drive_sync import PersonalDriveSyncJob, PersonalDriveSyncJobStatus
 from .storage_service import storage_service
-from .roll_service import get_roll, update_roll_status
+from .personal_drive_sync_service import upload_image_bytes_to_roll_folder
+from .personal_drive_sync_queue import enqueue_personal_drive_sync_job
 from ..core.encryption import decrypt_credential
-import time
-import random
 
 class TransferService:
     def process_credentials(self):
-        """Iterates over all storage credentials and syncs their inboxes."""
+        """
+        Queue outbound Agxel Vault sync for every user with an archive-capable Google
+        Drive connection. Enqueues one "sync everything that changed" job per user
+        (roll/frame-level idempotency is handled when the job runs, see
+        ``personal_drive_sync_service.roll_needs_personal_drive_sync``); actual
+        processing happens on the async queue (``transfer_worker`` drains it).
+        """
         db: Session = SessionLocal()
         try:
-            credentials = db.query(StorageCredential).all()
+            seen_users = set()
+            credentials = (
+                db.query(StorageCredential)
+                .filter(StorageCredential.provider == StorageProviderEnum.gdrive)
+                .filter(
+                    (StorageCredential.is_primary == True)  # noqa: E712
+                    | (StorageCredential.is_archive == True)  # noqa: E712
+                )
+                .all()
+            )
             for cred in credentials:
+                if cred.user_id in seen_users:
+                    continue
+                seen_users.add(cred.user_id)
                 try:
                     self.sync_storage(db, cred)
                 except Exception as e:
-                    print(f"Error syncing credential {cred.id}: {e}")
+                    print(f"Error queuing personal Drive sync for credential {cred.id}: {e}")
         finally:
             db.close()
 
@@ -35,7 +53,6 @@ class TransferService:
         user = db.query(User).filter(User.id == user_id).first()
         is_pro = user and user.subscription_tier == "pro"
         
-        results = []
         for attempt in range(max_retries):
             try:
                 # If user is PRO, we ALWAYS try to upload to SYSTEM_CLOUD first (or as well)
@@ -55,9 +72,9 @@ class TransferService:
                 else: # LOCAL
                     main_key = self._handle_local_transfer(db, user_id, roll_id, image_id, file_content)
                 
-                # For Pro users, we prefer the system (R2) URL over personal cloud.
-                # Use a case-insensitive check for 'gdrive://' anywhere in the primary key.
-                if is_pro and system_key and main_key and "gdrive://" in main_key.lower():
+                # Prefer system (R2) URL for gallery when personal path returns a Drive stub.
+                # Pro dual-write keeps R2 as the display source of truth.
+                if is_pro and system_key and main_key and str(main_key).lower().startswith("gdrive://"):
                     return system_key
 
                 return main_key or system_key
@@ -89,40 +106,75 @@ class TransferService:
     def _handle_personal_cloud(self, db: Session, user_id: str, roll_id: str, image_id: str, file_content: bytes):
         primary_cred = db.query(StorageCredential).filter(
             StorageCredential.user_id == user_id,
-            StorageCredential.is_primary == True
+            StorageCredential.is_primary == True  # noqa: E712
         ).first()
         
         if not primary_cred:
-            # Fallback to any archive credential if no primary exists
             primary_cred = db.query(StorageCredential).filter(
                 StorageCredential.user_id == user_id,
-                StorageCredential.is_archive == True
+                StorageCredential.is_archive == True  # noqa: E712
             ).first()
 
         if not primary_cred:
             raise Exception("No personal cloud configuration found")
-            
-        # Simulate upload to personal cloud
-        s3_key = f"{primary_cred.provider}://{primary_cred.host or 'cloud'}/Halide Archive/{roll_id}/{image_id}.jpg"
-        print(f"Uploading to personal cloud ({primary_cred.provider}): {s3_key}")
+
+        provider = primary_cred.provider
+        if provider == StorageProviderEnum.gdrive or str(provider) == "gdrive":
+            # Resolve frame number when the Image row already exists (re-uploads).
+            frame_number = None
+            existing = db.query(Image).filter(Image.id == image_id).first()
+            if existing is not None:
+                frame_number = existing.frame_number
+            return upload_image_bytes_to_roll_folder(
+                db,
+                user_id=user_id,
+                roll_id=roll_id,
+                image_id=image_id,
+                file_content=file_content,
+                frame_number=frame_number,
+            )
+
+        # Non-Drive providers (NAS / FTP / …) — not implemented yet.
+        s3_key = f"{primary_cred.provider}://{primary_cred.host or 'cloud'}/Agxel Vault/{roll_id}/{image_id}.jpg"
+        print(f"Uploading to personal cloud ({primary_cred.provider}): {s3_key} [stub]")
         return s3_key
 
     def _handle_local_transfer(self, db: Session, user_id: str, roll_id: str, image_id: str, file_content: bytes):
-        # MOCK: In a real world setting, this might move to a local NAS mount point
-        return f"local://nas/Halide Archive/{roll_id}/{image_id}.jpg"
+        return f"local://nas/Agxel Vault/{roll_id}/{image_id}.jpg"
 
     def sync_storage(self, db: Session, cred: StorageCredential):
-        """Dispatches to the correct protocol handler."""
+        """
+        Enqueue an outbound archive job for this Google Drive personal-cloud credential
+        (does not run the sync inline — the async queue processes it, see
+        ``personal_drive_sync_queue`` and ``tasks/transfer_worker.py``).
+        """
+        if cred.provider != StorageProviderEnum.gdrive and str(cred.provider) != "gdrive":
+            return
+        # Validate we can decrypt tokens before queuing a full user sync.
         password = decrypt_credential(cred.encrypted_auth_data)
-        
-        # MOCK IMPLEMENTATION: In a real system we would connect using
-        # google-api-python-client, O365, smbprotocol, ftplib etc.
-        # But for sprint 4 background worker testing...
-        
-        # Let's say we retrieved a list of files matching `Inbox/{roll_id}/image_x.jpg`
-        # We will simulate finding a file if we can query pending rolls for this user
-        
-        # self._mock_sync_pending_rolls(db, cred.user_id) # REMOVED: Prematurely updates status to SCANNED
-        pass
+        if not password:
+            raise RuntimeError(f"Could not decrypt credential {cred.id}")
+        try:
+            json.loads(password)
+        except Exception:
+            raise RuntimeError(f"Invalid credential payload for {cred.id}")
+
+        # Avoid piling up duplicate jobs for the same user while one is still queued/running.
+        has_pending_job = (
+            db.query(PersonalDriveSyncJob)
+            .filter(
+                PersonalDriveSyncJob.user_id == cred.user_id,
+                PersonalDriveSyncJob.status.in_(
+                    [PersonalDriveSyncJobStatus.queued, PersonalDriveSyncJobStatus.running]
+                ),
+            )
+            .first()
+        )
+        if has_pending_job:
+            return
+
+        job = enqueue_personal_drive_sync_job(db, user_id=cred.user_id, roll_ids=None)
+        print(f"Queued personal Drive sync job {job.id} for user {cred.user_id}")
+
 
 transfer_service = TransferService()

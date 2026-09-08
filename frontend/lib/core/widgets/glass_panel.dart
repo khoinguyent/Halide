@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../theme/halide_colors.dart';
 
 class GlassPanel extends StatelessWidget {
   final Widget child;
@@ -19,13 +20,14 @@ class GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = HalideColors.of(context);
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: c.navy.withValues(alpha: 0.35),
             blurRadius: 20,
             spreadRadius: -5,
           ),
@@ -42,13 +44,13 @@ class GlassPanel extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.white.withOpacity(0.12),
-                  Colors.white.withOpacity(0.04),
+                  c.glassFill(0.18),
+                  c.glassFill(0.08),
                 ],
               ),
               borderRadius: BorderRadius.circular(borderRadius),
               border: Border.all(
-                color: Colors.white.withOpacity(0.1),
+                color: c.glassBorder(0.35),
                 width: 1.5,
               ),
             ),

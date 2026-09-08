@@ -13,6 +13,7 @@ from ...core.dependencies import get_current_user
 from ...services import roll_service
 from ...services.export_service import export_roll_as_zip
 from ...services.email_service import send_export_zip_ready
+from ...services.gear_tier_limits import tier_is_pro
 from ...services.storage_service import storage_service
 
 router = APIRouter()
@@ -83,6 +84,11 @@ def update_roll_drive_url(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if not tier_is_pro(current_user.subscription_tier):
+        raise HTTPException(
+            status_code=402,
+            detail="Saving a lab Drive URL requires Halide Pro. On Free, add photos from this device.",
+        )
     return roll_service.update_roll_drive_url(
         db=db,
         roll_id=str(id),

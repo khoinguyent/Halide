@@ -1,3 +1,5 @@
+import 'package:frontend/l10n/app_localizations.dart';
+
 import '../../models/user_profile.dart';
 
 /// Free Archive tier: up to [kFreeTierMaxCameras] bodies, each with at most
@@ -13,11 +15,11 @@ bool canAddCameraOnPlan(UserPlan plan, int currentCameraCount) =>
 bool canMountLensOnCamera(UserPlan plan, int lensesOnCamera) =>
     !isFreeArchivePlan(plan) || lensesOnCamera < kFreeTierMaxLensesPerCamera;
 
-String freeTierCameraLimitMessage() =>
-    'Free includes up to $kFreeTierMaxCameras cameras. Upgrade to Halide Pro for unlimited gear.';
+String freeTierCameraLimitMessage(AppLocalizations l10n) =>
+    l10n.freeTierCameraLimit(kFreeTierMaxCameras);
 
 String freeTierLensLimitMessage() =>
-    'Free includes one lens per camera. Upgrade to Halide Pro to mount more.';
+    'Free includes one lens per camera. Upgrade to AgXel to mount more.';
 
 String freeTierStandaloneLensMessage() =>
     'On Free, add lenses from a camera\'s Mount screen (one lens per body).';

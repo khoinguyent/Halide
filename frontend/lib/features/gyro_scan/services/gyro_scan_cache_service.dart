@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../services/local_image_path_index.dart';
+import '../logic/gyro_scan_invert.dart';
 
 /// Local-first storage for gyro-scanned frames under Documents/HalideArchive/.
 class GyroScanCacheService {
@@ -30,18 +31,44 @@ class GyroScanCacheService {
       'frame_${frameNumber.toString().padLeft(2, '0')}_thumb.jpg';
 
   /// Saves captured raw bytes and generates a lightweight JPEG thumbnail.
+  ///
+  /// Processing pipeline (worker isolate):
+  ///   1. Deterministic crop — normalized HUD frame-guide rect on the capture.
+  ///   2. C-41 selective inversion on the cropped film frame.
+  ///
   /// Returns `(rawAbsolutePath, thumbAbsolutePath)`.
   Future<({String rawPath, String thumbPath})> saveCapture({
     required String rollId,
     required int frameNumber,
     required Uint8List rawBytes,
+    required double cropTop,
+    required double cropLeft,
+    required double cropWidth,
+    required double cropHeight,
   }) async {
+    final positiveBytes = await compute(
+      processGyroScanCapture,
+      (
+        bytes: rawBytes,
+        cropTop: cropTop,
+        cropLeft: cropLeft,
+        cropWidth: cropWidth,
+        cropHeight: cropHeight,
+      ),
+    );
+
+    debugPrint(
+      '[GyroScan] pipeline: '
+      '${rawBytes.lengthInBytes ~/ 1024} KB raw → '
+      '${positiveBytes.lengthInBytes ~/ 1024} KB cropped+positive',
+    );
+
     final dir = await _framesDir(rollId);
     final rawFile = File(p.join(dir.path, _rawName(frameNumber)));
-    await rawFile.writeAsBytes(rawBytes, flush: true);
+    await rawFile.writeAsBytes(positiveBytes, flush: true);
 
     final thumbFile = File(p.join(dir.path, _thumbName(frameNumber)));
-    final thumbBytes = await _generateThumb(rawBytes);
+    final thumbBytes = await _generateThumb(positiveBytes);
     await thumbFile.writeAsBytes(thumbBytes, flush: true);
 
     final doc = await getApplicationDocumentsDirectory();

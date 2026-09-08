@@ -22,7 +22,7 @@ class StorageConnectionService {
 
   /// Starts Google Sign-In with Drive scope and sends credentials to the backend.
   Future<void> connectGoogleDrive({
-    bool isArchive = false,
+    bool isArchive = true,
     bool isScanSync = true,
   }) async {
     try {
@@ -42,8 +42,10 @@ class StorageConnectionService {
             : null,
         scopes: const [
           'email',
+          // Lab-scan import from shared folders.
           'https://www.googleapis.com/auth/drive.readonly',
-          'https://www.googleapis.com/auth/drive.metadata.readonly',
+          // Create/update Agxel Vault archive folders & uploads.
+          'https://www.googleapis.com/auth/drive.file',
         ],
         serverClientId: clientId,
         forceCodeForRefreshToken: true,

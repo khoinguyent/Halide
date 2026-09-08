@@ -10,6 +10,8 @@ class Roll {
   final String brand;
   final String name;
   final Color color;
+  /// Film stock format key from API, e.g. `format_135` or `format_120`.
+  final String? filmFormat;
   final String? title;
   final String? description;
   final int? shotAtIso;
@@ -34,6 +36,7 @@ class Roll {
     required this.brand,
     required this.name,
     required this.color,
+    this.filmFormat,
     this.title,
     this.description,
     this.shotAtIso,
@@ -63,6 +66,7 @@ class Roll {
     int? shotOffset,
     String? title,
     String? description,
+    String? filmFormat,
     int? shotAtIso,
     int? expiredYear,
     List<Shot>? shots,
@@ -87,6 +91,7 @@ class Roll {
       createdAt: createdAt,
       title: title ?? this.title,
       description: description ?? this.description,
+      filmFormat: filmFormat ?? this.filmFormat,
       shotAtIso: shotAtIso ?? this.shotAtIso,
       expiredYear: expiredYear ?? this.expiredYear,
       shots: shots ?? this.shots,
@@ -102,6 +107,7 @@ class Roll {
       brand: json['brand'] ?? '',
       name: json['name'] ?? '',
       color: Color(int.parse(json['color']?.replaceFirst('#', '0xff') ?? '0xffcccccc')),
+      filmFormat: json['film_format']?.toString(),
       title: json['title'],
       description: json['description'],
       shotAtIso: json['shot_at_iso'],

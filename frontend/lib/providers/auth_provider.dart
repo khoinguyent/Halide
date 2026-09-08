@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../models/user_profile.dart';
 import '../services/purchase_service.dart';
 import '../providers/profile_provider.dart';
+import '../core/l10n/locale_provider.dart';
 
 bool _entitlementListenerRegistered = false;
 
@@ -32,6 +33,15 @@ final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   final service = ref.watch(profileServiceProvider);
   try {
     final profile = await service.getProfile();
+    final localeNotifier = ref.read(localeProvider.notifier);
+    if (profile.preferredLocale != null) {
+      await localeNotifier.syncFromBackend(profile.preferredLocale);
+    } else if (await localeNotifier.hasExplicitLocalPreference()) {
+      await localeNotifier.migrateLocalToBackend(service);
+    }
+    // else: no server or local choice → localeProvider stays null;
+    // MaterialApp uses resolveAppLocale(null, device) → device en/vi or English.
+    await service.syncDeviceTimezoneIfNeeded(profile);
     // ignore: avoid_print
     print('[Auth] Profile fetched: id=${profile.id}, plan=${profile.plan}');
     return profile;

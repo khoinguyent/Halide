@@ -1,7 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:image_picker/image_picker.dart';
+import '../models/user_profile.dart';
+import '../providers/auth_provider.dart';
+import '../providers/roll_provider.dart';
 import '../services/upload_service.dart';
 import '../core/widgets/image_placeholder.dart';
 import '../core/providers/notification_provider.dart';
@@ -58,23 +62,60 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
       _uploadedCount = 0;
     });
 
-    final service = UploadService();
+    final plan = ref.read(userPlanProvider);
     final List<String> succeededPaths = [];
 
-    for (final xFile in List.from(_selectedImages)) {
-      final file = File(xFile.path);
-      final success = await service.uploadRollImage(
-        rollId: widget.rollId,
-        imageFile: file,
-      );
-      if (success) {
-        succeededPaths.add(xFile.path); // use local path as stand-in for URL
-        setState(() => _uploadedCount++);
+    // Free: keep photos on-device only — never POST to R2.
+    if (plan == UserPlan.free) {
+      final user = ref.read(userProvider);
+      final token = await user?.getIdToken();
+      if (token == null || token.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _isUploading = false;
+            _uploadedCount = 0;
+          });
+          ref.read(notificationProvider.notifier).show(
+                context.l10n.couldNotAddImageReferences,
+                type: NotificationType.error,
+              );
+        }
+        return;
       }
-    }
-
-    if (succeededPaths.isNotEmpty) {
-      widget.onUploadComplete?.call();
+      final paths = _selectedImages.map((x) => x.path).toList();
+      try {
+        await ref.read(rollServiceProvider).addLocalImagesToRoll(
+              token,
+              widget.rollId,
+              paths,
+            );
+        succeededPaths.addAll(paths);
+        setState(() => _uploadedCount = paths.length);
+        widget.onUploadComplete?.call();
+      } catch (_) {
+        if (mounted) {
+          ref.read(notificationProvider.notifier).show(
+                context.l10n.couldNotAddImageReferences,
+                type: NotificationType.error,
+              );
+        }
+      }
+    } else {
+      final service = UploadService();
+      for (final xFile in List.from(_selectedImages)) {
+        final file = File(xFile.path);
+        final success = await service.uploadRollImage(
+          rollId: widget.rollId,
+          imageFile: file,
+        );
+        if (success) {
+          succeededPaths.add(xFile.path);
+          setState(() => _uploadedCount++);
+        }
+      }
+      if (succeededPaths.isNotEmpty) {
+        widget.onUploadComplete?.call();
+      }
     }
 
     setState(() {
@@ -83,9 +124,11 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
       _uploadedCount = 0;
     });
 
-    if (mounted) {
+    if (mounted && succeededPaths.isNotEmpty) {
       ref.read(notificationProvider.notifier).show(
-        'Uploaded ${succeededPaths.length} image(s) successfully.',
+        plan == UserPlan.free
+            ? context.l10n.addedLocalImageReferences
+            : context.l10n.uploadedSuccessfullyCount(succeededPaths.length),
         type: NotificationType.info,
       );
     }
@@ -93,6 +136,7 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final total = _selectedImages.length;
     final fg = widget.darkMode ? Colors.white : Colors.black87;
     final fgMuted = widget.darkMode ? Colors.white.withOpacity(0.6) : Colors.grey.shade600;
@@ -101,7 +145,7 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
 
     if (widget.readOnly) {
       return Text(
-        'Images are archived and can no longer be modified.',
+        l10n.archivedCannotModify,
         style: TextStyle(
           color: fgMuted,
           fontSize: 13,
@@ -112,7 +156,7 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Add Images', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: fg)),
+        Text(l10n.addImages, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: fg)),
         const SizedBox(height: 16),
         if (_selectedImages.isEmpty)
           GestureDetector(
@@ -130,7 +174,7 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
                 children: [
                   Icon(Icons.add_photo_alternate_outlined, size: 40, color: fgMuted),
                   const SizedBox(height: 8),
-                  Text('Tap to select photos', style: TextStyle(color: fgMuted)),
+                  Text(l10n.tapToSelectPhotos, style: TextStyle(color: fgMuted)),
                 ],
               ),
             ),
@@ -154,10 +198,10 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
                           width: 120,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            return const HalideImagePlaceholder(
+                            return HalideImagePlaceholder(
                               width: 120,
                               height: 120,
-                              message: 'File missed',
+                              message: l10n.fileMissed,
                             );
                           },
                         ),
@@ -193,7 +237,25 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
               valueColor: widget.darkMode ? const AlwaysStoppedAnimation<Color>(Colors.white) : null,
             ),
             const SizedBox(height: 8),
-            Text('Uploading $_uploadedCount / $total...', style: TextStyle(color: fgMuted, fontSize: 13)),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.uploadingProgress(_uploadedCount, total),
+                    style: TextStyle(color: fgMuted, fontSize: 13),
+                  ),
+                ),
+                if (total > 0)
+                  Text(
+                    '${((_uploadedCount / total) * 100).round()}%',
+                    style: TextStyle(
+                      color: widget.darkMode ? Colors.white : fgMuted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 12),
           ],
           Row(
@@ -201,7 +263,7 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
               OutlinedButton(
                 onPressed: _isUploading ? null : _pickImages,
                 style: widget.darkMode ? OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white38)) : null,
-                child: const Text('Add More'),
+                child: Text(l10n.addMore),
               ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
@@ -215,7 +277,7 @@ class _ImageUploaderWidgetState extends ConsumerState<ImageUploaderWidget> {
                             strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.cloud_upload_outlined),
-                label: Text(_isUploading ? 'Uploading...' : 'Upload All ($total)'),
+                label: Text(_isUploading ? l10n.uploading : l10n.uploadAllCount(total)),
               ),
             ],
           ),

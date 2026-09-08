@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -310,16 +311,17 @@ class _SpotMeteringHudBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Row(
       children: [
         _HudToggleChip(
-          label: 'Zone Overlay',
+          label: l10n.zoneOverlay,
           isOn: zoneEnabled,
           onTap: onToggleZone,
         ),
         const SizedBox(width: 8),
         _HudToggleChip(
-          label: 'Multi-Spot',
+          label: l10n.multiSpot,
           isOn: multiSpotEnabled,
           onTap: onToggleMultiSpot,
         ),
@@ -334,7 +336,7 @@ class _SpotMeteringHudBar extends StatelessWidget {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: Text(
-              'Clear Pins ($pinCount)',
+              l10n.clearPinsCount(pinCount),
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
             ),
           ),
@@ -376,7 +378,7 @@ class _HudToggleChip extends StatelessWidget {
             ),
           ),
           child: Text(
-            '$label: ${isOn ? 'On' : 'Off'}',
+            '$label: ${isOn ? context.l10n.toggleOn : context.l10n.toggleOff}',
             style: TextStyle(
               color: isOn ? Colors.white : Colors.white.withValues(alpha: 0.7),
               fontSize: 11,

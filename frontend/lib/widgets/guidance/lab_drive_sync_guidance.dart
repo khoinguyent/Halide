@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 import 'guidance_tokens.dart';
 
-/// Single-step coach mark: zinc scrim, orange ring, dark modal copy.
+/// Single-step coach mark: themed scrim, accent ring, dark modal copy.
 ///
 /// Do not set [TargetFocus.color] (it tints the full-screen dim).
 TutorialCoachMark buildSingleStepArchiveGuidance({
+  required BuildContext context,
   required GlobalKey targetKey,
   required String identify,
   required String body,
@@ -17,6 +19,9 @@ TutorialCoachMark buildSingleStepArchiveGuidance({
   double paddingFocus = 8,
   Future<void> Function(TargetFocus)? beforeFocus,
 }) {
+  final accent = GuidanceTokens.orange500(context);
+  final scrim = GuidanceTokens.zinc950(context);
+
   return TutorialCoachMark(
     beforeFocus: beforeFocus,
     targets: [
@@ -26,7 +31,7 @@ TutorialCoachMark buildSingleStepArchiveGuidance({
         shape: ShapeLightFocus.RRect,
         radius: radius,
         paddingFocus: paddingFocus,
-        borderSide: const BorderSide(color: GuidanceTokens.orange500, width: 2),
+        borderSide: BorderSide(color: accent, width: 2),
         enableOverlayTab: true,
         enableTargetTab: false,
         contents: [
@@ -53,16 +58,16 @@ TutorialCoachMark buildSingleStepArchiveGuidance({
                       alignment: Alignment.centerRight,
                       child: FilledButton(
                         style: FilledButton.styleFrom(
-                          backgroundColor: GuidanceTokens.orange500,
-                          foregroundColor: GuidanceTokens.zinc950,
+                          backgroundColor: accent,
+                          foregroundColor: scrim,
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         ),
                         onPressed: () {
                           controller.next();
                         },
-                        child: const Text(
-                          'GOT IT',
-                          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2),
+                        child: Text(
+                          context.l10n.guidanceGotItUpper,
+                          style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2),
                         ),
                       ),
                     ),
@@ -74,7 +79,7 @@ TutorialCoachMark buildSingleStepArchiveGuidance({
         ],
       ),
     ],
-    colorShadow: GuidanceTokens.zinc950,
+    colorShadow: scrim,
     opacityShadow: 0.92,
     pulseEnable: true,
     pulseAnimationDuration: const Duration(milliseconds: 800),
@@ -98,9 +103,9 @@ class _GuidanceCoachCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: GuidanceTokens.zinc950,
+          color: GuidanceTokens.zinc950(context),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: GuidanceTokens.orange500.withValues(alpha: 0.4)),
+          border: Border.all(color: GuidanceTokens.orange500(context).withValues(alpha: 0.4)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.45),

@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/core/widgets/halide_scaffold.dart';
 import 'package:frontend/features/storage/presentation/bloc/storage_accounts_bloc.dart';
 import 'package:frontend/models/storage_account.dart';
@@ -13,6 +15,7 @@ import '../../../../models/user_profile.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
 import '../../../../core/providers/notification_provider.dart';
 import '../../../../core/models/notification_model.dart';
+import '../../../../core/theme/halide_colors.dart';
 
 class StorageStrategyView extends riverpod.ConsumerStatefulWidget {
   final StorageAccountsBloc? bloc;
@@ -24,8 +27,6 @@ class StorageStrategyView extends riverpod.ConsumerStatefulWidget {
 
 class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyView> {
   late int _selectedTierIndex;
-  static const _zinc950 = Color(0xFF09090B);
-  static const _orange500 = Color(0xFFF97316);
 
   static String _formatGbFromBytes(int bytes, {int fractionDigits = 2}) {
     final gb = bytes / (1024 * 1024 * 1024);
@@ -41,12 +42,14 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final plan = ref.watch(userPlanProvider);
     final isFree = plan == UserPlan.free;
     final storageListVersion = ref.watch(storageAccountsListVersionProvider);
+    final colors = HalideColors.of(context);
 
     final shell = HalideScaffold(
-        backgroundColor: _zinc950,
+        backgroundColor: colors.background,
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -54,8 +57,8 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
             color: Colors.white,
           ),
           centerTitle: true,
-          title: const Text(
-            'STORAGE STRATEGY',
+          title: Text(
+            l10n.storageStrategyTitle,
             style: TextStyle(
               letterSpacing: 2.0,
               fontWeight: FontWeight.w600,
@@ -72,7 +75,7 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSystemCloudQuotaBanner(ref),
+              _buildSystemCloudQuotaBanner(ref, colors, l10n),
               const SizedBox(height: 16),
               StorageTierSelector(
                 selectedIndex: _selectedTierIndex,
@@ -80,7 +83,7 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
                 onSelected: (index) {
                   if (isFree && index > 1) {
                     ref.read(notificationProvider.notifier).show(
-                      'System Cloud requires Pro features. Professional sync is limited to individual cloud accounts.',
+                      l10n.systemCloudRequiresPro,
                       type: NotificationType.warning,
                     );
                     return;
@@ -89,7 +92,7 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
                 },
               ),
               const SizedBox(height: 22),
-              _buildContentForTier(context),
+              _buildContentForTier(context, colors, l10n),
             ],
           ),
         ),
@@ -110,7 +113,7 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
   }
 
   /// Backend quota from GET /api/v1/me (shows **0 GB** when empty, not an em dash).
-  Widget _buildSystemCloudQuotaBanner(riverpod.WidgetRef ref) {
+  Widget _buildSystemCloudQuotaBanner(riverpod.WidgetRef ref, HalideColors c, AppLocalizations l10n) {
     final profileAsync = ref.watch(userProfileProvider);
     return profileAsync.when(
       data: (UserProfile? p) {
@@ -133,7 +136,7 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'SYSTEM CLOUD QUOTA',
+                l10n.systemCloudQuota,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.55),
                   fontSize: 11,
@@ -143,7 +146,7 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
               ),
               const SizedBox(height: 8),
               Text(
-                '$usedLabel used of $capLabel',
+                l10n.storageUsedOf(usedLabel, capLabel),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -153,7 +156,9 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
               if ((p.additionalStorageBytes ?? 0) > 0) ...[
                 const SizedBox(height: 6),
                 Text(
-                  '+${_formatGbFromBytes(p.additionalStorageBytes!, fractionDigits: 1)} from add-on purchases',
+                  l10n.addonStorageFromPurchases(
+                    _formatGbFromBytes(p.additionalStorageBytes!, fractionDigits: 1),
+                  ),
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.5),
                     fontSize: 12,
@@ -164,13 +169,13 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
           ),
         );
       },
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Center(
           child: SizedBox(
             width: 22,
             height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2, color: _orange500),
+            child: CircularProgressIndicator(strokeWidth: 2, color: c.accent),
           ),
         ),
       ),
@@ -178,13 +183,13 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
     );
   }
 
-  Widget _buildContentForTier(BuildContext context) {
+  Widget _buildContentForTier(BuildContext context, HalideColors c, AppLocalizations l10n) {
     return BlocBuilder<StorageAccountsBloc, StorageAccountsState>(
       builder: (context, state) {
         if (state is StorageAccountsLoading) {
-          return const Padding(
-            padding: EdgeInsets.all(64),
-            child: Center(child: CircularProgressIndicator(color: _orange500)),
+          return Padding(
+            padding: const EdgeInsets.all(64),
+            child: Center(child: CircularProgressIndicator(color: c.accent)),
           );
         }
         if (state is StorageAccountsError) {
@@ -194,9 +199,10 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
           switch (_selectedTierIndex) {
             case 0:
               return _buildAccountList(
-                context, 
+                context,
                 state.accounts.where((a) => a.type == StorageAccountType.local).toList(),
-                title: 'LOCAL STORAGE',
+                l10n: l10n,
+                title: l10n.localStorage,
               );
             case 1:
               return CloudProvidersSection(accounts: state.accounts);
@@ -204,22 +210,24 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
               final systemAccounts = state.accounts.where((a) => a.type == StorageAccountType.system).toList();
               if (systemAccounts.isEmpty) {
                 return _buildAccountList(
-                  context, 
+                  context,
                   [],
-                  title: 'SYSTEM CLOUD',
-                  emptyDescription: 'Upgrade above to get Pro storage. Each account includes 5–10 GB by default.',
+                  l10n: l10n,
+                  title: l10n.systemCloud,
+                  emptyDescription: l10n.upgradeProStorageHint,
                 );
               }
               final systemAccount = systemAccounts.first;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _StorageConsumptionCard(account: systemAccount),
+                  _StorageConsumptionCard(account: systemAccount, l10n: l10n),
                   const SizedBox(height: 24),
                   _buildAccountList(
-                    context, 
+                    context,
                     systemAccounts,
-                    title: 'SYSTEM CLOUD CONNECTIONS',
+                    l10n: l10n,
+                    title: l10n.systemCloudConnections,
                   ),
                 ],
               );
@@ -233,10 +241,12 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
   }
 
   Widget _buildAccountList(
-    BuildContext context, 
-    List<StorageAccount> accounts, 
-    {required String title, String? emptyDescription}
-  ) {
+    BuildContext context,
+    List<StorageAccount> accounts, {
+    required AppLocalizations l10n,
+    required String title,
+    String? emptyDescription,
+  }) {
     if (accounts.isEmpty && emptyDescription != null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,7 +268,7 @@ class _StorageStrategyViewState extends riverpod.ConsumerState<StorageStrategyVi
         const SizedBox(height: 16),
         ...accounts.map((a) => Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: _StorageAccountCard(account: a),
+          child: _StorageAccountCard(account: a, l10n: l10n),
         )).toList(),
       ],
     );
@@ -285,11 +295,13 @@ class _SectionHeader extends StatelessWidget {
 
 class _StorageAccountCard extends StatelessWidget {
   final StorageAccount account;
+  final AppLocalizations l10n;
 
-  const _StorageAccountCard({Key? key, required this.account}) : super(key: key);
+  const _StorageAccountCard({Key? key, required this.account, required this.l10n}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final colors = HalideColors.of(context);
     final isPrimary = account.isPrimary;
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
@@ -302,13 +314,13 @@ class _StorageAccountCard extends StatelessWidget {
             color: Colors.white.withOpacity(0.06),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isPrimary ? const Color(0xFFF97316) : Colors.white.withOpacity(0.10),
+              color: isPrimary ? colors.accent : Colors.white.withOpacity(0.10),
               width: isPrimary ? 2 : 1,
             ),
             boxShadow: isPrimary
                 ? [
                     BoxShadow(
-                      color: const Color(0xFFF97316).withOpacity(0.30),
+                      color: colors.accent.withOpacity(0.30),
                       spreadRadius: 2,
                       blurRadius: 15,
                       offset: const Offset(0, 0),
@@ -342,11 +354,11 @@ class _StorageAccountCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF97316),
+                              color: colors.accent,
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            child: const Text(
-                              'PRIMARY',
+                            child: Text(
+                              l10n.primaryBadge,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,
@@ -373,13 +385,13 @@ class _StorageAccountCard extends StatelessWidget {
               IconButton(
                 icon: Icon(
                   account.isPrimary ? Icons.star_rounded : Icons.star_border_rounded,
-                  color: account.isPrimary ? const Color(0xFFF97316) : Colors.white.withOpacity(0.35),
+                  color: account.isPrimary ? colors.accent : Colors.white.withOpacity(0.35),
                   size: 28,
                 ),
                 onPressed: () {
                   context.read<StorageAccountsBloc>().add(TogglePrimaryAccount(account.id));
                 },
-                tooltip: account.isPrimary ? 'Primary' : 'Set as Primary',
+                tooltip: account.isPrimary ? l10n.primaryTooltip : l10n.setAsPrimary,
               ),
             ],
           ),
@@ -418,10 +430,12 @@ class _StorageAccountCard extends StatelessWidget {
 
 class _StorageConsumptionCard extends StatelessWidget {
   final StorageAccount account;
-  const _StorageConsumptionCard({Key? key, required this.account}) : super(key: key);
+  final AppLocalizations l10n;
+  const _StorageConsumptionCard({Key? key, required this.account, required this.l10n}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final colors = HalideColors.of(context);
     final used = account.storageUsed ?? 0;
     final limit = account.storageLimit ?? (100 * 1024 * 1024);
     final percent = (used / limit).clamp(0.0, 1.0);
@@ -439,29 +453,25 @@ class _StorageConsumptionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'STORAGE USAGE',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              Text(
-                '$usedGb GB of $limitGb GB',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+          Text(
+            l10n.storageUsage,
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          Text(
+            l10n.storageUsedOf('$usedGb GB', '$limitGb GB'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 16),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
@@ -469,24 +479,24 @@ class _StorageConsumptionCard extends StatelessWidget {
               minHeight: 12,
               backgroundColor: Colors.white.withOpacity(0.1),
               valueColor: AlwaysStoppedAnimation<Color>(
-                percent > 0.9 ? Colors.redAccent : const Color(0xFFF97316),
+                percent > 0.9 ? Colors.redAccent : colors.accent,
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () => context.push('/profile/settings/add-storage'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF97316),
+                backgroundColor: colors.accent,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 0,
               ),
-              child: const Text(
-                'ADD MORE STORAGE',
+              child: Text(
+                l10n.addMoreStorage,
                 style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.0),
               ),
             ),

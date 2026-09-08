@@ -2,6 +2,21 @@ from pydantic import BaseModel, EmailStr, Field, model_validator
 from typing import Optional
 from datetime import datetime
 
+class TimezoneUpdate(BaseModel):
+    timezone: str = Field(
+        description="IANA timezone name, e.g. Asia/Bangkok or America/New_York",
+        min_length=1,
+        max_length=64,
+    )
+
+
+class LocaleUpdate(BaseModel):
+    locale: str = Field(
+        description="App UI language: 'system', 'en', 'vi', 'ja', 'ko', 'zh', 'es', or 'fr'",
+        min_length=2,
+        max_length=16,
+    )
+
 class UserBase(BaseModel):
     email: EmailStr
     display_name: str
@@ -23,6 +38,8 @@ class UserOut(UserBase):
     has_seen_onboarding: bool = False
     has_seen_roll_guide: bool = False
     has_seen_lab_guide: bool = False
+    timezone: Optional[str] = None
+    preferred_locale: Optional[str] = None
 
     @model_validator(mode="after")
     def sync_limit(self) -> "UserOut":

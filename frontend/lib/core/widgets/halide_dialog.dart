@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import '../theme/halide_colors.dart';
 
 /// Height reserved at the bottom so the nav bar stays unblurred when a modal is open.
 const double kHalideModalNavBarReservedHeight = 100.0;
@@ -15,7 +17,7 @@ Future<T?> showHalideDialog<T>({
   return showGeneralDialog<T>(
     context: context,
     barrierDismissible: barrierDismissible,
-    barrierLabel: 'Halide dialog barrier',
+    barrierLabel: context.l10n.halideDialogBarrier,
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 200),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -126,7 +128,7 @@ Future<T?> showHalideModalBottomSheet<T>({
   return showGeneralDialog<T>(
     context: context,
     barrierDismissible: isDismissible,
-    barrierLabel: 'Halide bottom sheet barrier',
+    barrierLabel: context.l10n.halideBottomSheetBarrier,
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 300),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -194,10 +196,10 @@ class HalideModalContainer extends StatelessWidget {
             child: Container(
               padding: padding,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: HalideColors.of(context).glassFill(0.12),
                 borderRadius: BorderRadius.circular(borderRadius),
                 border: hasInnerBorder
-                    ? Border.all(color: Colors.white.withOpacity(0.07))
+                    ? Border.all(color: HalideColors.of(context).glassBorder(0.25))
                     : null,
               ),
               child: child,
@@ -252,9 +254,9 @@ class HalideTextField extends StatelessWidget {
       maxLines: maxLines,
       focusNode: focusNode,
       validator: validator,
-      cursorColor: Colors.white,
-      style: const TextStyle(
-        color: Colors.white,
+      cursorColor: HalideColors.of(context).slateTeal,
+      style: TextStyle(
+        color: HalideColors.of(context).textPrimary,
         fontSize: 15,
         letterSpacing: 0.5,
       ),
@@ -262,30 +264,30 @@ class HalideTextField extends StatelessWidget {
         labelText: label.toUpperCase(),
         errorText: errorText,
         labelStyle: TextStyle(
-          color: Colors.white.withOpacity(0.35),
+          color: HalideColors.of(context).steel.withValues(alpha: 0.85),
           fontSize: 9.5,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.2,
         ),
         prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: Colors.white24, size: 18)
+            ? Icon(prefixIcon, color: HalideColors.of(context).iconMuted(), size: 18)
             : null,
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(vertical: 10),
         enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: HalideColors.of(context).borderSubtle),
         ),
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white, width: 1.2),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: HalideColors.of(context).slateTeal, width: 1.2),
         ),
-        errorBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.redAccent),
+        errorBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: HalideColors.of(context).error),
         ),
-        focusedErrorBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
+        focusedErrorBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: HalideColors.of(context).error, width: 1.5),
         ),
-        errorStyle: const TextStyle(
-          color: Colors.redAccent,
+        errorStyle: TextStyle(
+          color: HalideColors.of(context).error,
           fontSize: 10,
           height: 1.2,
         ),
@@ -319,21 +321,21 @@ class HalideActionButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
+          backgroundColor: HalideColors.of(context).ash,
+          foregroundColor: HalideColors.of(context).textOnLight,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           elevation: 0,
-          disabledBackgroundColor: Colors.white.withOpacity(0.5),
+          disabledBackgroundColor: HalideColors.of(context).ash.withValues(alpha: 0.5),
         ),
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 height: 24,
                 width: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  color: Colors.black54,
+                  color: HalideColors.of(context).steel,
                 ),
               )
             : Text(
@@ -352,19 +354,20 @@ class HalideActionButton extends StatelessWidget {
 class HalideSimpleDialog extends StatelessWidget {
   final String title;
   final String message;
-  final String buttonText;
+  final String? buttonText;
   final VoidCallback? onButtonPressed;
 
   const HalideSimpleDialog({
     Key? key,
     required this.title,
     required this.message,
-    this.buttonText = 'OK',
+    this.buttonText,
     this.onButtonPressed,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return HalideModalContainer(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -392,7 +395,7 @@ class HalideSimpleDialog extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           HalideActionButton(
-            text: buttonText,
+            text: buttonText ?? l10n.ok,
             onPressed: onButtonPressed ?? () => Navigator.of(context).pop(),
           ),
         ],

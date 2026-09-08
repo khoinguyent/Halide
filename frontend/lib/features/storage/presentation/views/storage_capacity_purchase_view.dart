@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:frontend/core/models/notification_model.dart';
 import 'package:frontend/core/providers/notification_provider.dart';
 import 'package:frontend/core/widgets/halide_scaffold.dart';
@@ -15,6 +16,7 @@ import 'package:frontend/features/storage/domain/storage_addon_catalog.dart';
 import 'package:frontend/providers/auth_provider.dart';
 import 'package:frontend/providers/storage_accounts_refresh_provider.dart';
 import 'package:frontend/services/purchase_service.dart';
+import 'package:frontend/core/theme/halide_colors.dart';
 
 /// Choose stackable System Cloud storage add-ons (+5 / +10 / +50 GB). Shown only after store prices load.
 class StorageCapacityPurchaseView extends ConsumerStatefulWidget {
@@ -26,9 +28,6 @@ class StorageCapacityPurchaseView extends ConsumerStatefulWidget {
 }
 
 class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPurchaseView> {
-  static const _zinc950 = Color(0xFF09090B);
-  static const _orange500 = Color(0xFFF97316);
-
   late final BillingBloc _billingBloc;
   Map<String, StoreProduct> _productsById = {};
   Map<String, ProductDetails> _iapDetailsById = {};
@@ -64,11 +63,12 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
 
   void _exitAfterLoadFailure({required bool isRefresh}) {
     if (!mounted) return;
+    final l10n = context.l10n;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final msg = isRefresh
-          ? "We couldn't refresh prices. Please try again in a moment."
-          : "We couldn't load storage options. Check your connection and try again.";
+          ? l10n.couldNotRefreshPrices
+          : l10n.couldNotLoadStorageOptions;
       ref.read(notificationProvider.notifier).show(
             msg,
             type: NotificationType.error,
@@ -175,6 +175,7 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
       value: _billingBloc,
       child: BlocConsumer<BillingBloc, BillingState>(
         listener: (context, state) {
+          final l10n = context.l10n;
           if (state is PurchaseSuccess) {
             unawaited(Future(() async {
               ref.invalidate(userProfileProvider);
@@ -185,7 +186,7 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
               }
               if (!context.mounted) return;
               ref.read(notificationProvider.notifier).show(
-                    'Storage updated. Your new quota is active.',
+                    l10n.storageUpdated,
                     type: NotificationType.success,
                   );
               ref.read(storageAccountsListVersionProvider.notifier).bump();
@@ -193,7 +194,7 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
             }));
           } else if (state is PurchaseCancelled) {
             ref.read(notificationProvider.notifier).show(
-                  'Purchase cancelled.',
+                  l10n.purchaseCancelled,
                   type: NotificationType.info,
                 );
           } else if (state is PurchaseFailed) {
@@ -204,6 +205,8 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
           }
         },
         builder: (context, state) {
+          final l10n = context.l10n;
+          final colors = HalideColors.of(context);
           final purchasing = state is BillingLoading && _productsById.isNotEmpty;
           final tier = StorageAddonCatalog.tiers[_selectedIndex];
           final selectedPrice = _localizedPrice(tier);
@@ -211,7 +214,7 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
               _productsReady && !purchasing && selectedPrice != null;
 
           return HalideScaffold(
-            backgroundColor: _zinc950,
+            backgroundColor: colors.background,
             appBar: AppBar(
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
@@ -219,8 +222,8 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
                 color: Colors.white,
               ),
               centerTitle: true,
-              title: const Text(
-                'ADD STORAGE',
+              title: Text(
+                l10n.addStorageTitle,
                 style: TextStyle(
                   letterSpacing: 2.0,
                   fontWeight: FontWeight.w600,
@@ -240,9 +243,7 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Pick how much extra cloud space you need. Prices are shown in your '
-                          'local currency. You can buy the same size more than once — each '
-                          'purchase adds to your total.',
+                          l10n.storagePurchaseIntro,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.65),
                             fontSize: 14,
@@ -259,14 +260,14 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
                               tier: t,
                               priceLine: _priceLine(t),
                               selected: selected,
+                              stackableLabel: l10n.stackable,
                               onTap: () => setState(() => _selectedIndex = i),
                             ),
                           );
                         }),
                         const SizedBox(height: 20),
                         Text(
-                          'Each pack adds to your vault total — you can buy the same size again anytime. '
-                          'Payment uses the method on this device; extra space usually appears within a few moments.',
+                          l10n.storagePurchaseFooter,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.45),
                             fontSize: 11,
@@ -286,9 +287,9 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _orange500,
+                              backgroundColor: colors.accent,
                               foregroundColor: Colors.white,
-                              disabledBackgroundColor: _orange500.withOpacity(0.35),
+                              disabledBackgroundColor: colors.accent.withOpacity(0.35),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
@@ -297,8 +298,8 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
                             ),
                             child: Text(
                               selectedPrice == null
-                                  ? 'BUY ${tier.shortLabel.toUpperCase()}'
-                                  : 'Buy ${tier.shortLabel} — $selectedPrice',
+                                  ? l10n.buyTierNoPrice(tier.shortLabel.toUpperCase())
+                                  : l10n.buyTier(tier.shortLabel, selectedPrice),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 0.8,
@@ -310,7 +311,7 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
                         TextButton(
                           onPressed: purchasing ? null : () => _fetchStoreProducts(isRefresh: true),
                           child: Text(
-                            'Refresh prices',
+                            l10n.refreshPrices,
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.55),
                               fontWeight: FontWeight.w600,
@@ -322,15 +323,15 @@ class _StorageCapacityPurchaseViewState extends ConsumerState<StorageCapacityPur
                     ),
                   ),
                 if (!_productsReady && _loadingProducts)
-                  const Center(
-                    child: CircularProgressIndicator(color: _orange500),
+                  Center(
+                    child: CircularProgressIndicator(color: colors.accent),
                   ),
                 if (_productsReady && purchasing)
                   Positioned.fill(
                     child: Container(
-                      color: _zinc950.withOpacity(0.55),
-                      child: const Center(
-                        child: CircularProgressIndicator(color: _orange500),
+                      color: colors.background.withOpacity(0.55),
+                      child: Center(
+                        child: CircularProgressIndicator(color: colors.accent),
                       ),
                     ),
                   ),
@@ -347,12 +348,14 @@ class _TierCard extends StatelessWidget {
   final StorageAddonTier tier;
   final String priceLine;
   final bool selected;
+  final String stackableLabel;
   final VoidCallback onTap;
 
   const _TierCard({
     required this.tier,
     required this.priceLine,
     required this.selected,
+    required this.stackableLabel,
     required this.onTap,
   });
 
@@ -418,8 +421,8 @@ class _TierCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(color: _orange500.withOpacity(0.55)),
                           ),
-                          child: const Text(
-                            'STACKABLE',
+                          child: Text(
+                            stackableLabel,
                             style: TextStyle(
                               color: _orange500,
                               fontSize: 9,

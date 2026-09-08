@@ -74,6 +74,14 @@ class PurchaseFailed extends BillingState {
   List<Object?> get props => [message];
 }
 
+class RestoreCompleted extends BillingState {
+  final bool hasActiveEntitlement;
+  RestoreCompleted({required this.hasActiveEntitlement});
+
+  @override
+  List<Object?> get props => [hasActiveEntitlement];
+}
+
 class BillingBloc extends Bloc<BillingEvent, BillingState> {
   final PurchaseService _purchaseService = PurchaseService();
   final ApiService _apiService = ApiService();
@@ -154,9 +162,11 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
   Future<void> _onRestorePurchases(RestorePurchases event, Emitter<BillingState> emit) async {
     emit(BillingLoading());
     try {
-      await _purchaseService.restorePurchases();
+      final info = await _purchaseService.restorePurchases();
+      // Reconcile Postgres from RevenueCat (entitlements + storage add-ons).
       await _syncBillingBackendAfterPurchase();
-      emit(BillingInitial()); // Refresh state
+      final restored = info.entitlements.active.isNotEmpty;
+      emit(RestoreCompleted(hasActiveEntitlement: restored));
       add(LoadOfferings());
     } catch (e) {
       emit(OfferingsLoadFailed(e.toString()));

@@ -8,7 +8,7 @@ import '../services/halide_debug_log.dart';
 /// [channelFilter] — when non-null, only lines for that channel are shown and copied.
 void showHalideDebugLogSheet(
   BuildContext context, {
-  String title = 'HALIDE DEBUG LOG',
+  String title = 'AGXEL DEBUG LOG',
   String? channelFilter,
   String emptyHint = '(no log lines yet — use the app, then reopen)',
 }) {
@@ -49,7 +49,6 @@ void showHalideDebugLogSheet(
                     style: const TextStyle(
                       color: Color(0xFF86EFAC),
                       fontSize: 11,
-                      fontFamily: 'Courier',
                     ),
                   ),
                 ),

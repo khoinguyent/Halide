@@ -53,4 +53,10 @@ class AppConfig {
   /// Apple standard EULA for licensed applications (Terms of Use link on subscription UI).
   static const String appleStandardEulaUrl =
       'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+
+  /// Hands-free gyro-assisted negative scanning (roll detail + roll cards).
+  static const bool enableGyroScan = false;
+
+  /// Full-screen light table mode (nav dock shortcut).
+  static const bool enableLightTable = false;
 }

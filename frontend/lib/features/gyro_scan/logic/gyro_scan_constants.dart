@@ -1,11 +1,14 @@
-/// Calibrated 4×5 color matrix: invert channels and offset the orange/amber
-/// mask of standard color-negative film for a live “positive” preview.
-const List<double> orangeMaskInversionMatrix = [
-  -1.0, 0.0, 0.0, 0.0, 255.0, // Red
-  0.0, -1.2, 0.0, 0.0, 230.0, // Green — balance cyan shift
-  0.0, 0.0, -1.8, 0.0, 190.0, // Blue — neutralize amber base
-  0.0, 0.0, 0.0, 1.0, 0.0, // Alpha
+/// Live-preview matrix (approximation). Saved frames use adaptive C-41 in
+/// [applyC41Conversion].
+const List<double> orangeMaskPreviewMatrix = [
+  -1.62, 0.0, 0.0, 0.0, 255.0,
+  0.0, -2.0, 0.0, 0.0, 255.0,
+  0.0, 0.0, -2.8, 0.0, 255.0,
+  0.0, 0.0, 0.0, 1.0, 0.0,
 ];
+
+/// Alias used by the HUD [ColorFilter] toggle.
+const List<double> orangeMaskInversionMatrix = orangeMaskPreviewMatrix;
 
 /// Target ring radius (logical pixels).
 const double gyroTargetRingRadius = 48.0;
@@ -19,6 +22,11 @@ const double gyroLockedThetaDeg = 1.0;
 const double gyroReadyThetaDeg = 0.15;
 const double gyroAeAfLockThetaDeg = 0.50;
 const int gyroStableCaptureMs = 300;
+
+/// How long (ms) to let the camera AF hunt after requesting focus before
+/// locking AE/AF and allowing capture.  Empirically 600–800 ms covers most
+/// rear modules for a macro-distance negative on a light table.
+const int gyroFocusSettleMs = 700;
 
 /// Low-pass smoothing factor (higher = snappier).
 const double gyroSensorLerpAlpha = 0.22;

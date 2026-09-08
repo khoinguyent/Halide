@@ -6,7 +6,9 @@ from typing import Optional
 from firebase_admin import auth as firebase_auth
 
 from ...db.session import get_db
-from ...db.schemas.user import UserOut
+from ...db.schemas.user import UserOut, TimezoneUpdate, LocaleUpdate
+from ...services import analytics_service
+from ...services import locale_service
 from ...db.models.user import User, PurchaseHistory
 from ...db.models.roll import Roll
 from ...db.models.image import Image
@@ -99,6 +101,28 @@ def mark_lab_guide_seen(
     current_user.has_seen_lab_guide = True
     db.commit()
     db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/timezone", response_model=UserOut)
+def update_timezone(
+    body: TimezoneUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Persist the device IANA timezone for golden-hour and local-day analytics."""
+    analytics_service.persist_user_timezone(db, current_user, body.timezone)
+    return current_user
+
+
+@router.patch("/locale", response_model=UserOut)
+def update_locale(
+    body: LocaleUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Persist the user's preferred app UI language."""
+    locale_service.persist_user_locale(db, current_user, body.locale)
     return current_user
 
 

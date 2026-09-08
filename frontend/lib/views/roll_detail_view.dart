@@ -6,16 +6,21 @@ import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import '../core/widgets/glass_panel.dart';
+import '../core/theme/halide_colors.dart';
+import '../core/theme/roll_status_colors.dart';
 import '../models/roll.dart';
 import '../models/roll_status.dart';
 import '../models/film_stock.dart';
 import '../models/camera.dart';
 import '../models/user_profile.dart';
+import '../config/app_config.dart';
 import '../providers/auth_provider.dart';
 import '../providers/roll_provider.dart';
 import '../services/public_drive_lab_import_service.dart';
-import '../services/authenticated_drive_folder_import_service.dart';
 import '../providers/rolls_provider.dart';
 import '../features/rolls/presentation/bloc/rolls_bloc.dart';
 import '../widgets/synced_image.dart';
@@ -31,8 +36,10 @@ import '../services/local_sync_service.dart';
 import '../models/shot.dart';
 import '../models/roll_gallery.dart';
 import '../widgets/folder_tabs.dart';
+import '../widgets/status_selector.dart';
 import '../providers/ui_state_provider.dart';
 import '../providers/dashboard_provider.dart';
+import '../widgets/sync_progress_banner.dart';
 
 class RollDetailView extends ConsumerStatefulWidget {
   final String rollId;
@@ -87,12 +94,12 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
 
     return rollAsync.when(
       loading: () => Scaffold(
-        backgroundColor: const Color(0xFF0D0D0D),
-        appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: Colors.white),
-        body: const Center(child: CircularProgressIndicator(color: Colors.white)),
+        backgroundColor: HalideColors.of(context).background,
+        appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: HalideColors.of(context).textPrimary),
+        body: Center(child: CircularProgressIndicator(color: HalideColors.of(context).slateTeal)),
       ),
       error: (err, _) => Scaffold(
-        backgroundColor: const Color(0xFF0D0D0D),
+        backgroundColor: HalideColors.of(context).background,
         appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: Colors.white),
         body: Center(
           child: Padding(
@@ -104,7 +111,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => ref.refresh(rollDetailProvider(widget.rollId)),
-                  child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                  child: Text(context.l10n.retry, style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
@@ -154,7 +161,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     final selectedTabIndex = ref.watch(rollTabStateProvider)[widget.rollId] ?? 0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: HalideColors.of(context).background,
       appBar: AppBar(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -164,22 +171,33 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
                 roll.title ?? '${roll.brand} ${roll.name}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                style: TextStyle(fontWeight: FontWeight.w600, color: HalideColors.of(context).textPrimary),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             _StatusBadge(
               status: roll.status,
-              onTap: isShooting ? null : () => _onNextStatusTapped(context),
+              onTap: isArchived || roll.status == RollStatus.syncing
+                  ? null
+                  : () => _showStatusSelector(context, roll),
             ),
           ],
         ),
         backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
+        foregroundColor: HalideColors.of(context).textPrimary,
         elevation: 0,
       ),
       body: Column(
         children: [
+          if (!isArchived && roll.status != RollStatus.syncing)
+            roll.status == RollStatus.scanned
+                ? _ArchiveRollHint(
+                    onArchive: () => _confirmArchiveRoll(context),
+                  )
+                : _NextStepBanner(
+                    status: roll.status,
+                    onAdvance: () => _onNextStatusTapped(context),
+                  ),
           FolderTabs(
             selectedIndex: selectedTabIndex,
             onTabSelected: (index) {
@@ -234,83 +252,122 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     );
   }
 
-  Widget _buildScannedBody(BuildContext context, Roll roll, RollGalleryTriple triple) {
-    final hasDisplayableImages = triple.$1.isNotEmpty;
+  Future<void> _addPhotosToScannedRoll() async {
+    final picker = ImagePicker();
+    final List<XFile> picked = await picker.pickMultiImage();
+    if (picked.isEmpty) return;
 
-    if (hasDisplayableImages) {
-      return _buildGalleryGrid(context, roll, triple, shrinkWrap: true, offset: roll.shotOffset);
-    }
+    final plan = ref.read(userPlanProvider);
+    final user = ref.read(userProvider);
+    if (user == null) return;
+    final token = await user.getIdToken();
+    if (token == null) return;
 
-    Future<void> _handleImagesAddition() async {
-      final picker = ImagePicker();
-      final List<XFile> picked = await picker.pickMultiImage();
-      if (picked.isEmpty) return;
-
-      final plan = ref.read(userPlanProvider);
-      final user = ref.read(userProvider);
-      if (user == null) return;
-      final token = await user.getIdToken();
-      if (token == null) return;
-
-      if (plan == UserPlan.free) {
-        final rollService = ref.read(rollServiceProvider);
-        final paths = picked.map((x) => x.path).toList();
-        try {
-          await rollService.addLocalImagesToRoll(token, widget.rollId, paths);
-          ref.invalidate(rollDetailProvider(widget.rollId));
-          ref.invalidate(rollGalleryPairsProvider(widget.rollId));
-          if (mounted) {
-            ref.read(notificationProvider.notifier).show(
-              'ADDED LOCAL IMAGE REFERENCES (FREE TIER).',
-              type: NotificationType.info,
-            );
-          }
-        } catch (e) {
-          if (mounted) {
-            ref.read(notificationProvider.notifier).show(
-              'COULDN\'T ADD IMAGE REFERENCES. PLEASE TRY AGAIN.',
-              type: NotificationType.error,
-            );
-          }
+    if (plan == UserPlan.free) {
+      final rollService = ref.read(rollServiceProvider);
+      final paths = picked.map((x) => x.path).toList();
+      try {
+        await rollService.addLocalImagesToRoll(token, widget.rollId, paths);
+        ref.invalidate(rollDetailProvider(widget.rollId));
+        ref.invalidate(rollGalleryPairsProvider(widget.rollId));
+        if (mounted) {
+          ref.read(notificationProvider.notifier).show(
+                halideCaps(context.l10n.addedLocalImageReferences),
+                type: NotificationType.info,
+              );
         }
-      } else {
-        final uploader = UploadService();
-        int successCount = 0;
-        for (final xFile in picked) {
-          final file = File(xFile.path);
-          final ok = await uploader.uploadRollImage(
-            rollId: widget.rollId,
-            imageFile: file,
-          );
-          if (ok) successCount++;
+      } catch (e) {
+        if (mounted) {
+          ref.read(notificationProvider.notifier).show(
+                halideCaps(context.l10n.couldNotAddImageReferences),
+                type: NotificationType.error,
+              );
         }
-        if (successCount > 0) {
-          ref.invalidate(rollDetailProvider(widget.rollId));
-          ref.invalidate(rollGalleryPairsProvider(widget.rollId));
-          if (mounted) {
-            ref.read(notificationProvider.notifier).show(
-              'SUCCESSFULLY UPLOADED $successCount IMAGE(S)!',
-              type: NotificationType.success,
-            );
-          }
+      }
+    } else {
+      final uploader = UploadService();
+      int successCount = 0;
+      for (final xFile in picked) {
+        final file = File(xFile.path);
+        final ok = await uploader.uploadRollImage(
+          rollId: widget.rollId,
+          imageFile: file,
+        );
+        if (ok) successCount++;
+      }
+      if (successCount > 0) {
+        ref.invalidate(rollDetailProvider(widget.rollId));
+        ref.invalidate(rollGalleryPairsProvider(widget.rollId));
+        if (mounted) {
+          ref.read(notificationProvider.notifier).show(
+                halideCaps(context.l10n.successfullyUploadedCount(successCount)),
+                type: NotificationType.success,
+              );
         }
       }
     }
+  }
+
+  Widget _buildScannedBody(BuildContext context, Roll roll, RollGalleryTriple triple) {
+    final hasDisplayableImages = triple.$1.isNotEmpty;
+    final hasDriveUrl = (roll.driveUrl ?? '').trim().isNotEmpty;
+    // Drive-synced rolls: keep gallery as the lab delivery — no manual adds.
+    // Manual / device-only rolls: allow adding more photos anytime.
+    final canAddMore = !hasDriveUrl;
+    final l10n = context.l10n;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 260,
-          child: _buildGalleryGrid(
+        if (hasDriveUrl && hasDisplayableImages)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Text(
+              l10n.scannedDriveSyncedHint,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.45),
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ),
+        if (canAddMore && hasDisplayableImages)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _addPhotosToScannedRoll,
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                label: Text(l10n.addMorePhotos),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ),
+          ),
+        if (!hasDisplayableImages)
+          SizedBox(
+            height: 260,
+            child: _buildGalleryGrid(
+              context,
+              roll,
+              triple,
+              shrinkWrap: true,
+              emptyStateTopLeft: true,
+              onEmptyStateTap: canAddMore ? _addPhotosToScannedRoll : null,
+            ),
+          )
+        else
+          _buildGalleryGrid(
             context,
             roll,
             triple,
             shrinkWrap: true,
-            emptyStateTopLeft: true,
-            onEmptyStateTap: () => _handleImagesAddition(),
+            offset: roll.shotOffset,
+            onAddMore: canAddMore ? _addPhotosToScannedRoll : null,
           ),
-        ),
       ],
     );
   }
@@ -334,10 +391,11 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
             ),
           )
         else ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: _GyroScanResumeBar(rollId: widget.rollId),
-          ),
+          if (AppConfig.enableGyroScan)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: _GyroScanResumeBar(rollId: widget.rollId),
+            ),
           Padding(
             padding: const EdgeInsets.all(20),
             child: GlassPanel(
@@ -356,7 +414,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              'UPLOADED IMAGES',
+              context.l10n.uploadedImages,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -379,6 +437,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     bool shrinkWrap = false,
     bool emptyStateTopLeft = false,
     VoidCallback? onEmptyStateTap,
+    VoidCallback? onAddMore,
     int offset = 0,
   }) {
     final (pairedUrls, pairedIds, shotsAligned) = triple;
@@ -435,17 +494,33 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
       );
     }
 
+    final showAddCell = onAddMore != null;
     return GridView.builder(
       shrinkWrap: shrinkWrap,
       physics: shrinkWrap ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12),
-      itemCount: images.length,
+      itemCount: images.length + (showAddCell ? 1 : 0),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
       ),
       itemBuilder: (context, index) {
+        if (showAddCell && index == images.length) {
+          return GestureDetector(
+            onTap: onAddMore,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.18), width: 2),
+                color: Colors.white.withOpacity(0.04),
+              ),
+              child: const Center(
+                child: Icon(Icons.add_rounded, size: 28, color: Colors.white70),
+              ),
+            ),
+          );
+        }
         final path = images[index];
         return GestureDetector(
           onTap: () {
@@ -519,7 +594,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
             ),
             const SizedBox(width: 4),
             Text(
-              shot.aperture != null ? 'f/${shot.aperture}' : '---',
+              shot.aperture != null ? 'f/${shot.aperture}' : context.l10n.apertureMissing,
               style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w500),
             ),
           ],
@@ -528,15 +603,33 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     );
   }
 
-  Future<void> _onNextStatusTapped(BuildContext context) async {
-    final rollAsync = ref.read(rollDetailProvider(widget.rollId));
-    final roll = rollAsync.asData?.value;
-    if (roll == null) return;
+  Future<void> _showStatusSelector(BuildContext context, Roll roll) async {
+    if (roll.status == RollStatus.archived || roll.status == RollStatus.syncing) {
+      return;
+    }
 
-    final current = roll.status;
-    if (current == RollStatus.archived) return;
-    if (current == RollStatus.syncing) return;
+    await showHalideModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatusSelector(
+        currentStatus: roll.status,
+        onStatusSelected: (RollStatus newStatus) async {
+          if (newStatus == roll.status) return true;
+          try {
+            await _onStatusSelected(context, newStatus);
+            return true;
+          } catch (_) {
+            return false;
+          }
+        },
+      ),
+    );
+  }
 
+  static RollStatus? _nextStatus(RollStatus current) {
+    if (current == RollStatus.archived || current == RollStatus.syncing) {
+      return null;
+    }
     const userFlow = [
       RollStatus.shooting,
       RollStatus.lab,
@@ -544,9 +637,52 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
       RollStatus.archived,
     ];
     final idx = userFlow.indexOf(current);
-    if (idx < 0) return;
-    final next = idx < userFlow.length - 1 ? userFlow[idx + 1] : RollStatus.archived;
+    if (idx < 0 || idx >= userFlow.length - 1) return null;
+    return userFlow[idx + 1];
+  }
+
+  Future<void> _onNextStatusTapped(BuildContext context) async {
+    final rollAsync = ref.read(rollDetailProvider(widget.rollId));
+    final roll = rollAsync.asData?.value;
+    if (roll == null) return;
+
+    final next = _nextStatus(roll.status);
+    if (next == null || next == RollStatus.archived) return;
     await _onStatusSelected(context, next);
+  }
+
+  Future<void> _confirmArchiveRoll(BuildContext context) async {
+    final l10n = context.l10n;
+    final colors = HalideColors.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: colors.surfaceSheet,
+        title: Text(
+          l10n.moveToArchiveTitle,
+          style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          l10n.moveToArchiveBody,
+          style: TextStyle(color: colors.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel, style: TextStyle(color: colors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.archiveAction,
+              style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await _onStatusSelected(context, RollStatus.archived);
   }
 
   Future<void> _onStatusSelected(BuildContext context, RollStatus newStatus) async {
@@ -562,7 +698,7 @@ class _RollDetailViewState extends ConsumerState<RollDetailView> {
     } catch (_) {
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-          'WE COULDN\'T UPDATE THE STATUS. PLEASE TRY AGAIN.',
+          halideCaps(context.l10n.couldNotUpdateStatus),
           type: NotificationType.error,
         );
       }
@@ -616,6 +752,7 @@ class _ShotLogSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final shots = roll.shots;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -646,7 +783,7 @@ class _ShotLogSection extends StatelessWidget {
               Icon(Icons.list_alt_rounded, size: 14, color: Colors.white.withOpacity(0.3)),
               const SizedBox(width: 8),
               Text(
-                'TECHNICAL DATA (${shots.length})',
+                l10n.technicalDataCount(shots.length),
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 1.5,
@@ -659,12 +796,12 @@ class _ShotLogSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (shots.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(40),
+          Padding(
+            padding: const EdgeInsets.all(40),
             child: Center(
               child: Text(
-                'No technical logs recorded for this roll.',
-                style: TextStyle(color: Colors.white38, fontSize: 13),
+                l10n.noTechnicalLogs,
+                style: const TextStyle(color: Colors.white38, fontSize: 13),
               ),
             ),
           ),
@@ -703,7 +840,7 @@ class _ShotLogSection extends StatelessWidget {
                           Row(
                             children: [
                               Text(
-                                shot.aperture != null ? 'f/${shot.aperture}' : '---',
+                                shot.aperture != null ? 'f/${shot.aperture}' : context.l10n.apertureMissing,
                                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(width: 12),
@@ -738,6 +875,133 @@ class _ShotLogSection extends StatelessWidget {
   }
 }
 
+// ─── Next step banner ─────────────────────────────────────────────────────────
+
+class _NextStepBanner extends StatelessWidget {
+  final RollStatus status;
+  final VoidCallback onAdvance;
+
+  const _NextStepBanner({
+    required this.status,
+    required this.onAdvance,
+  });
+
+  static String _nextLabel(RollStatus next, AppLocalizations l10n) {
+    switch (next) {
+      case RollStatus.lab:
+        return halideCaps(l10n.sendToLab);
+      case RollStatus.scanned:
+        return halideCaps(l10n.markScanned);
+      case RollStatus.archived:
+        return halideCaps(l10n.archiveAction);
+      default:
+        return halideCaps(next.localizedLabel(l10n));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = HalideColors.of(context);
+    final next = _RollDetailViewState._nextStatus(status);
+    if (next == null || next == RollStatus.archived) {
+      return const SizedBox.shrink();
+    }
+
+    final color = RollStatusColors.forStatus(next, colors);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onAdvance,
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            border: Border(
+              bottom: BorderSide(color: color.withOpacity(0.25)),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.arrow_forward_rounded, size: 18, color: color),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  l10n.nextStepLabel(_nextLabel(next, l10n)),
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, size: 20, color: color.withOpacity(0.8)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subtle affordance when scans are done — archive is optional housekeeping, not a workflow step.
+class _ArchiveRollHint extends StatelessWidget {
+  const _ArchiveRollHint({required this.onArchive});
+
+  final VoidCallback onArchive;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = HalideColors.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_outline, size: 14, color: colors.iconMuted()),
+          const SizedBox(width: 6),
+          Text(
+            l10n.scansComplete,
+            style: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            ' · ',
+            style: TextStyle(color: colors.iconMuted(), fontSize: 12),
+          ),
+          TextButton(
+            onPressed: onArchive,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: colors.textSecondary,
+            ),
+            child: Text(
+              l10n.moveToArchiveLink,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+                decorationColor: colors.textSecondary.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 class _StatusBadge extends StatelessWidget {
@@ -751,32 +1015,9 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color bg;
-    final Color fg;
-
-    switch (status) {
-      case RollStatus.shooting:
-        bg = Colors.orange.withOpacity(0.16);
-        fg = Colors.orange;
-        break;
-      case RollStatus.lab:
-        bg = Colors.blue.withOpacity(0.16);
-        fg = Colors.blue;
-        break;
-      case RollStatus.scanned:
-        bg = Colors.green.withOpacity(0.16);
-        fg = Colors.green;
-        break;
-      case RollStatus.syncing:
-        bg = Colors.blue.withOpacity(0.12);
-        fg = Colors.blue.shade300;
-        break;
-      case RollStatus.archived:
-        bg = Colors.grey.withOpacity(0.22);
-        fg = Colors.grey.shade300;
-        break;
-    }
-
+    final l10n = context.l10n;
+    final fg = RollStatusColors.forStatus(status, HalideColors.of(context));
+    final bg = fg.withValues(alpha: status == RollStatus.archived ? 0.22 : 0.16);
     final isArchived = status == RollStatus.archived;
 
     return InkWell(
@@ -802,7 +1043,7 @@ class _StatusBadge extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text(
-              status.label.toUpperCase(),
+              halideCaps(status.localizedLabel(l10n)),
               style: TextStyle(
                 color: fg,
                 fontSize: 11,
@@ -861,11 +1102,12 @@ class _RollMetaEditorState extends ConsumerState<_RollMetaEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'ROLL INFO',
+        Text(
+          l10n.rollInfoSection,
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w900,
@@ -878,7 +1120,7 @@ class _RollMetaEditorState extends ConsumerState<_RollMetaEditor> {
           controller: _titleController,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            labelText: 'Title',
+            labelText: l10n.title,
             labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
             filled: true,
             fillColor: Colors.white.withOpacity(0.05),
@@ -903,7 +1145,7 @@ class _RollMetaEditorState extends ConsumerState<_RollMetaEditor> {
           minLines: 3,
           maxLines: 6,
           decoration: InputDecoration(
-            labelText: 'Description',
+            labelText: l10n.description,
             labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
             filled: true,
             fillColor: Colors.white.withOpacity(0.05),
@@ -936,13 +1178,13 @@ class _RollMetaEditorState extends ConsumerState<_RollMetaEditor> {
                       await widget.onSave(title, description);
                       if (context.mounted) {
                         ref.read(notificationProvider.notifier).show(
-                          'ROLL INFO UPDATED!',
+                          halideCaps(l10n.rollInfoUpdated),
                           type: NotificationType.success,
                         );
                       }
                     } catch (e) {
                         ref.read(notificationProvider.notifier).show(
-                          'WE COULDN\'T UPDATE YOUR ROLL INFO.',
+                          halideCaps(l10n.couldNotUpdateRollInfo),
                           type: NotificationType.error,
                         );
                     } finally {
@@ -961,9 +1203,9 @@ class _RollMetaEditorState extends ConsumerState<_RollMetaEditor> {
                     width: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text(
-                    'SAVE',
-                    style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                : Text(
+                    l10n.save.toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
                   ),
           ),
         ),
@@ -999,16 +1241,38 @@ class _AtLabDualChoiceState extends ConsumerState<_AtLabDualChoice> {
     super.dispose();
   }
 
+  Future<void> _markRollScannedIfPossible() async {
+    final user = ref.read(userProvider);
+    final token = await user?.getIdToken();
+    if (token == null) return;
+    try {
+      await ref.read(rollServiceProvider).updateRollStatus(token, widget.rollId, 'scanned');
+    } catch (e) {
+      debugPrint('[AtLab] could not set roll scanned: $e');
+    }
+  }
+
+  Future<void> _onFreeDeviceUploadComplete() async {
+    await _markRollScannedIfPossible();
+    widget.onUploadComplete();
+  }
+
   Future<void> _submitDriveUrl() async {
+    final l10n = context.l10n;
+    if (ref.read(userPlanProvider) == UserPlan.free) {
+      setState(() => _driveError = l10n.driveLabSyncProOnly);
+      return;
+    }
+
     final url = _driveUrlController.text.trim();
     if (url.isEmpty) {
-      setState(() => _driveError = 'Paste a shared Google Drive folder or ZIP link.');
+      setState(() => _driveError = l10n.pasteDriveLinkError);
       return;
     }
 
     final user = ref.read(userProvider);
     if (user == null) {
-      setState(() => _driveError = 'Sign in to sync from Drive.');
+      setState(() => _driveError = l10n.signInToSyncDrive);
       return;
     }
 
@@ -1032,7 +1296,7 @@ class _AtLabDualChoiceState extends ConsumerState<_AtLabDualChoice> {
       ref.invalidate(dashboardRollsProvider);
 
       ref.read(notificationProvider.notifier).show(
-        'DRIVE LINK SAVED — SYNCING…',
+        halideCaps(l10n.driveLinkSavedSyncing),
         type: NotificationType.info,
       );
 
@@ -1050,7 +1314,7 @@ class _AtLabDualChoiceState extends ConsumerState<_AtLabDualChoice> {
       final data = resp.data;
       if (data is Map && data['detail'] == 'Sync started in background') {
         ref.read(notificationProvider.notifier).show(
-          'SYNC STARTED IN BACKGROUND.',
+          halideCaps(l10n.syncStartedInBackground),
           type: NotificationType.info,
         );
       } else {
@@ -1058,7 +1322,7 @@ class _AtLabDualChoiceState extends ConsumerState<_AtLabDualChoice> {
             ? data['synced_count'].toString()
             : '0';
         ref.read(notificationProvider.notifier).show(
-          'IMPORTED $synced PHOTO(S) FROM DRIVE.',
+          halideCaps(l10n.importedPhotosFromDrive(synced)),
           type: NotificationType.success,
         );
       }
@@ -1067,9 +1331,13 @@ class _AtLabDualChoiceState extends ConsumerState<_AtLabDualChoice> {
       final detail = e.response?.data is Map
           ? (e.response?.data as Map)['detail']?.toString()
           : e.message;
-      setState(() => _driveError = detail ?? 'Could not sync from Drive.');
+      setState(() => _driveError = detail ?? l10n.couldNotSyncFromDrive);
     } catch (e) {
-      if (mounted) setState(() => _driveError = e.toString());
+      if (mounted) {
+        setState(
+          () => _driveError = e.toString().replaceFirst('Exception: ', '').replaceFirst('Bad state: ', ''),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSubmittingDrive = false);
     }
@@ -1084,16 +1352,114 @@ class _AtLabDualChoiceState extends ConsumerState<_AtLabDualChoice> {
     context.push('/roll/${widget.rollId}/gyro-scan');
   }
 
+  Widget _buildFreeDeviceImportCard(AppLocalizations l10n) {
+    return _DualChoiceCard(
+      icon: Icons.photo_library_outlined,
+      iconColor: Colors.tealAccent,
+      title: l10n.atLabAddFromDevice,
+      subtitle: l10n.atLabAddFromDeviceSubtitle,
+      child: ImageUploaderWidget(
+        rollId: widget.rollId,
+        onUploadComplete: () {
+          _onFreeDeviceUploadComplete();
+        },
+        darkMode: true,
+        readOnly: false,
+      ),
+    );
+  }
+
+  Widget _buildProDriveSyncCard(AppLocalizations l10n) {
+    return _DualChoiceCard(
+      icon: Icons.cloud_sync_rounded,
+      iconColor: Colors.blueAccent,
+      title: l10n.labDigitalSync,
+      subtitle: l10n.labDigitalSyncSubtitle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _driveUrlController,
+            enabled: !_isSubmittingDrive,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: l10n.driveUrlHint,
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.28)),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.05),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Colors.blueAccent),
+              ),
+            ),
+          ),
+          if (_driveError != null) ...[
+            const SizedBox(height: 8),
+            Text(_driveError!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            l10n.atLabNoDriveUrlHint,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.45),
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+          if (_isSubmittingDrive) ...[
+            const SizedBox(height: 12),
+            const SyncProgressBanner(
+              label: 'Syncing scans from Google Drive…',
+              progress: null,
+              accentColor: Colors.blueAccent,
+              compact: true,
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 44,
+            child: ElevatedButton(
+              onPressed: _isSubmittingDrive ? null : _submitDriveUrl,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white.withOpacity(0.95),
+                foregroundColor: Colors.black,
+                shape: const StadiumBorder(),
+              ),
+              child: _isSubmittingDrive
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.submitAndSync, style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final plan = ref.watch(userPlanProvider);
+    final isFree = plan == UserPlan.free;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'AT LAB',
-          style: TextStyle(
+        Text(
+          l10n.atLabSection,
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w900,
             fontSize: 14,
@@ -1102,100 +1468,48 @@ class _AtLabDualChoiceState extends ConsumerState<_AtLabDualChoice> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Choose how to bring scans into this roll.',
+          isFree ? l10n.chooseLabImportMethodFree : l10n.chooseLabImportMethod,
           style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13),
         ),
         const SizedBox(height: 20),
-        _DualChoiceCard(
-          icon: Icons.cloud_sync_rounded,
-          iconColor: Colors.blueAccent,
-          title: 'Lab Digital Sync',
-          subtitle: 'Paste a Google Drive folder or ZIP link from your lab.',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _driveUrlController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'https://drive.google.com/...',
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.28)),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Colors.blueAccent),
-                  ),
-                ),
-              ),
-              if (_driveError != null) ...[
-                const SizedBox(height: 8),
-                Text(_driveError!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-              ],
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: _isSubmittingDrive ? null : _submitDriveUrl,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.95),
-                    foregroundColor: Colors.black,
-                    shape: const StadiumBorder(),
-                  ),
-                  child: _isSubmittingDrive
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Submit & Sync', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
+        if (isFree)
+          _buildFreeDeviceImportCard(l10n)
+        else
+          _buildProDriveSyncCard(l10n),
         const SizedBox(height: 16),
-        _DualChoiceCard(
-          icon: Icons.document_scanner_outlined,
-          iconColor: Colors.orange,
-          title: 'Camera Scanning',
-          subtitle: 'Hands-free gyro-assisted scan over a light table.',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: _openGyroScan,
-                  icon: Icon(plan.isPro ? Icons.camera_alt_rounded : Icons.lock_outline_rounded),
-                  label: const Text('Scan Negatives (Light Table)'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange.withOpacity(0.92),
-                    foregroundColor: Colors.black,
-                    shape: const StadiumBorder(),
+        if (AppConfig.enableGyroScan)
+          _DualChoiceCard(
+            icon: Icons.document_scanner_outlined,
+            iconColor: Colors.orange,
+            title: l10n.cameraScanning,
+            subtitle: l10n.cameraScanningSubtitle,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _openGyroScan,
+                    icon: Icon(plan.isPro ? Icons.camera_alt_rounded : Icons.lock_outline_rounded),
+                    label: Text(l10n.scanNegatives),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange.withOpacity(0.92),
+                      foregroundColor: Colors.black,
+                      shape: const StadiumBorder(),
+                    ),
                   ),
                 ),
-              ),
-              if (!plan.isPro) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Premium feature — upgrade to scan with the gyro HUD.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11),
-                ),
+                if (!plan.isPro) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.premiumGyroScanFeatureHint,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1218,6 +1532,7 @@ class _GyroScanResumeBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final plan = ref.watch(userPlanProvider);
 
     return Material(
@@ -1240,8 +1555,8 @@ class _GyroScanResumeBar extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Continue gyro scan',
+                    Text(
+                      l10n.continueGyroScan,
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
@@ -1250,8 +1565,8 @@ class _GyroScanResumeBar extends ConsumerWidget {
                     ),
                     Text(
                       plan.isPro
-                          ? 'Add more frames, then tap Finish scanning when done.'
-                          : 'Premium — scan negatives with the gyro HUD.',
+                          ? l10n.continueGyroScanHint
+                          : l10n.premiumGyroScanResumeHint,
                       style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
                     ),
                   ],
@@ -1385,22 +1700,28 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
     widget.onUploadComplete();
     if (mounted) {
       ref.read(notificationProvider.notifier).show(
-        'SAVED $count PHOTO(S) ON THIS DEVICE.',
+        halideCaps(context.l10n.savedPhotosOnDevice(count)),
         type: NotificationType.success,
       );
     }
   }
 
   Future<void> _fetchLeafFiles() async {
+    final l10n = context.l10n;
+    if (ref.read(userPlanProvider) == UserPlan.free) {
+      setState(() => _error = l10n.driveLabSyncProOnly);
+      return;
+    }
+
     final url = _driveUrlController.text.trim();
     if (url.isEmpty) {
-      setState(() => _error = 'Please paste a shared Drive URL (folder or ZIP).');
+      setState(() => _error = l10n.pleasePasteDriveUrl);
       return;
     }
 
     final user = ref.read(userProvider);
     if (user == null) {
-      setState(() => _error = 'You must be signed in to sync from Drive.');
+      setState(() => _error = l10n.mustSignInDriveSync);
       return;
     }
 
@@ -1427,7 +1748,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
         debugPrint('[LabImport] local import failed, trying cloud sync: $e');
         if (mounted) {
           ref.read(notificationProvider.notifier).show(
-            'TRYING CLOUD SYNC…',
+            halideCaps(l10n.tryingCloudSync),
             type: NotificationType.info,
           );
         }
@@ -1449,37 +1770,12 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       _leafFiles = const [];
     });
 
-    if (_isDriveFolderUrl(url) && ref.read(userPlanProvider) == UserPlan.free) {
-      try {
-        final count = await AuthenticatedDriveFolderImportService.importFolder(
-          api: _api,
-          rollId: widget.rollId,
-          folderUrl: url,
-        );
-        if (!mounted) return;
-        await _afterLocalLabImport(count);
-        return;
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _error = e.toString());
-        ref.read(notificationProvider.notifier).show(
-              'COULDN\'T IMPORT FOLDER ON DEVICE. CHECK DRIVE ACCESS.',
-              type: NotificationType.error,
-            );
-        return;
-      } finally {
-        if (mounted) {
-          setState(() => _isFetching = false);
-        }
-      }
-    }
-
     // ZIP URLs cannot be pre-listed at leaf level reliably, so we directly sync (Pro cloud only).
     if (_isDriveZipUrl(url) && !_isDriveFolderUrl(url)) {
       try {
         if (!mounted) return;
         ref.read(notificationProvider.notifier).show(
-          'ZIP DETECTED. EXTRACTING AND SYNCING PHOTOS...',
+          halideCaps(l10n.zipDetectedSyncing),
           type: NotificationType.info,
         );
         await _syncImagesFromUrl();
@@ -1516,7 +1812,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
         } else {
           debugPrint('[Drive] list_leaf_files: unexpected payload type=${data.runtimeType}');
           _leafFiles = const [];
-          _error = 'Unexpected response from Drive.';
+          _error = l10n.unexpectedDriveResponse;
         }
       } else {
         // If it's not clearly a folder or zip, just fall back to sync via auto-router.
@@ -1527,7 +1823,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       debugPrint('[Drive] auto-sync starting (leafFiles=${_leafFiles.length})');
       if (_isDriveFolderUrl(url)) {
         ref.read(notificationProvider.notifier).show(
-          'FOUND ${_leafFiles.length} PHOTOS. IMPORTING INTO ROLL...',
+          halideCaps(l10n.foundPhotosImporting(_leafFiles.length)),
           type: NotificationType.info,
         );
       }
@@ -1538,7 +1834,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       final detail = data is Map<String, dynamic> ? data['detail']?.toString() : data?.toString();
       setState(() {
         _error = detail != null && detail.isNotEmpty
-            ? 'Backend error${status != null ? ' ($status)' : ''}: $detail'
+            ? l10n.backendErrorDetail(status != null ? ' ($status)' : '', detail)
             : e.toString();
       });
     } catch (e) {
@@ -1598,7 +1894,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
             ? data['synced_count'].toString()
             : '0';
         ref.read(notificationProvider.notifier).show(
-          'SUCCESSFULLY IMPORTED $synced NEW PHOTOS!',
+          halideCaps(context.l10n.successfullyImportedNewPhotos(synced)),
           type: NotificationType.success,
         );
         widget.onUploadComplete();
@@ -1609,12 +1905,12 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
       final body = e.response?.data;
       debugPrint('[Drive] sync error: ${e.response?.statusCode} $body');
       ref.read(notificationProvider.notifier).show(
-        'SYNC FAILED. PLEASE VERIFY YOUR DRIVE LINK AND PERMISSIONS.',
+        halideCaps(context.l10n.syncFailedVerifyDrive),
         type: NotificationType.error,
       );
     } catch (e) {
       ref.read(notificationProvider.notifier).show(
-        'SOMETHING WENT WRONG DURING SYNC.',
+        halideCaps(context.l10n.somethingWrongDuringSync),
         type: NotificationType.error,
       );
     }
@@ -1633,12 +1929,18 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final isPro = ref.watch(userPlanProvider).isPro;
+    final showProProgress = _isFetching && isPro;
+    // Free: device photos only — never show Drive URL mode.
+    final mode = isPro ? _mode : _LabImportMode.manual;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'IMPORT OPTIONS',
-          style: TextStyle(
+        Text(
+          l10n.importOptions,
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w900,
             fontSize: 14,
@@ -1651,21 +1953,30 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
           runSpacing: 10,
           children: [
             ChoiceChip(
-              label: const Text('Manual Add (Free)'),
-              selected: _mode == _LabImportMode.manual,
+              label: Text(l10n.manualAddFree),
+              selected: mode == _LabImportMode.manual,
               onSelected: (_) => setState(() => _mode = _LabImportMode.manual),
             ),
-            if (!_manualUploadDone) ...[
+            if (isPro && !_manualUploadDone) ...[
               ChoiceChip(
-                label: const Text('Drive URL'),
-                selected: _mode == _LabImportMode.drive,
+                label: Text(l10n.driveUrlChip),
+                selected: mode == _LabImportMode.drive,
                 onSelected: (_) => setState(() => _mode = _LabImportMode.drive),
               ),
             ],
           ],
         ),
         const SizedBox(height: 18),
-        if (_mode == _LabImportMode.manual)
+        if (showProProgress) ...[
+          const SyncProgressBanner(
+            label: 'Syncing scans from Google Drive…',
+            progress: null,
+            accentColor: Colors.blueAccent,
+            compact: true,
+          ),
+          const SizedBox(height: 14),
+        ],
+        if (mode == _LabImportMode.manual)
           ImageUploaderWidget(
             key: ValueKey('manual-uploader-$_manualUploadResetToken'),
             rollId: widget.rollId,
@@ -1678,7 +1989,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
             controller: _driveUrlController,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              labelText: 'Shared Drive URL (folder or ZIP)',
+              labelText: l10n.driveUrlLabel,
               labelStyle: const TextStyle(color: Colors.white38, fontSize: 13),
               filled: true,
               fillColor: Colors.white.withOpacity(0.05),
@@ -1713,9 +2024,9 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
                       width: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text(
-                      'Fetch Files',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                  : Text(
+                      l10n.fetchFiles,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
             ),
           ),
@@ -1729,7 +2040,7 @@ class _LabImportOptionsState extends ConsumerState<_LabImportOptions> {
           const SizedBox(height: 12),
           if (_leafFiles.isNotEmpty) ...[
             Text(
-              'Found ${_leafFiles.length} file(s) at leaf level.',
+              l10n.foundFilesAtLeaf(_leafFiles.length),
               style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -1848,6 +2159,7 @@ class _AlignmentCalibrationSliderState extends State<_AlignmentCalibrationSlider
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1855,9 +2167,9 @@ class _AlignmentCalibrationSliderState extends State<_AlignmentCalibrationSlider
           children: [
             const Icon(Icons.tune_rounded, size: 14, color: Colors.orange),
             const SizedBox(width: 8),
-            const Text(
-              'ALIGNMENT CALIBRATION',
-              style: TextStyle(
+            Text(
+              l10n.alignmentCalibration,
+              style: const TextStyle(
                 fontSize: 10,
                 letterSpacing: 1.5,
                 fontWeight: FontWeight.w900,
@@ -1866,15 +2178,15 @@ class _AlignmentCalibrationSliderState extends State<_AlignmentCalibrationSlider
             ),
             const Spacer(),
             Text(
-              '${_localOffset.toInt()} frames offset',
+              l10n.framesOffset(_localOffset.toInt()),
               style: const TextStyle(color: Colors.white60, fontSize: 10),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Adjust if your scans start with blank loading frames.',
-          style: TextStyle(color: Colors.white38, fontSize: 11),
+        Text(
+          l10n.alignmentCalibrationHint,
+          style: const TextStyle(color: Colors.white38, fontSize: 11),
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(

@@ -81,12 +81,18 @@ class GyroScanSyncService {
   }
 
   /// Upload all pending frames for [rollId]. Called from Finish scanning.
-  Future<void> processQueueForRoll(String rollId) async {
+  Future<void> processQueueForRoll(
+    String rollId, {
+    void Function(int done, int total)? onProgress,
+  }) async {
     if (_processing) return;
     _processing = true;
     try {
       var queue = await _loadQueue();
       final pending = queue.where((t) => t.rollId == rollId).toList();
+      final total = pending.length;
+      onProgress?.call(0, total);
+      var done = 0;
       for (final task in pending) {
         final ok = await _uploadOne(task);
         queue = await _loadQueue();
@@ -96,6 +102,8 @@ class GyroScanSyncService {
           );
           await _saveQueue(queue);
           await GyroScanCacheService.instance.deleteRawAfterSync(task.localRawPath);
+          done++;
+          onProgress?.call(done, total);
         } else {
           break;
         }

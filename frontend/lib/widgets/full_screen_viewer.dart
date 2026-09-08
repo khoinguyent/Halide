@@ -7,10 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:frontend/config/app_config.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:frontend/core/models/notification_model.dart';
+import 'package:frontend/config/app_config.dart';
 import 'package:frontend/core/providers/notification_provider.dart';
+import 'package:frontend/features/print/presentation/print_compose_view.dart';
 import 'package:frontend/models/film_stock.dart';
 import 'package:frontend/models/camera.dart';
 import 'package:frontend/models/user_profile.dart';
@@ -35,6 +37,7 @@ Future<void> _uploadPendingRotationsInBackground(
   ProviderContainer container,
   String rollId,
   Map<int, _PendingCloudRotation> pending,
+  String uploadFailureMessage,
 ) async {
   if (pending.isEmpty) return;
   final edit = RollImageEditService();
@@ -59,8 +62,7 @@ Future<void> _uploadPendingRotationsInBackground(
   if (failures > 0) {
     try {
       container.read(notificationProvider.notifier).show(
-            'WE COULDN\'T UPLOAD YOUR ROTATED PHOTOS TO THE CLOUD. '
-            'THEY\'RE STILL SAVED ON THIS PHONE — OPEN THE ROLL AND TRY AGAIN.',
+            uploadFailureMessage,
             type: NotificationType.error,
           );
     } catch (_) {}
@@ -139,6 +141,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
   void _popWithAsyncCloudFlush([Object? result]) {
     final container = ProviderScope.containerOf(context);
     final rollId = widget.rollId;
+    final failureMsg = halideCaps(context.l10n.couldNotUploadRotated);
     final pending = ref.read(userPlanProvider) == UserPlan.pro && _pendingProCloud.isNotEmpty
         ? Map<int, _PendingCloudRotation>.from(_pendingProCloud)
         : <int, _PendingCloudRotation>{};
@@ -147,7 +150,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
     Navigator.of(context).pop(result);
 
     if (pending.isNotEmpty) {
-      unawaited(_uploadPendingRotationsInBackground(container, rollId, pending));
+      unawaited(_uploadPendingRotationsInBackground(container, rollId, pending, failureMsg));
     }
   }
 
@@ -223,39 +226,23 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
     return outPath;
   }
 
-  String _mimeTypeForPath(String path) {
-    final lower = path.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    return 'image/jpeg';
-  }
-
-  Future<void> _shareCurrentImage() async {
-    try {
-      final path = await _ensureLocalOrTempFileForExport();
-      if (path == null || !File(path).existsSync()) {
-        ref.read(notificationProvider.notifier).show(
-              'IMAGE NOT AVAILABLE OFFLINE YET. WAIT FOR DOWNLOAD OR CHECK CONNECTION.',
-              type: NotificationType.warning,
-            );
-        return;
-      }
-      final mime = _mimeTypeForPath(path);
-      final name = p.basename(path);
-      await Share.shareXFiles([
-        XFile(path, mimeType: mime, name: name),
-      ]);
-    } catch (e, st) {
-      debugPrint('[FullScreenViewer] share failed: $e\n$st');
-      ref.read(notificationProvider.notifier).show(
-            'COULDN\'T SHARE IMAGE.',
-            type: NotificationType.error,
-          );
-    }
+  Future<void> _openSendAsPrint() async {
+    // Free users may stamp/edit locally; send is gated inside compose.
+    final imageId = _imageIdAt(_currentIndex) ?? '';
+    final url = widget.imageUrls[_currentIndex];
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PrintComposeView(
+          rollId: widget.rollId,
+          imageId: imageId,
+          imageUrl: url,
+        ),
+      ),
+    );
   }
 
   Future<void> _saveCurrentToPhotos() async {
+    final l10n = context.l10n;
     try {
       var granted = await Gal.hasAccess(toAlbum: true);
       if (!granted) {
@@ -263,7 +250,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
       }
       if (!granted) {
         ref.read(notificationProvider.notifier).show(
-              'PHOTOS LIBRARY ACCESS DENIED. ENABLE IN SETTINGS.',
+              halideCaps(l10n.photosAccessDenied),
               type: NotificationType.error,
             );
         return;
@@ -271,7 +258,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
       final path = await _ensureLocalOrTempFileForExport();
       if (path == null || !File(path).existsSync()) {
         ref.read(notificationProvider.notifier).show(
-              'IMAGE NOT AVAILABLE OFFLINE YET. WAIT FOR DOWNLOAD OR CHECK CONNECTION.',
+              halideCaps(l10n.imageNotAvailableOffline),
               type: NotificationType.warning,
             );
         return;
@@ -279,19 +266,19 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
       await Gal.putImage(path);
       if (!mounted) return;
       ref.read(notificationProvider.notifier).show(
-            'SAVED TO PHOTOS.',
+            halideCaps(l10n.savedToPhotos),
             type: NotificationType.success,
           );
     } on GalException catch (e, st) {
       debugPrint('[FullScreenViewer] gal save: $e\n$st');
       ref.read(notificationProvider.notifier).show(
-            'COULDN\'T SAVE TO PHOTOS.',
+            halideCaps(l10n.couldNotSaveToPhotos),
             type: NotificationType.error,
           );
     } catch (e, st) {
       debugPrint('[FullScreenViewer] save to photos failed: $e\n$st');
       ref.read(notificationProvider.notifier).show(
-            'COULDN\'T SAVE TO PHOTOS.',
+            halideCaps(l10n.couldNotSaveToPhotos),
             type: NotificationType.error,
           );
     }
@@ -300,7 +287,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
   void _showHalideDebugLogs() {
     showHalideDebugLogSheet(
       context,
-      title: 'HALIDE DEBUG LOG',
+      title: 'AGXEL DEBUG LOG',
       channelFilter: null,
       emptyHint: '(no log lines yet — open rolls, meter, or sync images)',
     );
@@ -322,13 +309,14 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
 
   Future<void> _applyRotation(int quarterTurns) async {
     if (_rotating) return;
+    final l10n = context.l10n;
     final url = widget.imageUrls[_currentIndex];
     final canRotate = url.startsWith('http') ||
         url.startsWith('/') ||
         url.startsWith('file://');
     if (!canRotate) {
       ref.read(notificationProvider.notifier).show(
-            'CANNOT ROTATE THIS IMAGE TYPE.',
+            halideCaps(l10n.cannotRotateImageType),
             type: NotificationType.error,
           );
       return;
@@ -364,7 +352,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
       debugPrint('[FullScreenViewer] rotate failed: $e\n$st');
       setState(() => _rotating = false);
       ref.read(notificationProvider.notifier).show(
-            'COULD NOT ROTATE IMAGE.',
+            halideCaps(l10n.couldNotRotateImage),
             type: NotificationType.error,
           );
     }
@@ -372,6 +360,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final plan = ref.watch(userPlanProvider);
     final isPro = plan == UserPlan.pro;
 
@@ -433,17 +422,26 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
                         IconButton(
                           icon: const Icon(Icons.arrow_back, color: Colors.white),
                           onPressed: _rotating ? null : _exitViewer,
+                          visualDensity: VisualDensity.compact,
+                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                          padding: EdgeInsets.zero,
                         ),
                         if (AppConfig.showInAppDiagnostics) ...[
                           IconButton(
                             tooltip: 'Debug logs (Sync, Meter, …)',
                             onPressed: _rotating ? null : _showHalideDebugLogs,
-                            icon: const Icon(Icons.terminal, color: Color(0xFFFFA07A), size: 22),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.terminal, color: Color(0xFFFFA07A), size: 20),
                           ),
                           IconButton(
                             tooltip: 'Image URL & cache',
                             onPressed: _rotating ? null : _showCurrentImageUrlDiagnostics,
-                            icon: const Icon(Icons.link, color: Color(0xFFFFA07A), size: 22),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.link, color: Color(0xFFFFA07A), size: 20),
                           ),
                         ],
                         const Spacer(),
@@ -451,40 +449,52 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
                           '${_currentIndex + 1} / ${widget.imageUrls.length}',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const Spacer(),
                         if (_rotating)
                           const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            padding: EdgeInsets.symmetric(horizontal: 8),
                             child: SizedBox(
-                              width: 22,
-                              height: 22,
+                              width: 20,
+                              height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             ),
                           )
                         else ...[
                           IconButton(
-                            tooltip: 'Share',
-                            onPressed: _shareCurrentImage,
-                            icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
+                            tooltip: l10n.sendAsPrint,
+                            onPressed: _openSendAsPrint,
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            padding: EdgeInsets.zero,
+                            icon: const _PostcardIcon(color: Colors.white, size: 22),
                           ),
                           IconButton(
-                            tooltip: 'Save to Photos',
+                            tooltip: l10n.saveToPhotos,
                             onPressed: _saveCurrentToPhotos,
-                            icon: const Icon(Icons.download_rounded, color: Colors.white),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.download_rounded, color: Colors.white, size: 22),
                           ),
                           IconButton(
-                            tooltip: '90° counter-clockwise',
+                            tooltip: l10n.rotate90CounterClockwise,
                             onPressed: () => _applyRotation(-1),
-                            icon: const Icon(Icons.rotate_left, color: Colors.white),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.rotate_left, color: Colors.white, size: 22),
                           ),
                           IconButton(
-                            tooltip: '90° clockwise',
+                            tooltip: l10n.rotate90Clockwise,
                             onPressed: () => _applyRotation(1),
-                            icon: const Icon(Icons.rotate_right, color: Colors.white),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.rotate_right, color: Colors.white, size: 22),
                           ),
                         ],
                       ],
@@ -497,7 +507,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
                     left: 16,
                     right: 16,
                     child: Text(
-                      'Edits save on this device. Upgrade to Pro to sync rotated images to the cloud.',
+                      l10n.editsLocalOnlyHint,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11),
                     ),
@@ -508,7 +518,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
                     left: 16,
                     right: 16,
                     child: Text(
-                      'Unsaved cloud changes: ${_pendingProCloud.length} — leaving uploads to Halide Cloud.',
+                      l10n.unsavedCloudChanges(_pendingProCloud.length),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.amber.withOpacity(0.85), fontSize: 11),
                     ),
@@ -562,7 +572,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
                             const Spacer(),
                             if (widget.iso != null)
                               Text(
-                                'ISO ${widget.iso}',
+                                l10n.isoValue('${widget.iso}'),
                                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                           ],
@@ -570,7 +580,7 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
                         if (widget.dateScanned != null) ...[
                           const SizedBox(height: 8),
                           Text(
-                            'Scanned: ${widget.dateScanned!.toLocal().toString().split(' ')[0]}',
+                            l10n.scannedDate(widget.dateScanned!.toLocal().toString().split(' ')[0]),
                             style: const TextStyle(color: Colors.white54, fontSize: 12),
                           ),
                         ],
@@ -591,12 +601,14 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
   Widget _buildShotMetadataOverlay(int imageIndex) {
     if (widget.shots == null || widget.shots!.isEmpty) return const SizedBox.shrink();
 
+    final l10n = context.l10n;
     final shotIndex = imageIndex;
     if (shotIndex < 0 || shotIndex >= widget.shots!.length) return const SizedBox.shrink();
 
     final shot = widget.shots![shotIndex];
     final aperture = shot['aperture'];
     final speed = shot['shutter_speed'];
+    final missing = l10n.apertureMissing;
 
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -607,9 +619,9 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
           const SizedBox(height: 8),
           Row(
             children: [
-              _infoTile(Icons.camera_rounded, aperture != null ? 'f/$aperture' : '---'),
+              _infoTile(Icons.camera_rounded, aperture != null ? 'f/$aperture' : missing),
               const SizedBox(width: 24),
-              _infoTile(Icons.timer_outlined, speed ?? '---'),
+              _infoTile(Icons.timer_outlined, speed ?? missing),
               const Spacer(),
               if (shot['location_lat'] != null) const Icon(Icons.location_on_outlined, color: Colors.orange, size: 14),
             ],
@@ -631,4 +643,91 @@ class _FullScreenViewerState extends ConsumerState<FullScreenViewer> {
       ],
     );
   }
+}
+
+/// Landscape postcard silhouette: card + stamp square + address lines.
+class _PostcardIcon extends StatelessWidget {
+  const _PostcardIcon({required this.color, this.size = 24});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _PostcardIconPainter(color),
+      ),
+    );
+  }
+}
+
+class _PostcardIconPainter extends CustomPainter {
+  _PostcardIconPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.07
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+
+    final fill = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final inset = size.width * 0.08;
+    final card = RRect.fromRectAndRadius(
+      Rect.fromLTWH(inset, size.height * 0.18, size.width - inset * 2, size.height * 0.64),
+      Radius.circular(size.width * 0.06),
+    );
+    canvas.drawRRect(card, stroke);
+
+    // Stamp (top-right)
+    final stamp = Rect.fromLTWH(
+      size.width * 0.58,
+      size.height * 0.28,
+      size.width * 0.26,
+      size.height * 0.22,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(stamp, Radius.circular(size.width * 0.03)),
+      stroke,
+    );
+    // Small photo hint inside stamp
+    canvas.drawCircle(
+      Offset(stamp.center.dx, stamp.center.dy),
+      size.width * 0.045,
+      stroke,
+    );
+
+    // Address / message lines (left)
+    final lineLeft = size.width * 0.2;
+    final lineRight = size.width * 0.5;
+    final y0 = size.height * 0.42;
+    for (var i = 0; i < 3; i++) {
+      final y = y0 + i * size.height * 0.1;
+      canvas.drawLine(Offset(lineLeft, y), Offset(lineRight, y), stroke);
+    }
+
+    // Tiny stamp perforations (dots)
+    final dotR = size.width * 0.015;
+    for (var i = 0; i < 3; i++) {
+      canvas.drawCircle(
+        Offset(stamp.left - size.width * 0.04, stamp.top + stamp.height * (0.2 + i * 0.3)),
+        dotR,
+        fill,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PostcardIconPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

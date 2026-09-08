@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../providers/auth_provider.dart';
@@ -38,10 +40,11 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
   bool _isUploading = false;
 
   Future<void> _pickImages() async {
+    final l10n = context.l10n;
     final remainingSlots = widget.maxImages - (widget.currentImageCount + _selectedImages.length);
     if (remainingSlots <= 0) {
       ref.read(notificationProvider.notifier).show(
-        'Maximum of ${widget.maxImages} images allowed per gear item.',
+        halideCaps(l10n.maxImagesAllowed(widget.maxImages)),
         type: NotificationType.error,
       );
       return;
@@ -55,7 +58,6 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
       limit: remainingSlots,
     );
     if (images.isNotEmpty) {
-      // Enforce the constraint
       final imagesToAdd = images.take(remainingSlots).toList();
       setState(() {
         _selectedImages.addAll(imagesToAdd);
@@ -63,7 +65,7 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
       if (images.length > remainingSlots) {
         if (mounted) {
            ref.read(notificationProvider.notifier).show(
-          'Only added $remainingSlots images to stay within the limit of ${widget.maxImages}.',
+          l10n.onlyAddedRemainingImages(remainingSlots, widget.maxImages),
           type: NotificationType.info,
         );
         }
@@ -82,13 +84,14 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
 
     setState(() => _isUploading = true);
 
+    final l10n = context.l10n;
     final user = ref.read(authServiceProvider).currentUser;
     final token = await user?.getIdToken();
     if (token == null) {
       if (mounted) {
         setState(() => _isUploading = false);
         ref.read(notificationProvider.notifier).show(
-              'SIGN IN TO UPLOAD GEAR PHOTOS.',
+              halideCaps(l10n.signInUploadGearPhotos),
               type: NotificationType.error,
             );
       }
@@ -101,23 +104,22 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
       if (!mounted) return;
       ref.invalidate(userGearProvider);
       ref.read(notificationProvider.notifier).show(
-            'SUCCESSFULLY UPLOADED ${files.length} IMAGE(S)!',
+            halideCaps(l10n.successfullyUploadedGearImages(files.length)),
             type: NotificationType.success,
           );
     } on GearImageUploadException catch (e, st) {
       debugPrint('[GearImageUploader] upload failed: $e\n$st');
       if (mounted) {
         final detail = e.detail?.toUpperCase() ?? '';
-        String message = 'UPLOAD FAILED. CHECK CONNECTION OR STORAGE.';
+        String message = halideCaps(l10n.uploadFailedCheckConnection);
         if (e.statusCode == 404 ||
             detail.contains('USER CAMERA NOT FOUND') ||
             detail.contains('NOT FOUND')) {
-          message =
-              'GEAR NOT FOUND FOR THIS ACCOUNT. OPEN THE LOCKER, PULL TO REFRESH, THEN TRY AGAIN.';
+          message = halideCaps(l10n.gearNotFoundRefresh);
         } else if (e.statusCode == 402 || detail.contains('STORAGE LIMIT')) {
-          message = 'STORAGE LIMIT REACHED. FREE SOME SPACE OR UPGRADE YOUR PLAN.';
+          message = halideCaps(l10n.storageLimitFreeSpace);
         } else if (e.statusCode == 400) {
-          message = detail.isNotEmpty ? detail : 'UPLOAD REJECTED. CHECK FILE SIZE (MAX 15 MB) AND FORMAT.';
+          message = detail.isNotEmpty ? detail : halideCaps(l10n.uploadRejectedFormat);
         }
         ref.read(notificationProvider.notifier).show(message, type: NotificationType.error);
         ref.invalidate(userGearProvider);
@@ -126,7 +128,7 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
       debugPrint('[GearImageUploader] upload failed: $e\n$st');
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-              'UPLOAD FAILED. CHECK CONNECTION OR STORAGE.',
+              halideCaps(l10n.uploadFailedCheckConnection),
               type: NotificationType.error,
             );
       }
@@ -142,11 +144,12 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final total = _selectedImages.length;
     final remainingAllowed = widget.maxImages - widget.currentImageCount;
 
     if (remainingAllowed <= 0 && _selectedImages.isEmpty) {
-      return const SizedBox.shrink(); // Hide uploader if max reached
+      return const SizedBox.shrink();
     }
 
     final fg = widget.darkMode ? Colors.white : Colors.black87;
@@ -160,8 +163,8 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Add Images', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: fg)),
-            Text('${widget.currentImageCount + _selectedImages.length} / ${widget.maxImages}', style: TextStyle(color: fgMuted)),
+            Text(l10n.addImages, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: fg)),
+            Text(l10n.imageCount(widget.currentImageCount + _selectedImages.length, widget.maxImages), style: TextStyle(color: fgMuted)),
           ],
         ),
         const SizedBox(height: 16),
@@ -181,7 +184,7 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
                 children: [
                   Icon(Icons.add_photo_alternate_outlined, size: 40, color: fgMuted),
                   const SizedBox(height: 8),
-                  Text('Tap to select up to $remainingAllowed photos', style: TextStyle(color: fgMuted)),
+                  Text(l10n.tapToSelectUpTo(remainingAllowed), style: TextStyle(color: fgMuted)),
                 ],
               ),
             ),
@@ -240,7 +243,7 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
               valueColor: widget.darkMode ? const AlwaysStoppedAnimation<Color>(Colors.white) : null,
             ),
             const SizedBox(height: 8),
-            Text('Uploading…', style: TextStyle(color: fgMuted, fontSize: 13)),
+            Text(l10n.uploading, style: TextStyle(color: fgMuted, fontSize: 13)),
             const SizedBox(height: 12),
           ],
           Row(
@@ -249,7 +252,7 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
                 OutlinedButton(
                   onPressed: _isUploading ? null : _pickImages,
                   style: widget.darkMode ? OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white38)) : null,
-                  child: const Text('Add More'),
+                  child: Text(l10n.addMore),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -264,7 +267,7 @@ class _GearImageUploaderWidgetState extends ConsumerState<GearImageUploaderWidge
                             strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.cloud_upload_outlined),
-                label: Text(_isUploading ? 'Uploading...' : 'Upload All ($total)'),
+                label: Text(_isUploading ? l10n.uploading : l10n.uploadAllCount(total)),
               ),
             ],
           ),

@@ -19,13 +19,18 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# drive.readonly: lab-scan import from shared folders the user did not create.
+# drive.file: create/update Agxel Vault archive folders and uploads owned by this app.
 DRIVE_SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
-    "https://www.googleapis.com/auth/drive.metadata.readonly",
+    "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
     "openid",
 ]
+
+AGXEL_VAULT_FOLDER_NAME = "Agxel Vault"
+_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
 # Naive UTC — google-auth compares expiry with naive UTC (see google.auth._helpers.utcnow).
 _LEGACY_FORCE_REFRESH_EXPIRY = datetime(1970, 1, 1, 0, 0, 0)
@@ -111,6 +116,14 @@ def exchange_server_auth_code(server_auth_code: str) -> Dict[str, Any]:
     """Exchange a one-time server auth code (from mobile) for access and refresh tokens."""
     if not _is_configured():
         raise RuntimeError("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set to connect Google Drive")
+    # Google silently expands the granted scope set (e.g. adds the implied
+    # "drive.metadata.readonly" alongside "drive.file"/"drive.readonly", and may
+    # reorder the scope string). oauthlib's default strict comparison between
+    # requested vs. granted scopes then raises `Warning("Scope has changed ...")`
+    # on every single token exchange. We only ever gain scopes here, never lose
+    # them, so relax the check rather than fail the whole connect flow.
+    import os
+    os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
     try:
         from google_auth_oauthlib.flow import Flow
         flow = Flow.from_client_config(
@@ -194,6 +207,86 @@ def list_root_files(credentials: Credentials, page_size: int = 20) -> List[Dict[
     return results.get("files", [])
 
 
+def _drive_service(credentials: Credentials):
+    return build("drive", "v3", credentials=credentials, cache_discovery=False)
+
+
+def _escape_drive_query_value(value: str) -> str:
+    """Escape a string for use inside a Drive API ``q`` single-quoted literal."""
+    return (value or "").replace("\\", "\\\\").replace("'", "\\'")
+
+
+def find_child_by_name(
+    credentials: Credentials,
+    *,
+    parent_id: str,
+    name: str,
+    mime_type: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Return the first non-trashed child under parent with the given name (optional mime filter)."""
+    service = _drive_service(credentials)
+    safe_name = _escape_drive_query_value(name)
+    safe_parent = _escape_drive_query_value(parent_id)
+    q = f"name = '{safe_name}' and '{safe_parent}' in parents and trashed = false"
+    if mime_type:
+        q += f" and mimeType = '{_escape_drive_query_value(mime_type)}'"
+    resp = (
+        service.files()
+        .list(
+            q=q,
+            spaces="drive",
+            fields="files(id, name, mimeType, webViewLink)",
+            pageSize=10,
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+        )
+        .execute()
+    )
+    files = resp.get("files") or []
+    return files[0] if files else None
+
+
+def create_folder(
+    credentials: Credentials,
+    name: str,
+    *,
+    parent_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a Drive folder. parent_id defaults to My Drive root when omitted."""
+    service = _drive_service(credentials)
+    body: Dict[str, Any] = {"name": name, "mimeType": _FOLDER_MIME_TYPE}
+    if parent_id:
+        body["parents"] = [parent_id]
+    return (
+        service.files()
+        .create(body=body, fields="id, name, mimeType, webViewLink", supportsAllDrives=True)
+        .execute()
+    )
+
+
+def find_or_create_folder(
+    credentials: Credentials,
+    name: str,
+    *,
+    parent_id: str = "root",
+) -> Dict[str, Any]:
+    """Find a folder by name under parent, or create it."""
+    existing = find_child_by_name(
+        credentials,
+        parent_id=parent_id,
+        name=name,
+        mime_type=_FOLDER_MIME_TYPE,
+    )
+    if existing:
+        return existing
+    return create_folder(credentials, name, parent_id=parent_id)
+
+
+def ensure_agxel_vault_folder(credentials: Credentials) -> Dict[str, Any]:
+    """Ensure the top-level ``Agxel Vault`` folder exists in My Drive."""
+    return find_or_create_folder(credentials, AGXEL_VAULT_FOLDER_NAME, parent_id="root")
+
+
 def upload_file(
     credentials: Credentials,
     file_content: bytes,
@@ -202,21 +295,71 @@ def upload_file(
     parent_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Upload a file to Google Drive. Returns file metadata (id, name, webViewLink if available)."""
-    service = build("drive", "v3", credentials=credentials)
-    body = {"name": name}
+    service = _drive_service(credentials)
+    body: Dict[str, Any] = {"name": name}
     if parent_id:
         body["parents"] = [parent_id]
-    import io
     media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype=mime_type, resumable=True)
-    file = (
+    return (
         service.files()
-        .create(body=body, media_body=media, fields="id, name, webViewLink")
+        .create(
+            body=body,
+            media_body=media,
+            fields="id, name, webViewLink",
+            supportsAllDrives=True,
+        )
         .execute()
     )
-    return file
 
 
-_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+def update_file_content(
+    credentials: Credentials,
+    file_id: str,
+    file_content: bytes,
+    mime_type: str = "application/octet-stream",
+) -> Dict[str, Any]:
+    """Replace the media body of an existing Drive file."""
+    service = _drive_service(credentials)
+    media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype=mime_type, resumable=True)
+    return (
+        service.files()
+        .update(
+            fileId=file_id,
+            media_body=media,
+            fields="id, name, webViewLink",
+            supportsAllDrives=True,
+        )
+        .execute()
+    )
+
+
+def upload_or_update_file(
+    credentials: Credentials,
+    *,
+    parent_id: str,
+    name: str,
+    file_content: bytes,
+    mime_type: str = "application/octet-stream",
+) -> Dict[str, Any]:
+    """
+    Idempotent upload: if a non-trashed file with ``name`` already exists under
+    ``parent_id``, replace its content; otherwise create it.
+    """
+    existing = find_child_by_name(credentials, parent_id=parent_id, name=name)
+    if existing and existing.get("mimeType") != _FOLDER_MIME_TYPE:
+        return update_file_content(
+            credentials,
+            existing["id"],
+            file_content,
+            mime_type=mime_type,
+        )
+    return upload_file(
+        credentials,
+        file_content,
+        name,
+        mime_type=mime_type,
+        parent_id=parent_id,
+    )
 
 
 def extract_drive_folder_id(folder_url_or_id: str) -> str:

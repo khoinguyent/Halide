@@ -2,15 +2,20 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/models/film_stock.dart';
 import 'package:frontend/models/camera.dart';
 import 'package:frontend/models/roll_status.dart';
 import 'package:frontend/features/rolls/data/rolls_repository.dart';
 import 'package:frontend/features/rolls/presentation/bloc/rolls_bloc.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
+import 'package:frontend/core/theme/halide_colors.dart';
 import 'package:frontend/core/providers/notification_provider.dart';
 import 'package:frontend/core/models/notification_model.dart';
 import 'package:frontend/providers/guidance_pending_provider.dart';
+import 'package:frontend/providers/auth_provider.dart';
 import 'package:frontend/services/fetch_scans_helper.dart';
 
 class AddRollFormData {
@@ -64,6 +69,8 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
   List<Camera> _cameras = [];
   bool _isLoading = true;
   bool _showValidationError = false;
+  bool _showFramesError = false;
+  int _step = 0;
 
   final _stockController = TextEditingController();
   final _cameraController = TextEditingController();
@@ -105,7 +112,6 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
     }
   }
 
-  /// Strip zero-width chars used only to trigger [Autocomplete] option refresh on focus.
   static String _normalizeAutocompleteQuery(String s) {
     return s.replaceAll('\u200b', '').trim();
   }
@@ -145,19 +151,71 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
     });
   }
 
-  Widget _buildStatusSelector() {
+  bool get _showDriveUrlField {
+    final isPro = ref.watch(userPlanProvider).isPro;
+    if (!isPro) return false;
+    return _formData.status == RollStatus.lab ||
+        _formData.status == RollStatus.scanned;
+  }
+
+  Widget _buildStepIndicator(AppLocalizations l10n) {
+    return Row(
+      children: [
+        _StepDot(label: '1', title: l10n.addRollStep1, active: _step == 0, done: _step > 0),
+        Expanded(
+          child: Container(
+            height: 2,
+            margin: const EdgeInsets.only(bottom: 18),
+            color: _step > 0
+                ? HalideColors.of(context).slateTeal.withValues(alpha: 0.5)
+                : HalideColors.of(context).glassBorder(0.2),
+          ),
+        ),
+        _StepDot(label: '2', title: l10n.addRollStep2, active: _step == 1, done: false),
+      ],
+    );
+  }
+
+  Widget _buildFrameInput(AppLocalizations l10n) {
+    return HalideTextField(
+      label: halideCaps(l10n.totalFrames),
+      initialValue: _formData.maxFrames.toString(),
+      keyboardType: TextInputType.number,
+      errorText: _showFramesError
+          ? 'ENTER A VALID FRAME COUNT (1 OR MORE)'
+          : null,
+      onChanged: (val) {
+        final trimmed = val.trim();
+        if (trimmed.isEmpty) {
+          _formData.maxFrames = 0;
+          return;
+        }
+        final parsed = int.tryParse(trimmed);
+        if (parsed != null && parsed > 0) {
+          _formData.maxFrames = parsed;
+          if (_showFramesError) {
+            setState(() => _showFramesError = false);
+          }
+        } else {
+          _formData.maxFrames = 0;
+        }
+      },
+    );
+  }
+
+  Widget _buildStatusSelector(AppLocalizations l10n) {
     return DropdownButtonFormField<RollStatus>(
       value: _formData.status,
-      dropdownColor: const Color(0xFF1A1C29),
-      icon: const Icon(
+      dropdownColor: HalideColors.of(context).surfaceSheet,
+      icon: Icon(
         Icons.keyboard_arrow_down,
         color: Colors.white24,
         size: 18,
       ),
       decoration: InputDecoration(
-        labelText: 'STATUS',
+        labelText: halideCaps(l10n.status),
         labelStyle: TextStyle(
-          color: Colors.white.withOpacity(0.35),
+          color: HalideColors.of(context).steel.withValues(alpha: 0.85),
           fontSize: 9.5,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.2,
@@ -165,34 +223,154 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(vertical: 10),
         enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: HalideColors.of(context).borderSubtle),
         ),
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white, width: 1.2),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: HalideColors.of(context).slateTeal, width: 1.2),
         ),
       ),
-      style: const TextStyle(
-        color: Colors.white,
+      style: TextStyle(
+        color: HalideColors.of(context).textPrimary,
         fontSize: 15,
         letterSpacing: 0.5,
       ),
-      items: const [
-        DropdownMenuItem(value: RollStatus.shooting, child: Text('Shooting')),
-        DropdownMenuItem(value: RollStatus.lab, child: Text('At Lab')),
-        DropdownMenuItem(value: RollStatus.scanned, child: Text('Scanned')),
+      items: [
+        DropdownMenuItem(value: RollStatus.shooting, child: Text(RollStatus.shooting.localizedLabel(l10n))),
+        DropdownMenuItem(value: RollStatus.lab, child: Text(RollStatus.lab.localizedLabel(l10n))),
+        DropdownMenuItem(value: RollStatus.scanned, child: Text(RollStatus.scanned.localizedLabel(l10n))),
       ],
       onChanged: (status) {
         if (status != null) {
           setState(() {
             _formData.status = status;
+            if (!_showDriveUrlField) {
+              _formData.driveUrl = null;
+            }
           });
         }
       },
     );
   }
 
+  Widget _buildStepOne(AppLocalizations l10n) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildSearchableStockPicker(l10n),
+        const SizedBox(height: 16),
+        _buildSearchableCameraPicker(l10n),
+        const SizedBox(height: 16),
+        _buildFrameInput(l10n),
+      ],
+    );
+  }
+
+  Widget _buildStepTwo(AppLocalizations l10n) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        HalideTextField(
+          label: halideCaps(l10n.title),
+          initialValue: _formData.title,
+          onChanged: (val) => _formData.title = val,
+        ),
+        const SizedBox(height: 16),
+        HalideTextField(
+          label: halideCaps(l10n.description),
+          initialValue: _formData.description,
+          onChanged: (val) => _formData.description = val,
+          maxLines: 3,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: HalideTextField(
+                label: halideCaps(l10n.iso),
+                initialValue: _formData.shotAtIso?.toString(),
+                keyboardType: TextInputType.number,
+                onChanged: (val) => _formData.shotAtIso = int.tryParse(val),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: HalideTextField(
+                label: halideCaps(l10n.expiredYear),
+                initialValue: _formData.expiredYear?.toString(),
+                keyboardType: TextInputType.number,
+                onChanged: (val) => _formData.expiredYear = int.tryParse(val),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildStatusSelector(l10n),
+        if (_showDriveUrlField) ...[
+          const SizedBox(height: 16),
+          HalideTextField(
+            label: halideCaps(l10n.driveUrlOptional),
+            initialValue: _formData.driveUrl,
+            onChanged: (val) => _formData.driveUrl = val,
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _goNext() {
+    if (_formData.selectedStock == null) {
+      setState(() {
+        _showValidationError = true;
+        _showFramesError = false;
+      });
+      return;
+    }
+    if (_formData.maxFrames < 1) {
+      setState(() {
+        _showFramesError = true;
+        _showValidationError = false;
+      });
+      return;
+    }
+    setState(() {
+      _showValidationError = false;
+      _showFramesError = false;
+      _step = 1;
+    });
+  }
+
+  Widget _buildStepTwoActions(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        HalideActionButton(
+          text: halideCaps(l10n.startRoll),
+          onPressed: _submit,
+        ),
+        SizedBox(height: 4),
+        TextButton(
+          onPressed: () => setState(() => _step = 0),
+          style: TextButton.styleFrom(
+            foregroundColor: HalideColors.of(context).textSecondary,
+            minimumSize: const Size(double.infinity, 44),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Text(
+            halideCaps(l10n.back),
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return BlocListener<RollsBloc, RollsState>(
       listener: (context, state) async {
         if (state is RollActionSuccess) {
@@ -204,15 +382,12 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
             ref.read(newRollGuidanceRollIdProvider.notifier).setPending(id);
           }
           widget.onRollAdded();
-          ref
-              .read(notificationProvider.notifier)
-              .show(
-                'YOUR NEW ROLL IS READY TO SHOOT!',
-                type: NotificationType.success,
-              );
+          ref.read(notificationProvider.notifier).show(
+            'YOUR NEW ROLL IS READY TO SHOOT!',
+            type: NotificationType.success,
+          );
 
           if (id != null && driveUrl != null && driveUrl.isNotEmpty) {
-            // Trigger fetch scans helper, no await so it runs after modal closes
             FetchScansHelper.handleFetchScans(
               context: context,
               ref: ref,
@@ -223,9 +398,10 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
 
           Navigator.of(context).pop();
         } else if (state is RollsError) {
-          ref
-              .read(notificationProvider.notifier)
-              .show(state.message, type: NotificationType.error);
+          ref.read(notificationProvider.notifier).show(
+            state.message,
+            type: NotificationType.error,
+          );
         }
       },
       child: HalideModalContainer(
@@ -240,87 +416,26 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'ADD NEW ROLL'.toUpperCase(),
-                      style: const TextStyle(
+                      halideCaps(l10n.openNewRoll),
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                        color: HalideColors.of(context).textPrimary,
                         letterSpacing: 2.5,
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    _buildStepIndicator(l10n),
+                    const SizedBox(height: 24),
+                    if (_step == 0) _buildStepOne(l10n) else _buildStepTwo(l10n),
                     const SizedBox(height: 32),
-                    _buildStatusSelector(),
-                    const SizedBox(height: 16),
-                    HalideTextField(
-                      label: 'TITLE',
-                      initialValue: _formData.title,
-                      onChanged: (val) => _formData.title = val,
-                    ),
-                    const SizedBox(height: 16),
-                    HalideTextField(
-                      label: 'DESCRIPTION',
-                      initialValue: _formData.description,
-                      onChanged: (val) => _formData.description = val,
-                      maxLines: 4,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSearchableStockPicker(),
-                    const SizedBox(height: 16),
-                    _buildSearchableCameraPicker(),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: HalideTextField(
-                            label: 'ISO',
-                            initialValue: _formData.shotAtIso?.toString(),
-                            keyboardType: TextInputType.number,
-                            onChanged: (val) =>
-                                _formData.shotAtIso = int.tryParse(val),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: HalideTextField(
-                            label: 'EXPIRED YEAR',
-                            initialValue: _formData.expiredYear?.toString(),
-                            keyboardType: TextInputType.number,
-                            onChanged: (val) =>
-                                _formData.expiredYear = int.tryParse(val),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    HalideTextField(
-                      label: 'TOTAL FRAMES (E.G. 36)',
-                      initialValue: _formData.maxFrames.toString(),
-                      keyboardType: TextInputType.number,
-                      onChanged: (val) =>
-                          _formData.maxFrames = int.tryParse(val) ?? 36,
-                    ),
-                    const SizedBox(height: 16),
-                    HalideTextField(
-                      label: 'DRIVE URL (OPTIONAL)',
-                      initialValue: _formData.driveUrl,
-                      onChanged: (val) {
-                        _formData.driveUrl = val;
-                        if (val.trim().isNotEmpty) {
-                          setState(() {
-                            _formData.status = RollStatus.scanned;
-                          });
-                        } else {
-                          setState(() {
-                            _formData.status = RollStatus.shooting;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 48),
-                    HalideActionButton(
-                      text: 'INITIALIZE ROLL',
-                      onPressed: _submit,
-                    ),
+                    if (_step == 0)
+                      HalideActionButton(
+                        text: halideCaps(l10n.next),
+                        onPressed: _goNext,
+                      )
+                    else
+                      _buildStepTwoActions(l10n),
                   ],
                 ),
               ),
@@ -328,7 +443,7 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
     );
   }
 
-  Widget _buildSearchableStockPicker() {
+  Widget _buildSearchableStockPicker(AppLocalizations l10n) {
     return Autocomplete<FilmStock>(
       displayStringForOption: (stock) =>
           '${stock.brand} ${stock.name} (${stock.format})',
@@ -342,7 +457,7 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
         return HalideTextField(
           controller: controller,
           focusNode: focusNode,
-          label: 'FILM STOCK (*)',
+          label: halideCaps(l10n.filmStock),
           errorText: (_showValidationError && _formData.selectedStock == null)
               ? 'PLEASE SELECT A FILM STOCK'
               : null,
@@ -359,7 +474,7 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
               constraints: const BoxConstraints(maxHeight: 250),
               margin: const EdgeInsets.only(top: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1C29),
+                color: const Color(0xFF314F6E),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white.withOpacity(0.12)),
               ),
@@ -386,7 +501,7 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
     );
   }
 
-  Widget _buildSearchableCameraPicker() {
+  Widget _buildSearchableCameraPicker(AppLocalizations l10n) {
     return Autocomplete<Camera>(
       displayStringForOption: (camera) => camera.displayName,
       optionsBuilder: (textEditingValue) =>
@@ -396,7 +511,7 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
         return HalideTextField(
           controller: controller,
           focusNode: focusNode,
-          label: 'GEAR',
+          label: halideCaps(l10n.gear),
           onTap: () => _kickAutocompleteOptions(controller),
         );
       },
@@ -410,7 +525,7 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
               constraints: const BoxConstraints(maxHeight: 250),
               margin: const EdgeInsets.only(top: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1C29),
+                color: const Color(0xFF314F6E),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white.withOpacity(0.12)),
               ),
@@ -439,10 +554,21 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
 
   void _submit() {
     if (_formData.selectedStock == null) {
-      setState(() => _showValidationError = true);
+      setState(() {
+        _showValidationError = true;
+        _step = 0;
+      });
+      return;
+    }
+    if (_formData.maxFrames < 1) {
+      setState(() {
+        _showFramesError = true;
+        _step = 0;
+      });
       return;
     }
 
+    final isPro = ref.read(userPlanProvider).isPro;
     context.read<RollsBloc>().add(
       AddRollEvent(
         filmStockId: _formData.selectedStock!.id,
@@ -453,8 +579,62 @@ class _AddRollFormState extends ConsumerState<AddRollForm> {
         expiredYear: _formData.expiredYear,
         maxFrames: _formData.maxFrames,
         status: _formData.status.name,
-        driveUrl: _formData.driveUrl,
+        driveUrl: isPro ? _formData.driveUrl : null,
       ),
+    );
+  }
+}
+
+class _StepDot extends StatelessWidget {
+  final String label;
+  final String title;
+  final bool active;
+  final bool done;
+
+  const _StepDot({
+    required this.label,
+    required this.title,
+    required this.active,
+    required this.done,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active || done ? HalideColors.of(context).slateTeal : HalideColors.of(context).steel;
+    return Column(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: active ? HalideColors.of(context).slateTeal.withValues(alpha: 0.2) : HalideColors.of(context).glassFill(0.06),
+            border: Border.all(color: color, width: active ? 2 : 1),
+          ),
+          child: Center(
+            child: done
+                ? Icon(Icons.check, size: 14, color: HalideColors.of(context).slateTeal)
+                : Text(
+                    label,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            color: color,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
     );
   }
 }

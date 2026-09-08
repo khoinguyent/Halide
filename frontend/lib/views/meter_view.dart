@@ -11,6 +11,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 import '../config/app_config.dart';
+import '../core/l10n/enum_l10n.dart';
+import '../core/l10n/l10n_extension.dart';
 import '../core/models/notification_model.dart';
 import '../core/providers/notification_provider.dart';
 import '../features/meter/providers/meter_provider.dart';
@@ -31,6 +33,7 @@ import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
 import '../services/sensor_service.dart';
 import '../widgets/aperture_slider_control.dart';
+import '../widgets/exif_capture_modal.dart' show kShotNotesMaxLength;
 
 class MeterView extends ConsumerStatefulWidget {
   const MeterView({Key? key}) : super(key: key);
@@ -334,12 +337,12 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
       await _resumeCameraPreviewIfNeeded();
       if (!mounted) return;
       final coach = buildSingleStepArchiveGuidance(
+        context: context,
         targetKey: _meterSpotKey,
         identify: 'meter_spot_intro',
         contentAlign: ContentAlign.bottom,
         body:
-            'Tap the circle to spot-meter the center and return to aperture priority. '
-            'Tap f/ or SS to set exposure, EV or ISO for compensation, then LOCK to hold exposure while you compose.',
+            context.l10n.guidanceMeterSpotIntro,
         onCompleted: () {
           unawaited(_resumeCameraPreviewIfNeeded());
           Future<void>.delayed(const Duration(milliseconds: 200), () {
@@ -357,13 +360,12 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
       await _resumeCameraPreviewIfNeeded();
       if (!mounted) return;
       final coach = buildSingleStepArchiveGuidance(
+        context: context,
         targetKey: _meterLogToRollKey,
         identify: 'meter_log_to_roll_intro',
         contentAlign: ContentAlign.top,
         paddingFocus: 6,
-        body:
-            'Tap LOG TO ROLL to save aperture, shutter, and meter details to a roll in Shooting. '
-            'Entries show in Shot Log with your archive EXIF logs.',
+        body: context.l10n.guidanceMeterLogToRoll,
         onCompleted: () {
           unawaited(GuidanceService.instance.setMeterIntroSeen());
           WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -398,7 +400,9 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
+        builder: (ctx, setSheet) {
+          final l10n = ctx.l10n;
+          return Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -411,8 +415,8 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('ISO',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 12)),
+              Text(l10n.meterIso,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 12)),
               const SizedBox(height: 14),
               Wrap(
                 spacing: 10, runSpacing: 10,
@@ -429,11 +433,12 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                 }).toList(),
               ),
               const SizedBox(height: 16),
-              Text('Changes will update EV and the computed exposure.',
+              Text(l10n.changesUpdateEv,
                 style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 12)),
             ],
           ),
-        ),
+        );
+        },
       ),
     );
   }
@@ -451,6 +456,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
+            final l10n = ctx.l10n;
             return Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
               child: Column(
@@ -465,9 +471,9 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'EV',
-                    style: TextStyle(
+                  Text(
+                    l10n.meterEv,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 2,
@@ -476,7 +482,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Compensation: ${comp >= 0 ? '+' : ''}${comp.toStringAsFixed(1)}',
+                    l10n.evCompensationValue('${comp >= 0 ? '+' : ''}${comp.toStringAsFixed(1)}'),
                     style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 10),
@@ -504,7 +510,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                       backgroundColor: Colors.white10,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    child: const Text('RESET'),
+                    child: Text(l10n.reset.toUpperCase()),
                   ),
                 ],
               ),
@@ -527,6 +533,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         side: BorderSide(color: Colors.white10, width: 0.5),
       ),
       builder: (ctx) {
+        final l10n = ctx.l10n;
         final bottomPadding = MediaQuery.of(ctx).padding.bottom;
         return Padding(
           padding: EdgeInsets.fromLTRB(24, 12, 24, 24 + bottomPadding),
@@ -548,9 +555,9 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'APERTURE',
-                    style: TextStyle(
+                  Text(
+                    l10n.meterAperture.toUpperCase(),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -565,7 +572,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
               ),
               const SizedBox(height: 8),
               Text(
-                'Drag to set f-stop. Tap the meter circle to return to aperture priority.',
+                l10n.aperturePickerHint,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.4),
                   fontSize: 11,
@@ -619,7 +626,9 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
+        builder: (ctx, setSheet) {
+          final l10n = ctx.l10n;
+          return Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -632,11 +641,11 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('SHUTTER SPEED',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 12)),
+              Text(l10n.shutterSpeed.toUpperCase(),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 12)),
               const SizedBox(height: 8),
               Text(
-                'Selecting a shutter speed switches to Shutter Priority.\nTap the meter circle to return to Aperture Priority.',
+                l10n.shutterPickerHint,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
               ),
@@ -657,7 +666,8 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
               ),
             ],
           ),
-        ),
+        );
+        },
       ),
     );
   }
@@ -702,6 +712,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
     final exposurePanelBottom = _navBarClearance + zoneLegendReserve;
     final evTarget = meterState.isLocked ? meterState.ev : meterState.evBase;
 
+    final l10n = context.l10n;
     final showMeterDebug = AppConfig.showInAppDiagnostics;
 
     return HalideScaffold(
@@ -709,9 +720,9 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         title: showMeterDebug
             ? GestureDetector(
                 onLongPress: _showMeterDebugSheet,
-                child: const Text(
-                  'PRECISION METER',
-                  style: TextStyle(
+                child: Text(
+                  l10n.precisionMeterTitle,
+                  style: const TextStyle(
                     letterSpacing: 2,
                     fontWeight: FontWeight.w300,
                     fontSize: 20,
@@ -719,9 +730,9 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                   ),
                 ),
               )
-            : const Text(
-                'PRECISION METER',
-                style: TextStyle(
+            : Text(
+                l10n.precisionMeterTitle,
+                style: const TextStyle(
                   letterSpacing: 2,
                   fontWeight: FontWeight.w300,
                   fontSize: 20,
@@ -750,7 +761,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                         const CircularProgressIndicator(color: Colors.white24, strokeWidth: 2),
                         const SizedBox(height: 16),
                         Text(
-                          'Starting camera…',
+                          l10n.startingCamera,
                           style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13),
                         ),
                       ],
@@ -847,13 +858,14 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
   }
 
   Widget _hudExpandCollapseButton({required bool expanded}) {
+    final l10n = context.l10n;
     return IconButton(
       onPressed: () => _toggleExposureHud(expanded: !expanded),
       icon: Icon(
         expanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
         color: Colors.white70,
       ),
-      tooltip: expanded ? 'Collapse exposure panel' : 'Expand exposure panel',
+      tooltip: expanded ? l10n.collapseExposurePanel : l10n.expandExposurePanel,
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -909,6 +921,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
     MeterState meterState,
     AdvancedSpotMeteringState spotState,
   ) {
+    final l10n = context.l10n;
     final reading = _exposurePanelReading(meterState, spotState);
     final accent = reading.usesPinAverage
         ? const Color(0xFFF97316)
@@ -936,7 +949,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                   if (reading.usesPinAverage) ...[
                     const SizedBox(width: 8),
                     Text(
-                      '${reading.pinCount} pin${reading.pinCount == 1 ? '' : 's'}',
+                      l10n.pinCountShort(reading.pinCount, reading.pinCount == 1 ? '' : 's'),
                       style: TextStyle(
                         color: accent.withValues(alpha: 0.85),
                         fontSize: 10,
@@ -977,6 +990,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
     MeterState meterState,
     AdvancedSpotMeteringState spotState,
   ) {
+    final l10n = context.l10n;
     final reading = _exposurePanelReading(meterState, spotState);
     final multiSpotAccent = const Color(0xFFF97316);
     final statusColor = reading.usesPinAverage
@@ -987,14 +1001,14 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                 ? const Color(0xFF4ADE80)
                 : Colors.white38;
     final statusLabel = reading.usesPinAverage
-        ? 'MULTI-SPOT · ${reading.pinCount} PIN${reading.pinCount == 1 ? '' : 'S'}'
+        ? l10n.multiSpotPinStatus(reading.pinCount, reading.pinCount == 1 ? '' : 'S')
         : spotState.multiSpotEnabled
-            ? 'MULTI-SPOT — TAP TO ADD PINS'
+            ? l10n.multiSpotTapAddPins
             : meterState.isLocked
-                ? 'LOCKED'
+                ? l10n.lockedStatus
                 : meterState.isAeStable
-                    ? 'STABLE'
-                    : 'METERING…';
+                    ? l10n.stableStatus
+                    : l10n.meteringStatus;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1012,14 +1026,14 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
           children: [
             if (reading.usesPinAverage)
               _infoColumn(
-                'PINS',
+                l10n.pinsLabel,
                 '${reading.pinCount}',
                 valueColor: multiSpotAccent,
               )
             else
               _infoColumn('LUX', '~${meterState.lux.toStringAsFixed(0)}'),
-            _infoColumn('EV', reading.ev.toStringAsFixed(1), onTap: _showEvPicker),
-            _infoColumn('ISO', meterState.iso.toStringAsFixed(0), onTap: _showIsoPicker),
+            _infoColumn(l10n.meterEv, reading.ev.toStringAsFixed(1), onTap: _showEvPicker),
+            _infoColumn(l10n.meterIso, meterState.iso.toStringAsFixed(0), onTap: _showIsoPicker),
           ],
         ),
         const SizedBox(height: 2),
@@ -1069,7 +1083,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
               ),
             ),
             child: Text(
-              meterState.isLocked ? 'UNLOCK' : 'LOCK EXPOSURE',
+              meterState.isLocked ? l10n.unlockExposure : l10n.lockExposureUpper,
               style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8, fontSize: 12),
             ),
           ),
@@ -1086,8 +1100,8 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text(
-                'LOG TO ROLL →',
+              child: Text(
+                l10n.logToRollArrow,
                 style: TextStyle(
                   color: Colors.orange,
                   fontWeight: FontWeight.bold,
@@ -1107,7 +1121,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
                 ),
                 child: const Icon(Icons.camera_rounded, color: Colors.orange, size: 20),
               ),
-              tooltip: 'Log meter reading to roll',
+              tooltip: l10n.logMeterReadingTooltip,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -1207,11 +1221,23 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         '$mode$lock';
   }
 
-  Future<void> _logMeterToRoll(BuildContext sheetContext, String rollId) async {
+  String _composeMeterNotes(MeterState s, String? userNotes) {
+    final auto = _buildMeterExifNotes(s);
+    final user = (userNotes ?? '').trim();
+    if (user.isEmpty) return auto;
+    final capped = user.length > 500 ? user.substring(0, 500) : user;
+    return '$capped\n\n$auto';
+  }
+
+  Future<void> _logMeterToRoll(
+    BuildContext sheetContext,
+    String rollId, {
+    String? userNotes,
+  }) async {
     Navigator.of(sheetContext).pop();
     final meter = ref.read(meterProvider);
     final shutter = _formatShutterSpeed(meter.shutterSpeed);
-    final notes = _buildMeterExifNotes(meter);
+    final notes = _composeMeterNotes(meter, userNotes);
 
     double? lat;
     double? lng;
@@ -1250,7 +1276,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
       ref.invalidate(rollDetailProvider(rollId));
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-              'METER READING LOGGED',
+              halideCaps(context.l10n.meterReadingLogged),
               type: NotificationType.success,
             );
       }
@@ -1258,7 +1284,7 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
       debugPrint('[MeterView] log to roll failed: $e');
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-              'COULDN\'T LOG READING. TRY AGAIN.',
+              halideCaps(context.l10n.couldNotLogReading),
               type: NotificationType.error,
             );
       }
@@ -1276,84 +1302,169 @@ class _MeterViewState extends ConsumerState<MeterView> with WidgetsBindingObserv
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        final asyncRolls = ref.watch(dashboardRollsProvider);
-        final maxH = MediaQuery.of(ctx).size.height * 0.52;
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + MediaQuery.of(ctx).padding.bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'LOG METER READING',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Pick a roll in Shooting status. Saves aperture, shutter, and meter details to the shot log.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: maxH,
-                  child: asyncRolls.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(
-                      child: Text(
-                        'Could not load rolls.',
-                        style: TextStyle(color: Colors.white.withOpacity(0.6)),
-                      ),
-                    ),
-                    data: (rolls) {
-                      final shooting =
-                          rolls.where((r) => r.status == RollStatus.shooting).toList();
-                      if (shooting.isEmpty) {
-                        return Center(
-                          child: Text(
-                            'No rolls in Shooting status.\nStart a roll from the archive.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white.withOpacity(0.5), height: 1.4),
-                          ),
-                        );
-                      }
-                      return ListView.separated(
-                        itemCount: shooting.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final roll = shooting[index];
-                          return _MeterShootingRollTile(
-                            roll: roll,
-                            onTap: () => _logMeterToRoll(ctx, roll.id),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
+        return _LogMeterReadingSheet(
+          onSelectRoll: (rollId, notes) => _logMeterToRoll(ctx, rollId, userNotes: notes),
         );
       },
+    );
+  }
+}
+
+class _LogMeterReadingSheet extends ConsumerStatefulWidget {
+  final void Function(String rollId, String? notes) onSelectRoll;
+
+  const _LogMeterReadingSheet({
+    required this.onSelectRoll,
+  });
+
+  @override
+  ConsumerState<_LogMeterReadingSheet> createState() => _LogMeterReadingSheetState();
+}
+
+class _LogMeterReadingSheetState extends ConsumerState<_LogMeterReadingSheet> {
+  final TextEditingController _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  String? _trimmedNotes() {
+    final t = _notesController.text.trim();
+    if (t.isEmpty) return null;
+    return t.length > kShotNotesMaxLength ? t.substring(0, kShotNotesMaxLength) : t;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final maxH = MediaQuery.of(context).size.height * 0.42;
+    final rollsAsync = ref.watch(dashboardRollsProvider);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          16 + MediaQuery.of(context).padding.bottom + keyboardInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.logMeterReadingTitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              l10n.logMeterReadingHint,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              halideCaps(l10n.shotNotesLabel),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.35),
+                fontSize: 10,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _notesController,
+              maxLength: kShotNotesMaxLength,
+              maxLines: 3,
+              minLines: 2,
+              textInputAction: TextInputAction.done,
+              style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.35),
+              cursorColor: Colors.orange,
+              decoration: InputDecoration(
+                hintText: l10n.shotNotesHint,
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.28), fontSize: 13),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.06),
+                counterStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 11),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Colors.orange, width: 1.2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: maxH,
+              child: rollsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(
+                  child: Text(
+                    l10n.couldNotLoadRolls,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+                  ),
+                ),
+                data: (rolls) {
+                  final shooting =
+                      rolls.where((r) => r.status == RollStatus.shooting).toList();
+                  if (shooting.isEmpty) {
+                    return Center(
+                      child: Text(
+                        l10n.noRollsInShooting,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          height: 1.4,
+                        ),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    itemCount: shooting.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final roll = shooting[index];
+                      return _MeterShootingRollTile(
+                        roll: roll,
+                        onTap: () => widget.onSelectRoll(roll.id, _trimmedNotes()),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1369,10 +1480,11 @@ class _MeterShootingRollTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = (roll.title?.trim().isNotEmpty ?? false) ? roll.title!.trim() : 'Untitled roll';
+    final l10n = context.l10n;
+    final title = (roll.title?.trim().isNotEmpty ?? false) ? roll.title!.trim() : l10n.untitledRoll;
     final film = '${roll.brand} ${roll.name}'.trim();
-    final iso = roll.shotAtIso != null ? 'ISO ${roll.shotAtIso}' : 'ISO —';
-    final cam = roll.cameraName?.trim().isNotEmpty == true ? roll.cameraName! : 'No camera';
+    final iso = roll.shotAtIso != null ? l10n.isoValue('${roll.shotAtIso}') : '${l10n.meterIso} —';
+    final cam = roll.cameraName?.trim().isNotEmpty == true ? roll.cameraName! : l10n.noCamera;
     final lens = roll.lensName?.trim().isNotEmpty == true ? roll.lensName! : '—';
     final gearLine = '$cam · $lens';
 
@@ -1475,6 +1587,7 @@ class _MeterFreeOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Positioned.fill(
       child: ClipRect(
         child: Stack(
@@ -1503,8 +1616,8 @@ class _MeterFreeOverlay extends StatelessWidget {
                           child: const Icon(Icons.lock_person_rounded, size: 56, color: Colors.orangeAccent),
                         ),
                         const SizedBox(height: 20),
-                        const Text(
-                          'PRO FEATURE',
+                        Text(
+                          l10n.proFeatureBadge,
                           style: TextStyle(
                             color: Colors.orangeAccent,
                             fontWeight: FontWeight.w900,
@@ -1513,8 +1626,8 @@ class _MeterFreeOverlay extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        const Text(
-                          'Precision light metering is included with Halide Pro.',
+                        Text(
+                          l10n.precisionMeterProTitle,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white,
@@ -1525,7 +1638,7 @@ class _MeterFreeOverlay extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Upgrade to unlock spot metering, EV compensation, manual exposure, and logging to your rolls.',
+                          l10n.precisionMeterProSubtitle,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.65),
@@ -1542,8 +1655,8 @@ class _MeterFreeOverlay extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 16),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: const Text(
-                            'VIEW PLANS',
+                          child: Text(
+                            l10n.viewPlans,
                             style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2),
                           ),
                         ),

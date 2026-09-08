@@ -48,10 +48,27 @@ class GuidanceService {
 
   Future<void> setMeterIntroSeen() async => _write(_kMeterIntro);
 
+  /// Print compose: stamp drag / pinch / lock intro.
+  String get _kPrintStampIntro => 'guidance_${AppConfig.flavor.name}_seen_print_stamp_intro';
+
+  Future<bool> get hasSeenPrintStampIntro async => _read(_kPrintStampIntro);
+
+  Future<void> setPrintStampIntroSeen() async => _write(_kPrintStampIntro);
+
   /// Gyro Scan HUD: preview mode toggle (negative vs positive).
   String get _kGyroScanIntro => 'guidance_${AppConfig.flavor.name}_seen_gyro_scan_intro';
 
   Future<bool> get hasSeenGyroScanIntro async => _read(_kGyroScanIntro);
 
   Future<void> setGyroScanIntroSeen() async => _write(_kGyroScanIntro);
+
+  /// Archive: personal Drive backup via the cloud-upload app bar icon.
+  String get _kPersonalDriveBackupGuidance =>
+      'guidance_${AppConfig.flavor.name}_seen_personal_drive_backup';
+
+  Future<bool> get hasSeenPersonalDriveBackupGuidance async =>
+      _read(_kPersonalDriveBackupGuidance);
+
+  Future<void> setPersonalDriveBackupGuidanceSeen() async =>
+      _write(_kPersonalDriveBackupGuidance);
 }

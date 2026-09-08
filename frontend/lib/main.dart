@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import 'config/app_config.dart';
 import 'config/env_loader.dart';
+import 'core/l10n/locale_provider.dart';
+import 'core/providers/theme_provider.dart';
+import 'core/theme/halide_theme.dart';
 import 'firebase_options.dart';
 import 'router/app_router.dart';
 import 'services/purchase_service.dart';
@@ -45,19 +49,31 @@ class HalideApp extends ConsumerWidget {
 /// A gate widget that shows a loading spinner while Firebase
 /// resolves the initial auth state (avoids the router making
 /// a blind decision before authStateChanges fires the first event).
-class AuthGate extends StatelessWidget {
+class AuthGate extends ConsumerWidget {
   const AuthGate({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = HalideTheme.fromColors(ref.watch(halideColorsProvider));
+    final userLocale = ref.watch(localeProvider);
+    final deviceLocale = WidgetsBinding.instance.platformDispatcher.locale;
+    final locale = resolveAppLocale(userLocale, deviceLocale);
+
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
+        final localizations = AppLocalizations.localizationsDelegates;
+        final supported = AppLocalizations.supportedLocales;
+
         // Still waiting for the first auth event
         if (snapshot.connectionState == ConnectionState.waiting) {
           return MaterialApp(
             scaffoldMessengerKey: scaffoldMessengerKey,
             debugShowCheckedModeBanner: false,
+            theme: theme,
+            locale: locale,
+            localizationsDelegates: localizations,
+            supportedLocales: supported,
             home: const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             ),
@@ -66,7 +82,10 @@ class AuthGate extends StatelessWidget {
         // Auth resolved — let the router take over
         Widget app = MaterialApp.router(
           scaffoldMessengerKey: scaffoldMessengerKey,
-          title: 'Halide',
+          title: 'AgXel',
+          locale: locale,
+          localizationsDelegates: localizations,
+          supportedLocales: supported,
           builder: (context, child) {
             Widget result = child!;
             if (AppConfig.flavor != AppFlavor.prod) {
@@ -92,10 +111,7 @@ class AuthGate extends StatelessWidget {
             );
           },
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            primarySwatch: Colors.blue,
-            useMaterial3: true,
-          ),
+          theme: theme,
           routerConfig: appRouter,
         );
         return app;

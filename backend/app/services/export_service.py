@@ -98,7 +98,7 @@ def _readme_text(meta: dict) -> str:
     title = meta.get("title") or "Untitled Roll"
     return "\n".join(
         [
-            "Halide — Gallery Export",
+            "AgXel — Gallery Export",
             "",
             f"Roll: {title}",
             f"Roll ID: {meta.get('roll_id')}",

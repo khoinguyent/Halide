@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>A postcard for you</title>
+  </head>
+  <body style="margin:0;padding:0;background:#e8dfc8;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#e8dfc8;margin:0;padding:0;">
+      <tr>
+        <td align="center" style="padding:24px 12px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;border-collapse:separate;border-spacing:0;">
+            <tr>
+              <td style="background:#f3ebd8;border:1px solid #d6cbb0;border-radius:18px;overflow:hidden;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:0;">
+                      <div style="height:6px;line-height:6px;background:linear-gradient(90deg,#c4a574 0%,#8b7355 50%,#2c2416 100%);"></div>
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:18px 20px 14px 20px;border-bottom:1px solid #d6cbb0;">
+                      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#2c2416;">
+                        <div style="letter-spacing:6px;font-weight:800;font-size:12px;opacity:.75;">AGXEL VAULT</div>
+                        <div style="margin-top:10px;font-size:22px;font-weight:900;letter-spacing:.4px;line-height:1.2;">You've got a postcard</div>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:18px 20px 8px 20px;">
+                      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;font-size:14px;line-height:1.7;color:#5c5346;">
+                        <p style="margin:0 0 10px 0;color:#2c2416;">Hi,</p>
+                        <p style="margin:0 0 12px 0;">
+                          <strong style="color:#2c2416;">{{ sender_name }}</strong> sent you a postcard —
+                          the quiet, old-fashioned kind of love: a photo on the front,
+                          a few handwritten words waiting on the back.
+                        </p>
+                        <p style="margin:0 0 18px 0;">
+                          Flip it open and read what they wrote, just like mail that crossed oceans for you.
+                        </p>
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 10px auto;">
+                          <tr>
+                            <td align="center" style="padding:14px;background:#ffffff;border-radius:16px;border:1px solid #d6cbb0;">
+                              <a href="{{ public_url }}" target="_blank" style="text-decoration:none;">
+                                <img src="{{ qr_image_url }}" width="300" height="300" alt="QR stamp to open postcard"
+                                     style="display:block;width:300px;height:300px;border:0;border-radius:8px;" />
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                        <p style="margin:0 0 14px 0;text-align:center;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#5c5346;">
+                          Scan the stamp to open your postcard
+                        </p>
+                        <p style="margin:0 0 10px 0;text-align:center;font-size:12px;">
+                          <a href="{{ public_url }}" target="_blank" style="color:#8b7355;text-decoration:underline;">
+                            Or open in browser
+                          </a>
+                        </p>
+                        <p style="margin:16px 0 10px 0;">This postcard link expires in <strong style="color:#2c2416;">{{ expire_days }} days</strong>.</p>
+                        <p style="margin:18px 0 0 0;opacity:.9;">With love — AgXel Vault</p>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:14px 20px 18px 20px;border-top:1px solid #d6cbb0;">
+                      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;font-size:12px;line-height:1.55;color:#8b7355;">
+                        <div style="opacity:.9;margin:0 0 10px 0;">Sent with AgXel Vault.</div>
+                        <div style="color:#5c5346;margin:0 0 8px 0;">
+                          Send your own postcards — get AgXel Vault free on the App Store.
+                        </div>
+                        <a href="https://apps.apple.com/vn/app/agxel-vault/id6761399152" target="_blank"
+                           style="color:#8b7355;font-weight:700;text-decoration:underline;">
+                          Download on the App Store
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

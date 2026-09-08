@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/core/constants/free_tier_limits.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
 import 'package:frontend/providers/auth_provider.dart';
 import 'package:frontend/providers/gear_provider.dart';
@@ -37,6 +39,7 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final l10n = context.l10n;
     setState(() => _isLoading = true);
 
     try {
@@ -55,7 +58,7 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
       };
 
       if (_gearType == 'Camera') {
-        final block = ref.read(userGearProvider.notifier).blockReasonForNewCamera();
+        final block = ref.read(userGearProvider.notifier).blockReasonForNewCamera(context.l10n);
         if (block != null) {
           ref.read(notificationProvider.notifier).show(
                 block,
@@ -84,14 +87,14 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
         }
         Navigator.of(context).pop();
         ref.read(notificationProvider.notifier).show(
-          'YOUR ${_gearType.toUpperCase()} IS READY!',
+          halideCaps(l10n.gearReady(_gearType.toUpperCase())),
           type: NotificationType.success,
         );
       }
     } catch (e) {
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-          'WE COULDN\'T ADD YOUR ${_gearType.toUpperCase()}. PLEASE TRY AGAIN.',
+          halideCaps(l10n.couldNotAddGear(_gearType.toUpperCase())),
           type: NotificationType.error,
         );
       }
@@ -115,6 +118,7 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return HalideModalContainer(
       padding: const EdgeInsets.all(32),
       child: _isLoading
@@ -126,7 +130,7 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'ADD ${_gearType.toUpperCase()}',
+                    l10n.addGearTypeTitle(_gearType.toUpperCase()),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 18,
@@ -140,26 +144,26 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
                   const SizedBox(height: 32),
                   HalideTextField(
                     controller: _nicknameController,
-                    label: 'NICKNAME',
+                    label: l10n.nickname.toUpperCase(),
                   ),
                   const SizedBox(height: 16),
                   HalideTextField(
                     controller: _brandController,
-                    label: 'MANUFACTURER',
+                    label: l10n.manufacturer.toUpperCase(),
                   ),
                   const SizedBox(height: 16),
                   HalideTextField(
                     controller: _modelController,
-                    label: 'MODEL',
+                    label: l10n.model.toUpperCase(),
                   ),
                   const SizedBox(height: 16),
                   HalideTextField(
                     controller: _serialController,
-                    label: 'SERIAL NUMBER',
+                    label: l10n.serialNumber.toUpperCase(),
                   ),
                   const SizedBox(height: 48),
                   HalideActionButton(
-                    text: 'SAVE ${_gearType.toUpperCase()}',
+                    text: l10n.saveGearType(_gearType.toUpperCase()),
                     isLoading: _isLoading,
                     onPressed: _submit,
                   ),
@@ -195,7 +199,9 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
   }
 
   Widget _buildTypeButton(String type) {
+    final l10n = context.l10n;
     final isSelected = _gearType == type;
+    final label = type == 'Camera' ? l10n.camera : l10n.lens;
     return GestureDetector(
       onTap: () => _onTypeChanged(type),
       child: Container(
@@ -207,7 +213,7 @@ class _AddGearFormState extends ConsumerState<AddGearForm> {
         ),
         alignment: Alignment.center,
         child: Text(
-          type.toUpperCase(),
+          label.toUpperCase(),
           style: TextStyle(
             color: isSelected ? Colors.white : Colors.white24,
             fontWeight: FontWeight.w900,

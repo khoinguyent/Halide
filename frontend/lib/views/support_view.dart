@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 
 import '../core/widgets/halide_scaffold.dart';
 import '../providers/auth_provider.dart';
@@ -15,6 +17,7 @@ class SupportView extends ConsumerWidget {
     required String subject,
     required String body,
   }) async {
+    final l10n = context.l10n;
     final uri = Uri(
       scheme: 'mailto',
       path: _supportEmail,
@@ -27,13 +30,26 @@ class SupportView extends ConsumerWidget {
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open your email app.')),
+        SnackBar(content: Text(l10n.unableToOpenEmail)),
       );
     }
   }
 
+  String _emailBody(AppLocalizations l10n, String email, String uid, String placeholder) {
+    return [
+      l10n.emailGreeting,
+      '',
+      placeholder,
+      '',
+      l10n.emailBodySeparator,
+      l10n.emailAccountLine(email),
+      l10n.emailUserIdLine(uid),
+    ].join('\n');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final authService = ref.watch(authServiceProvider);
     final u = authService.currentUser;
     final uid = u?.uid ?? '';
@@ -42,9 +58,9 @@ class SupportView extends ConsumerWidget {
 
     return HalideScaffold(
       appBar: AppBar(
-        title: const Text(
-          'SUPPORT',
-          style: TextStyle(
+        title: Text(
+          l10n.supportTitle,
+          style: const TextStyle(
             letterSpacing: 4,
             fontWeight: FontWeight.w900,
             fontSize: 18,
@@ -64,7 +80,7 @@ class SupportView extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'We read every message.',
+              l10n.supportHeadline,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.9),
                 fontSize: 18,
@@ -74,7 +90,7 @@ class SupportView extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Send your feedback, bug reports, and feature requests to $_supportEmail.',
+              l10n.supportDescription(_supportEmail),
               style: TextStyle(
                 color: Colors.white.withOpacity(0.6),
                 fontSize: 14,
@@ -84,46 +100,28 @@ class SupportView extends ConsumerWidget {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                final body = [
-                  'Hi Halide team,',
-                  '',
-                  '(Describe what happened / what you need)',
-                  '',
-                  '—',
-                  'Account: $email',
-                  'User ID: $uid',
-                ].join('\n');
                 _composeEmail(
                   context: context,
-                  subject: 'Halide Support',
-                  body: body,
+                  subject: l10n.supportEmailSubject,
+                  body: _emailBody(l10n, email, uid, l10n.supportEmailBodyPlaceholder),
                 );
               },
-              child: const Text('Contact Support'),
+              child: Text(l10n.contactSupport),
             ),
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: () {
-                final body = [
-                  'Hi Halide team,',
-                  '',
-                  '(Tell us what you loved / what you want improved)',
-                  '',
-                  '—',
-                  'Account: $email',
-                  'User ID: $uid',
-                ].join('\n');
                 _composeEmail(
                   context: context,
-                  subject: 'Halide Feedback',
-                  body: body,
+                  subject: l10n.feedbackEmailSubject,
+                  body: _emailBody(l10n, email, uid, l10n.feedbackEmailBodyPlaceholder),
                 );
               },
-              child: const Text('Send Feedback'),
+              child: Text(l10n.sendFeedback),
             ),
             const Spacer(),
             Text(
-              'Tip: screenshots help a lot.',
+              l10n.supportTip,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.35),
                 fontSize: 12,
@@ -136,4 +134,3 @@ class SupportView extends ConsumerWidget {
     );
   }
 }
-

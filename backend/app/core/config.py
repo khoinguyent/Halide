@@ -39,13 +39,20 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str
     S3_REGION: str = "auto"
 
-    # Email (Gmail SMTP via App Password)
+    # Email — prefer Gmail API (HTTPS) when GMAIL_REFRESH_TOKEN is set;
+    # falls back to SMTP App Password (often blocked on cloud droplets).
     EMAIL_HOST: str = "smtp.gmail.com"
     EMAIL_PORT: int = 587
     EMAIL_USER: Optional[str] = None          # halide.app.notify@gmail.com
     EMAIL_APP_PASSWORD: Optional[str] = None  # 16-char App Password (no spaces)
-    EMAIL_FROM_NAME: str = "Halide"
-    EMAIL_FROM_ADDRESS: Optional[str] = None  # hello@halide.io.vn
+    EMAIL_FROM_NAME: str = "AgXel Vault"
+    EMAIL_FROM_ADDRESS: Optional[str] = None  # support@halide.io.vn (mailbox; display name is AgXel Vault)
+    # OAuth refresh token for EMAIL_USER (scope gmail.send). Reuses GOOGLE_CLIENT_ID/SECRET.
+    GMAIL_REFRESH_TOKEN: Optional[str] = None
+
+    # Public web origin for shared prints (e.g. https://api.smartconnector.io.vn).
+    # When unset, print URLs are built from the incoming request host.
+    PUBLIC_WEB_BASE_URL: Optional[str] = None
 
     # Billing (optional for local dev)
     REVENUE_CAT_WEBHOOK_SECRET: Optional[str] = None

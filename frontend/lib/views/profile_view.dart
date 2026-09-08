@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import '../config/app_config.dart';
 import '../providers/auth_provider.dart';
 import '../models/user_profile.dart';
@@ -20,28 +22,36 @@ class ProfileView extends ConsumerStatefulWidget {
   ConsumerState<ProfileView> createState() => _ProfileViewState();
 }
 
-Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref, AuthService authService) async {
+Future<void> _confirmDeleteAccount(
+  BuildContext context,
+  WidgetRef ref,
+  AuthService authService,
+  AppLocalizations l10n,
+) async {
   final confirmed = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (ctx) => AlertDialog(
       backgroundColor: const Color(0xFF18181B),
-      title: const Text(
-        'Delete Account?',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+      title: Text(
+        l10n.deleteAccountTitle,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
       ),
-      content: const Text(
-        'This action is permanent. All your film rolls, EXIF logs, and cloud-synced images will be wiped from our servers immediately.',
-        style: TextStyle(color: Colors.white70, height: 1.4),
+      content: Text(
+        l10n.deleteAccountBody,
+        style: const TextStyle(color: Colors.white70, height: 1.4),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),
-          child: Text('Cancel', style: TextStyle(color: Colors.white.withOpacity(0.6))),
+          child: Text(l10n.cancel, style: TextStyle(color: Colors.white.withOpacity(0.6))),
         ),
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(true),
-          child: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800)),
+          child: Text(
+            l10n.delete,
+            style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800),
+          ),
         ),
       ],
     ),
@@ -71,7 +81,7 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
       onLongPress: () {
         showHalideDebugLogSheet(
           context,
-          title: 'HALIDE DEBUG LOG',
+          title: 'AGXEL DEBUG LOG',
           channelFilter: null,
           emptyHint: '(no log lines yet — use meter tab or open rolls with images)',
         );
@@ -82,11 +92,14 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final authService = ref.watch(authServiceProvider);
     final firebaseUser = authService.currentUser;
     final profileAsync = ref.watch(userProfileProvider);
 
-    final displayName = profileAsync.value?.displayName ?? firebaseUser?.displayName ?? 'Film Enthusiast';
+    final displayName = profileAsync.value?.displayName ??
+        firebaseUser?.displayName ??
+        l10n.filmEnthusiast;
     final email = profileAsync.value?.email ?? firebaseUser?.email ?? '';
     final bio = profileAsync.value?.bio;
     final avatarUrl = profileAsync.value?.avatarUrl ?? firebaseUser?.photoURL;
@@ -94,9 +107,9 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
     return HalideScaffold(
       appBar: AppBar(
         title: _debugLogTitleGesture(
-          child: const Text(
-            'PROFILE',
-            style: TextStyle(
+          child: Text(
+            l10n.profileTitle,
+            style: const TextStyle(
               letterSpacing: 4,
               fontWeight: FontWeight.w900,
               fontSize: 18,
@@ -113,13 +126,20 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
         child: Column(
           children: [
-            _buildCenteredHeader(avatarUrl, displayName, email, bio, ref.watch(userPlanProvider)),
+            _buildCenteredHeader(
+              context,
+              avatarUrl,
+              displayName,
+              email,
+              bio,
+              ref.watch(userPlanProvider),
+            ),
             const SizedBox(height: 32),
             GlassPanel(
               padding: EdgeInsets.zero,
               child: _ProfileOption(
                 icon: Icons.star_rounded,
-                label: 'Halide Premium',
+                label: l10n.halidePremium,
                 color: const Color(0xFFF97316),
                 onTap: () => context.push('/paywall'),
               ),
@@ -131,44 +151,63 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
                 children: [
                   _ProfileOption(
                     icon: Icons.edit_outlined,
-                    label: 'Edit Profile',
+                    label: l10n.editProfile,
                     onTap: () => context.push('/profile/edit'),
                   ),
                   const _Divider(),
                   _ProfileOption(
                     icon: Icons.folder_special_outlined,
-                    label: 'Storage strategy',
+                    label: l10n.storageStrategy,
                     onTap: () => context.go('/profile/settings'),
                   ),
                   const _Divider(),
                   _ProfileOption(
+                    icon: Icons.language_outlined,
+                    label: l10n.language,
+                    onTap: () => context.go('/profile/language'),
+                  ),
+                  const _Divider(),
+                  _ProfileOption(
+                    icon: Icons.palette_outlined,
+                    label: l10n.themes,
+                    onTap: () => context.go('/profile/theme'),
+                  ),
+                  const _Divider(),
+                  _ProfileOption(
+                    icon: Icons.grid_view_rounded,
+                    label: l10n.shootingAnalytics,
+                    color: const Color(0xFFF97316),
+                    onTap: () => context.push('/profile/analytics'),
+                  ),
+                  const _Divider(),
+                  _ProfileOption(
                     icon: Icons.help_outline,
-                    label: 'Support',
+                    label: l10n.support,
                     onTap: () => context.go('/profile/support'),
                   ),
                   const _Divider(),
                   _ProfileOption(
                     icon: Icons.privacy_tip_outlined,
-                    label: 'Privacy Policy',
+                    label: l10n.privacyPolicy,
                     onTap: () => context.go('/profile/privacy'),
                   ),
                   const _Divider(),
                   _ProfileOption(
                     icon: Icons.description_outlined,
-                    label: 'Terms & Conditions',
+                    label: l10n.termsAndConditions,
                     onTap: () => context.go('/profile/terms'),
                   ),
                   const _Divider(),
                   _ProfileOption(
                     icon: Icons.delete_forever_outlined,
-                    label: 'Delete Account',
+                    label: l10n.deleteAccount,
                     color: Colors.redAccent,
-                    onTap: () => _confirmDeleteAccount(context, ref, authService),
+                    onTap: () => _confirmDeleteAccount(context, ref, authService, l10n),
                   ),
                   const _Divider(),
                   _ProfileOption(
                     icon: Icons.logout,
-                    label: 'Sign Out',
+                    label: l10n.signOut,
                     color: Colors.redAccent,
                     onTap: () async {
                       await authService.signOut();
@@ -184,7 +223,14 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
     );
   }
 
-  Widget _buildCenteredHeader(String? avatarUrl, String displayName, String email, String? bio, UserPlan plan) {
+  Widget _buildCenteredHeader(
+    BuildContext context,
+    String? avatarUrl,
+    String displayName,
+    String email,
+    String? bio,
+    UserPlan plan,
+  ) {
     return Column(
       children: [
         FutureBuilder<String?>(
@@ -193,7 +239,7 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
             final localPath = snapshot.data;
             final hasLocal = localPath != null && File(localPath).existsSync();
             final useRemoteUrl = (avatarUrl ?? '').isNotEmpty && avatarUrl != 'local';
-            
+
             return Stack(
               children: [
                 Container(
@@ -218,7 +264,7 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
                 Positioned(
                   bottom: 0,
                   right: 0,
-                  child: _buildPlanBadge(plan),
+                  child: _buildPlanBadge(context, plan),
                 ),
               ],
             );
@@ -263,7 +309,8 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
     );
   }
 
-  Widget _buildPlanBadge(UserPlan plan) {
+  Widget _buildPlanBadge(BuildContext context, UserPlan plan) {
+    final l10n = context.l10n;
     Color badgeColor;
     String label;
     List<Color> gradientColors;
@@ -275,12 +322,12 @@ class _ProfileViewState extends ConsumerState<ProfileView> {
       case UserPlan.monthly:
       case UserPlan.annually:
         badgeColor = const Color(0xFFF59E0B);
-        label = 'PRO';
+        label = l10n.planPro;
         gradientColors = [const Color(0xFFF59E0B), const Color(0xFFD97706)];
         break;
       default:
         badgeColor = Colors.white.withOpacity(0.3);
-        label = 'FREE';
+        label = l10n.planFree;
         gradientColors = [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.2)];
     }
 

@@ -2,10 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/widgets/halide_scaffold.dart';
 import '../core/widgets/glass_panel.dart';
-import '../core/widgets/halide_dialog.dart';
 import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
 import '../models/user_profile.dart';
@@ -64,6 +64,7 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final profileAsync = ref.watch(userProfileProvider);
     final profile = profileAsync.value;
     _initFromProfile(profile);
@@ -77,9 +78,9 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
           color: Colors.white,
         ),
         centerTitle: true,
-        title: const Text(
-          'EDIT PROFILE',
-          style: TextStyle(
+        title: Text(
+          l10n.editProfileTitle,
+          style: const TextStyle(
             letterSpacing: 4,
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -132,7 +133,7 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Tap to upload photo',
+              l10n.tapToUploadPhoto,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.5),
                 fontSize: 13,
@@ -143,25 +144,25 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildLabel('Full Name'),
+                  _buildLabel(l10n.displayName),
                   const SizedBox(height: 8),
                   _buildTextField(
                     controller: _nameController,
-                    hint: 'Your display name',
+                    hint: l10n.displayNameHint,
                   ),
                   const SizedBox(height: 20),
-                  _buildLabel('Professional Nickname'),
+                  _buildLabel(l10n.professionalNickname),
                   const SizedBox(height: 8),
                   _buildTextField(
                     controller: _nicknameController,
-                    hint: 'e.g. Film Shooter',
+                    hint: l10n.nicknameHint,
                   ),
                   const SizedBox(height: 20),
-                  _buildLabel('Bio'),
+                  _buildLabel(l10n.bio),
                   const SizedBox(height: 8),
                   _buildTextField(
                     controller: _bioController,
-                    hint: 'A short bio for your profile',
+                    hint: l10n.bioHint,
                     maxLines: 4,
                   ),
                 ],
@@ -187,7 +188,7 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
                           ref.invalidate(userProfileProvider);
                           if (context.mounted) {
                             ref.read(notificationProvider.notifier).show(
-                              'PROFILE UPDATED SUCCESSFULLY!',
+                              l10n.profileUpdated.toUpperCase(),
                               type: NotificationType.success,
                             );
                             context.pop();
@@ -195,7 +196,7 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
                         } catch (e) {
                           if (context.mounted) {
                             ref.read(notificationProvider.notifier).show(
-                              'COULDN\'T UPDATE PROFILE. PLEASE TRY AGAIN.',
+                              l10n.profileUpdateFailed.toUpperCase(),
                               type: NotificationType.error,
                             );
                           }
@@ -209,7 +210,7 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: const Text('Save changes'),
+                child: Text(l10n.saveChanges),
               ),
             ),
             const SizedBox(height: 100), // Extra space for keyboard scrolling
@@ -252,6 +253,7 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
   }
 
   Future<void> _pickAndSaveAvatar() async {
+    final l10n = context.l10n;
     final XFile? picked = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 512,
@@ -269,7 +271,7 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
         });
         if (mounted) {
           ref.read(notificationProvider.notifier).show(
-            'PHOTO SAVED ON THIS DEVICE. TAP "SAVE CHANGES" TO UPDATE PROFILE.',
+            l10n.photoSavedTapSaveChanges.toUpperCase(),
             type: NotificationType.info,
           );
         }
@@ -280,7 +282,7 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
       if (mounted) setState(() => _avatarLoading = false);
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-          'COULD NOT SAVE PHOTO. PLEASE TRY AGAIN.',
+          l10n.couldNotSavePhoto.toUpperCase(),
           type: NotificationType.error,
         );
       }

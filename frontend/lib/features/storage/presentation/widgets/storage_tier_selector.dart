@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
+import '../../../../core/theme/halide_colors.dart';
 
 class StorageTierSelector extends StatelessWidget {
   final int selectedIndex;
@@ -13,26 +16,28 @@ class StorageTierSelector extends StatelessWidget {
     this.isFree = false,
   }) : super(key: key);
 
-  static const List<TierData> _tiers = [
-    TierData(
-      label: 'Local Device',
-      badge: 'Free',
-      icon: Icons.smartphone_outlined,
-    ),
-    TierData(
-      label: 'Personal Cloud',
-      badge: 'BYO',
-      icon: Icons.cloud_outlined,
-    ),
-    TierData(
-      label: 'System Cloud',
-      badge: 'Pro',
-      icon: Icons.auto_awesome,
-    ),
-  ];
+  List<TierData> _tiers(AppLocalizations l10n) => [
+        TierData(
+          label: l10n.storageLocal,
+          badge: l10n.free,
+          icon: Icons.smartphone_outlined,
+        ),
+        TierData(
+          label: l10n.storagePersonalCloud,
+          badge: l10n.tierBadgeByo,
+          icon: Icons.cloud_outlined,
+        ),
+        TierData(
+          label: l10n.storageSystemCloud,
+          badge: l10n.planPro,
+          icon: Icons.auto_awesome,
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final tiers = _tiers(l10n);
     final onSelected = this.onSelected;
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
@@ -44,12 +49,12 @@ class StorageTierSelector extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
         ),
         child: Row(
-          children: List.generate(_tiers.length, (index) {
+          children: List.generate(tiers.length, (index) {
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(right: index == _tiers.length - 1 ? 0 : 8),
+                padding: EdgeInsets.only(right: index == tiers.length - 1 ? 0 : 8),
                 child: _TierSegment(
-                  data: _tiers[index],
+                  data: tiers[index],
                   isSelected: selectedIndex == index,
                   isLocked: isFree && index > 1,
                   onTap: onSelected == null ? null : () => onSelected(index),
@@ -92,9 +97,9 @@ class _TierSegment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const orange500 = Color(0xFFF97316);
+    final accent = HalideColors.of(context).accent;
     final inactiveOpacity = 0.45;
-    final badgeIsPro = data.badge.toLowerCase() == 'pro';
+    final badgeIsPro = data.badge.toUpperCase() == context.l10n.planPro;
 
     return Material(
       color: Colors.transparent,
@@ -108,13 +113,13 @@ class _TierSegment extends StatelessWidget {
             color: Colors.white.withOpacity(isSelected ? 0.05 : 0.00),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: isSelected ? orange500 : Colors.white.withOpacity(0.10),
+              color: isSelected ? accent : Colors.white.withOpacity(0.10),
               width: isSelected ? 2 : 1,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: orange500.withOpacity(0.22),
+                      color: accent.withOpacity(0.22),
                       blurRadius: 16,
                       spreadRadius: 1,
                       offset: const Offset(0, 0),
@@ -133,13 +138,15 @@ class _TierSegment extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 data.label,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: isSelected ? Colors.white : Colors.white.withOpacity(inactiveOpacity),
-                  fontSize: 13,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.1,
+                  height: 1.15,
                 ),
               ),
               const SizedBox(height: 8),
@@ -147,7 +154,7 @@ class _TierSegment extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: badgeIsPro
-                      ? orange500.withOpacity(isSelected ? 0.95 : 0.70)
+                      ? accent.withOpacity(isSelected ? 0.95 : 0.70)
                       : Colors.white.withOpacity(isSelected ? 0.12 : 0.08),
                   borderRadius: BorderRadius.circular(999),
                 ),

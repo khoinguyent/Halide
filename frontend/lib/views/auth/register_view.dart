@@ -2,8 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import '../../providers/auth_provider.dart';
-import '../../core/widgets/halide_dialog.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/models/notification_model.dart';
 
@@ -51,8 +51,9 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
   }
 
   Future<void> _register() async {
+    final l10n = context.l10n;
     if (_passwordController.text != _confirmPasswordController.text) {
-      _showError('Passwords do not match');
+      _showError(l10n.passwordsDoNotMatch);
       return;
     }
 
@@ -74,6 +75,8 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -102,7 +105,7 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
               ),
             ),
           ),
-          
+
           SafeArea(
             child: Column(
               children: [
@@ -132,18 +135,18 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          'Join Halide',
-                          style: TextStyle(
+                        Text(
+                          l10n.joinHalide,
+                          style: const TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                             letterSpacing: 2,
                           ),
                         ),
-                        const Text(
-                          'Capture your analog journey',
-                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        Text(
+                          l10n.registerSubtitle,
+                          style: const TextStyle(color: Colors.white70, fontSize: 16),
                         ),
                         const SizedBox(height: 48),
                         // Glassmorphic Card
@@ -163,11 +166,11 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    _buildTextField(_emailController, 'Email', Icons.email_outlined),
+                                    _buildTextField(_emailController, l10n.email, Icons.email_outlined),
                                     const SizedBox(height: 16),
-                                    _buildTextField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
+                                    _buildTextField(_passwordController, l10n.password, Icons.lock_outline, obscureText: true),
                                     const SizedBox(height: 16),
-                                    _buildTextField(_confirmPasswordController, 'Confirm Password', Icons.lock_outline, obscureText: true),
+                                    _buildTextField(_confirmPasswordController, l10n.confirmPassword, Icons.lock_outline, obscureText: true),
                                     const SizedBox(height: 40),
                                     SizedBox(
                                       height: 56,
@@ -179,9 +182,9 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                                           shape: const StadiumBorder(),
                                           elevation: 0,
                                         ),
-                                        child: const Text(
-                                          'Create Account',
-                                          style: TextStyle(
+                                        child: Text(
+                                          l10n.createAccount,
+                                          style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -197,9 +200,9 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                         const SizedBox(height: 24),
                         TextButton(
                           onPressed: () => context.pop(),
-                          child: const Text(
-                            'Already have an account? Sign In',
-                            style: TextStyle(
+                          child: Text(
+                            '${l10n.alreadyHaveAccount} ${l10n.signIn}',
+                            style: const TextStyle(
                               color: Colors.white70,
                               fontWeight: FontWeight.w500,
                             ),
@@ -213,7 +216,7 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
               ],
             ),
           ),
-          
+
           if (_isLoading)
             Positioned.fill(
               child: BackdropFilter(

@@ -23,6 +23,9 @@ class User(Base):
     has_seen_onboarding = Column(Boolean, default=False, server_default=text("false"), nullable=False)
     has_seen_roll_guide = Column(Boolean, default=False, server_default=text("false"), nullable=False)
     has_seen_lab_guide = Column(Boolean, default=False, server_default=text("false"), nullable=False)
+    timezone = Column(String(64), nullable=True)
+    # App UI language: null = never set, "system" = follow device, "en" / "vi" = explicit.
+    preferred_locale = Column(String(16), nullable=True)
 
     @validates('subscription_tier')
     def validate_subscription_tier(self, key, value):

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta property="og:title" content="A postcard from {{ sender_name }}">
+  <meta property="og:description" content="Flip the postcard to read the note on the back — a little love, the old-fashioned way.">
+  <meta property="og:image" content="{{ image_url }}">
+  <title>A postcard for you</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,700;1,400;1,700&family=Mali:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: {{ paper_bg }};
+      --ink: {{ text_color }};
+      --font-hand: "Mali", "Segoe Print", cursive;
+      --font-type: "Be Vietnam Pro", "Helvetica Neue", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      background: #0a0a0b;
+      color: #f5f5f4;
+      font-family: var(--font-type);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .wrap {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 12px 24px;
+      gap: 14px;
+    }
+    .hint {
+      font-size: 12px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      opacity: .55;
+      text-align: center;
+    }
+    .stage {
+      /* Sized to the photo aspect ratio so front and back match. */
+      width: min(96vw, 480px);
+      height: min(60dvh, 520px);
+      perspective: 1400px;
+    }
+    .card {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform .7s cubic-bezier(.2,.8,.2,1);
+      cursor: pointer;
+      border-radius: 2px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.55);
+    }
+    .card.flipped { transform: rotateY(180deg); }
+    .face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .front {
+      background: #000;
+    }
+    .front img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .back {
+      background: var(--paper);
+      transform: rotateY(180deg);
+      background-image:
+        radial-gradient(rgba(0,0,0,.03) 1px, transparent 1px);
+      background-size: 3px 3px;
+    }
+    .note {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: min(72%, 320px);
+      color: var(--ink);
+      line-height: 1.3;
+      white-space: pre-wrap;
+      word-break: break-word;
+      text-align: center;
+    }
+    .meta {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 14px;
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(44,36,22,.45);
+      font-family: var(--font-type);
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .actions a {
+      color: #0a0a0b;
+      background: #f5f5f4;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      border-radius: 999px;
+    }
+    .actions a.ghost {
+      background: transparent;
+      color: #a1a1aa;
+      border: 1px solid rgba(255,255,255,.18);
+    }
+    .brand {
+      font-size: 11px;
+      letter-spacing: .28em;
+      opacity: .35;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hint" id="hint">Tap to flip · love note on the back</div>
+    <div class="stage" id="stage">
+      <div class="card" id="card" role="button" aria-label="Flip postcard" tabindex="0">
+        <div class="face front">
+          <img id="print-image" src="{{ image_url }}" alt="Shared postcard" loading="eager">
+        </div>
+        <div class="face back">
+          {% if layers and layers|length > 0 %}
+            {% for layer in layers %}
+              {% set fs = (layer.font_style or 'hand')|lower %}
+              {% set is_type = fs.startswith('type') %}
+              {% set is_bold = '_b' in fs or 'bold' in fs %}
+              {% set is_italic = '_i' in fs or 'italic' in fs %}
+              <div class="note"
+                   style="left: {{ (layer.pos_x * 100)|round(2) }}%;
+                          top: {{ (layer.pos_y * 100)|round(2) }}%;
+                          font-size: clamp(14px, {{ layer.font_size }}px, 64px);
+                          color: {{ layer.text_color or text_color }};
+                          text-align: {{ layer.text_align or 'center' }};
+                          font-family: {% if is_type %}var(--font-type){% else %}var(--font-hand){% endif %};
+                          font-weight: {% if is_bold %}700{% elif is_type %}500{% else %}400{% endif %};
+                          font-style: {% if is_italic %}italic{% else %}normal{% endif %};">{{ layer.text }}</div>
+            {% endfor %}
+          {% else %}
+            {% set fs = (font_style or 'hand')|lower %}
+            {% set is_type = fs.startswith('type') %}
+            {% set is_bold = '_b' in fs or 'bold' in fs %}
+            {% set is_italic = '_i' in fs or 'italic' in fs %}
+            <div class="note"
+                 style="left: {{ (pos_x * 100)|round(2) }}%;
+                        top: {{ (pos_y * 100)|round(2) }}%;
+                        font-size: clamp(14px, {{ font_size }}px, 64px);
+                        text-align: {{ text_align }};
+                        font-family: {% if is_type %}var(--font-type){% else %}var(--font-hand){% endif %};
+                        font-weight: {% if is_bold %}700{% elif is_type %}500{% else %}400{% endif %};
+                        font-style: {% if is_italic %}italic{% else %}normal{% endif %};">{{ note }}</div>
+          {% endif %}
+          <div class="meta">From {{ sender_name }} · expires {{ expires_at }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <a href="{{ image_url }}" download="halide_front.jpg">Download photo</a>
+      <a class="ghost" href="{{ note_download_url }}">Download note</a>
+    </div>
+    <div class="brand">AgXel</div>
+  </div>
+  <script>
+    (function () {
+      var card = document.getElementById('card');
+      var hint = document.getElementById('hint');
+      var stage = document.getElementById('stage');
+      var img = document.getElementById('print-image');
+
+      function sizeStageToImage() {
+        if (!img.naturalWidth || !img.naturalHeight) return;
+        var maxW = Math.min(window.innerWidth * 0.96, 480);
+        var maxH = Math.min(window.innerHeight * 0.72, 720);
+        var aspect = img.naturalWidth / img.naturalHeight;
+        var w = maxW;
+        var h = w / aspect;
+        if (h > maxH) {
+          h = maxH;
+          w = h * aspect;
+        }
+        stage.style.width = Math.round(w) + 'px';
+        stage.style.height = Math.round(h) + 'px';
+      }
+
+      if (img.complete) sizeStageToImage();
+      img.addEventListener('load', sizeStageToImage);
+      window.addEventListener('resize', sizeStageToImage);
+
+      function flip() {
+        card.classList.toggle('flipped');
+        hint.textContent = card.classList.contains('flipped')
+          ? 'Tap to see the photo'
+          : 'Tap to flip · note on the back';
+      }
+      card.addEventListener('click', flip);
+      card.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
+      });
+    })();
+  </script>
+</body>
+</html>

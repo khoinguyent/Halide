@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:frontend/config/app_config.dart';
+import 'package:frontend/core/theme/halide_colors.dart';
 import 'package:frontend/features/light_table/logic/light_table_color.dart';
 import 'package:frontend/models/user_profile.dart';
 
@@ -19,6 +21,7 @@ class GlassNavigationDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = HalideColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
       child: ClipRRect(
@@ -28,21 +31,24 @@ class GlassNavigationDock extends StatelessWidget {
           child: Container(
             height: 64,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: colors.glassFill(0.12),
               borderRadius: BorderRadius.circular(32),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: colors.glassBorder(0.35),
                 width: 1.5,
               ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildNavItem(Icons.camera_roll_outlined, 0),
-                _buildNavItem(Icons.photo_camera_outlined, 1),
-                const SizedBox(width: 48), // central FAB space
-                _buildNavItem(Icons.exposure_outlined, 2, showLock: !plan.isPro),
-                _buildActionItem(LightTableTokens.navIcon, onLightTableTap),
+                _buildNavItem(context, colors, Icons.camera_roll_outlined, 0),
+                _buildNavItem(context, colors, Icons.photo_camera_outlined, 1),
+                const SizedBox(width: 48),
+                _buildNavItem(context, colors, Icons.exposure_outlined, 2, showLock: !plan.isPro),
+                if (AppConfig.enableLightTable)
+                  _buildActionItem(context, colors, LightTableTokens.navIcon, onLightTableTap)
+                else
+                  _buildNavItem(context, colors, Icons.person_outline, 3),
               ],
             ),
           ),
@@ -51,7 +57,13 @@ class GlassNavigationDock extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(IconData icon, int index, {bool showLock = false}) {
+  Widget _buildNavItem(
+    BuildContext context,
+    HalideColors colors,
+    IconData icon,
+    int index, {
+    bool showLock = false,
+  }) {
     final isSelected = currentIndex == index;
     return GestureDetector(
       onTap: () => onTabSelected(index),
@@ -60,7 +72,7 @@ class GlassNavigationDock extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+            color: isSelected ? colors.textPrimary : colors.iconMuted(),
             size: 28,
           ),
           if (showLock)
@@ -69,14 +81,14 @@ class GlassNavigationDock extends StatelessWidget {
               right: -4,
               child: Container(
                 padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Colors.orangeAccent,
+                decoration: BoxDecoration(
+                  color: colors.sage,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.lock,
                   size: 10,
-                  color: Colors.black,
+                  color: colors.navy,
                 ),
               ),
             ),
@@ -85,7 +97,12 @@ class GlassNavigationDock extends StatelessWidget {
     );
   }
 
-  Widget _buildActionItem(IconData icon, VoidCallback onTap) {
+  Widget _buildActionItem(
+    BuildContext context,
+    HalideColors colors,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
     return Tooltip(
       message: 'Light Table',
       child: GestureDetector(
@@ -97,7 +114,7 @@ class GlassNavigationDock extends StatelessWidget {
           child: Center(
             child: Icon(
               icon,
-              color: Colors.white.withOpacity(0.5),
+              color: colors.iconMuted(),
               size: 28,
             ),
           ),

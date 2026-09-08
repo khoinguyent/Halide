@@ -123,6 +123,8 @@ If you intentionally need **production** API in a TestFlight build, set **`FLAVO
 
 | Build | Version   | Date       | Delivery UUID |
 |-------|-----------|------------|-----------------|
+| 99    | 1.1.5+99  | 2026-08-05 | 8e61d150-503e-40bd-971d-62fc0739d449 (staging FLAVOR, free local Drive sync + device→Vault backup) |
+| 98    | 1.1.5+98  | 2026-08-05 | d350252a-0ab8-485e-a867-08349c5d5a20 (staging FLAVOR, personal Drive multi-roll sync) |
 | 67    | 1.1.0+67  | 2026-05-12 | de0cfdb3-abd7-438d-8a6b-03dd5e8f5d43 |
 | 66    | 1.0.1+66  | 2026-05-12 | |
 | 65    | 1.0.0+65  | 2026-05-12 | *(upload failed: train 1.0.0 closed)* |

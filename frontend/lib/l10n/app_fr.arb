@@ -1,0 +1,1101 @@
+{
+  "@@locale": "fr",
+  "appTitle": "AgXel",
+  "appTagline": "Coeur analogique, cerveau numérique",
+  "ok": "OK",
+  "cancel": "Annuler",
+  "save": "Enregistrer",
+  "saveChanges": "Enregistrer les modifications",
+  "delete": "Supprimer",
+  "retry": "Réessayer",
+  "back": "Retour",
+  "close": "Fermer",
+  "clear": "Effacer",
+  "more": "Plus",
+  "less": "Moins",
+  "status": "Statut",
+  "loading": "Chargement…",
+  "somethingWentWrong": "Quelque chose s'est mal passé",
+  "couldNotOpenLink": "Impossible d'ouvrir le lien.",
+  "tryAgain": "Essayer à nouveau",
+  "lastUpdated": "Dernière mise à jour : {date}",
+  "languageSettingsTitle": "LANGUE",
+  "languageSystemDefault": "Valeur par défaut du système",
+  "languageEnglish": "Anglais",
+  "languageVietnamese": "Vietnamien",
+  "languageDescription": "Choisissez votre langue préférée pour l'application.",
+  "profileTitle": "PROFIL",
+  "filmEnthusiast": "Passionné de photo argentique",
+  "halidePremium": "AgXel",
+  "editProfile": "Modifier le profil",
+  "storageStrategy": "Stratégie de stockage",
+  "themes": "Thèmes",
+  "shootingAnalytics": "Analyse des prises de vue",
+  "support": "Assistance",
+  "privacyPolicy": "Politique de confidentialité",
+  "termsAndConditions": "Conditions générales",
+  "deleteAccount": "Supprimer le compte",
+  "signOut": "Se déconnecter",
+  "deleteAccountTitle": "Supprimer le compte ?",
+  "deleteAccountBody": "Cette action est définitive. Toutes vos pellicules, journaux EXIF et images synchronisées dans le cloud seront immédiatement effacés de nos serveurs.",
+  "planPro": "PRO",
+  "planFree": "FREE",
+  "loginWithEmail": "Se connecter avec l’e-mail",
+  "loginWithPhone": "Se connecter avec le téléphone",
+  "loginWithGoogle": "Connectez-vous avec Google",
+  "loginWithApple": "Connectez-vous avec Apple",
+  "verifyPhone": "Vérifier le téléphone",
+  "verificationCode": "Le code de vérification",
+  "verifyAndLogin": "Vérifier et se connecter",
+  "backToOptions": "Retour aux options",
+  "newHere": "Nouveau ici ?",
+  "createAccount": "Créer un compte",
+  "emailSignIn": "Connexion par e-mail",
+  "email": "E-mail",
+  "password": "Mot de passe",
+  "login": "Se connecter",
+  "phoneSignIn": "Connexion par téléphone",
+  "phoneSignInHint": "Nous enverrons un code à votre numéro",
+  "phoneNumber": "Numéro de téléphone",
+  "sendCode": "Envoyer le code",
+  "phoneVerificationFailed": "La vérification du téléphone a échoué",
+  "welcomeSignIn": "Bienvenue sur AgXel. Connectez-vous !",
+  "welcomeSignUp": "Bienvenue sur AgXel. Inscrivez-vous !",
+  "registerTitle": "CRÉER UN COMPTE",
+  "alreadyHaveAccount": "Vous avez déjà un compte ?",
+  "signIn": "Se connecter",
+  "archiveTitle": "ARCHIVE",
+  "openNewRoll": "Ouvrir une nouvelle pellicule",
+  "loadYourFirstRoll": "Chargez votre première pellicule",
+  "showAllRolls": "Afficher toutes les pellicules",
+  "filterAll": "Tous",
+  "filterInProgress": "En cours",
+  "filterArchived": "Archivé",
+  "lifecycleShoot": "Prise de vue",
+  "lifecycleLab": "Laboratoire",
+  "lifecycleScan": "Numérisation",
+  "lifecycleArchive": "Archive",
+  "rollStatusShooting": "En prise de vue",
+  "rollStatusLab": "Au labo",
+  "rollStatusSyncing": "Synchronisation…",
+  "rollStatusScanned": "Numérisé",
+  "rollStatusArchived": "Archivé",
+  "addRollStep1": "LE ROULEAU",
+  "addRollStep2": "DÉTAILS",
+  "totalFrames": "Nombre total d'images (par exemple 12, 24, 36)",
+  "title": "Titre",
+  "description": "Description",
+  "iso": "ISO",
+  "expiredYear": "Année expirée",
+  "driveUrlOptional": "URL du lecteur (facultatif)",
+  "shotNotesLabel": "Notes",
+  "shotNotesHint": "Facultatif — jusqu'à 500 caractères",
+  "startRoll": "Démarrer le lancer",
+  "next": "Suivant",
+  "filmStock": "Pellicule (*)",
+  "gear": "Engrenage",
+  "logShot": "Coup de journal",
+  "openRoll": "Rouleau ouvert",
+  "driveLink": "Lien de lecteur",
+  "saveAndSync": "Enregistrer et synchroniser",
+  "recordShot": "Prise de vue record",
+  "shutterSpeed": "Vitesse d'obturation",
+  "aperture": "Ouverture",
+  "logShotTitle": "Coup de journal",
+  "manualAddFree": "Ajout manuel (gratuit)",
+  "submitAndSync": "Soumettre et synchroniser",
+  "reset": "Réinitialiser",
+  "photos": "Photos",
+  "shotLog": "Journal de tir",
+  "lockerTitle": "LES ENGRENAGES",
+  "addGear": "Ajouter du matériel",
+  "addFirstGear": "Ajouter la première vitesse",
+  "nickname": "Surnom",
+  "manufacturer": "Fabricant",
+  "model": "Modèle",
+  "serialNumber": "Numéro de série",
+  "saveGear": "Sauvegarder{gearType}",
+  "camera": "Caméra",
+  "lens": "Lentille",
+  "cameraNotFound": "Caméra introuvable",
+  "editGear": "Modifier l'équipement",
+  "editGearImages": "Modifier les images d'équipement",
+  "createAndMount": "Créer et monter",
+  "createNewLens": "Créer un nouvel objectif",
+  "createMountLensHint": "Créez et montez un nouvel objectif sur ce corps.",
+  "newLensDetails": "Détails des nouveaux objectifs",
+  "selectLensToMount": "Sélectionnez l'objectif à monter",
+  "noLensesAvailable": "Aucun objectif disponible",
+  "gearStatusActive": "Actif",
+  "gearStatusRepair": "En réparation",
+  "gearStatusSold": "Vendu",
+  "gearStatusArchived": "Archivé",
+  "meterTitle": "MÈTRE",
+  "startingCamera": "Démarrage de la caméra…",
+  "logToRoll": "Connectez-vous pour rouler",
+  "zoneOverlay": "Superposition de zones",
+  "multiSpot": "Multi-spot",
+  "lockExposure": "Verrouillage",
+  "changesUpdateEv": "Les modifications mettront à jour l’EV et l’exposition calculée.",
+  "subscriptionTitle": "AGXEL",
+  "restorePurchases": "Restaurer les achats",
+  "restoredSuccessfully": "Restauré avec succès.",
+  "noPreviousPurchases": "Aucun achat précédent trouvé.",
+  "restoreFailed": "La restauration n'a pas pu être terminée. Veuillez réessayer.",
+  "privacyPolicyLink": "politique de confidentialité",
+  "termsOfUse": "Conditions d'utilisation",
+  "subscribe": "S'abonner",
+  "freePlanName": "Les archives",
+  "proPlanName": "AgXel",
+  "annual": "Annuel",
+  "monthly": "Mensuel",
+  "freeFeature1": "Enregistrement de rouleaux et de cadres (ouverture, obturateur, emplacement)",
+  "freeFeature2": "Prise de vue → Laboratoire → Numérisé → Flux de travail archivé",
+  "freeFeature3": "Jusqu'à 3 caméras (1 objectif chacune) et rouleaux illimités",
+  "freeFeature4": "Récupérer des images depuis Lab Drive",
+  "freeFeature5": "Synchronisation cloud personnelle (Google Drive, NAS)",
+  "freeFeature6": "Journalisation EXIF ​​standard",
+  "proFeature1": "Tout est gratuit",
+  "proFeature2": "AgXel Cloud Storage (System Cloud hébergé)",
+  "proFeature3": "Posemètre professionnel (mesure spot et EV)",
+  "proFeature4": "Conseils d'exposition avancés",
+  "proFeature5": "Assistance prioritaire",
+  "storageLocal": "Appareil local",
+  "storagePersonalCloud": "Nuage personnel",
+  "storageSystemCloud": "Nuage système",
+  "localStorage": "STOCKAGE LOCAL",
+  "systemCloud": "NUAGE SYSTÈME",
+  "systemCloudConnections": "CONNEXIONS AU CLOUD DU SYSTÈME",
+  "localAccounts": "COMPTES LOCAUX",
+  "connectGoogle": "Connectez Google",
+  "connectNas": "Connecter le NAS",
+  "host": "Hôte",
+  "username": "Nom d'utilisateur",
+  "passwordField": "Mot de passe",
+  "connectionFailed": "Échec de la connexion",
+  "archiveStorage": "Stockage d'archives",
+  "labScanSync": "Synchronisation des analyses de laboratoire",
+  "addStorage": "Ajouter du stockage",
+  "supportTitle": "SOUTIEN",
+  "supportHeadline": "Nous lisons chaque message.",
+  "supportDescription": "Envoyez vos commentaires, rapports de bogues et demandes de fonctionnalités à{email}.",
+  "contactSupport": "Contacter l'assistance",
+  "sendFeedback": "Envoyer des commentaires",
+  "supportTip": "Astuce : les captures d'écran sont très utiles.",
+  "unableToOpenEmail": "Impossible d'ouvrir votre application de messagerie.",
+  "supportEmailSubject": "Support aux halogénures",
+  "feedbackEmailSubject": "Commentaires sur les halogénures",
+  "themesTitle": "THÈMES",
+  "themeDeepHarbor": "Port profond",
+  "themeMistyForest": "Forêt brumeuse",
+  "themeOceanRoot": "Racine océanique",
+  "themeBlueBell": "Cloche bleue",
+  "themeCherryBlossom": "Fleur de cerisier",
+  "themeMorningFrost": "Gelée du matin",
+  "themeCarbonNight": "Nuit du carbone",
+  "themeHarvestTable": "Tableau de récolte",
+  "themeSpaceIndigo": "Espace Indigo",
+  "analyticsTitle": "ANALYSE DE TIR",
+  "exposureMatrix": "MATRICE D'EXPOSITION",
+  "favoriteEmulsion": "ÉMULSION PRÉFÉRÉE",
+  "activeHardware": "MATÉRIEL ACTIF",
+  "streak": "TRAÎNÉE",
+  "current": "actuel",
+  "best": "MEILLEUR",
+  "longestStreak": "la plus longue séquence",
+  "total": "TOTAL",
+  "shotsFired": "coups de feu tirés",
+  "active": "ACTIF",
+  "activeDays": "jours actifs",
+  "privacyTitle": "CONFIDENTIALITÉ",
+  "termsTitle": "TERMES",
+  "privacyDocumentLabel": "POLITIQUE DE CONFIDENTIALITÉ",
+  "termsDocumentLabel": "CONDITIONS DE SERVICE",
+  "editProfileTitle": "MODIFIER LE PROFIL",
+  "displayName": "Nom d'affichage",
+  "professionalNickname": "Surnom professionnel",
+  "bio": "Biographie",
+  "profileUpdated": "Profil mis à jour.",
+  "profileUpdateFailed": "Impossible de mettre à jour le profil.",
+  "rollDetailTitle": "ROULER",
+  "labDigitalSync": "Synchronisation numérique du laboratoire",
+  "labDigitalSyncSubtitle": "Collez un dossier Google Drive ou un lien ZIP de votre laboratoire.",
+  "driveUrlHint": "https://drive.google.com/...",
+  "atLabNoDriveUrlHint": "Pas de lien Drive ? Passez le statut à Scanné (utilisez Suivant : Marquer comme scanné ci-dessus) pour ajouter des photos depuis cet appareil.",
+  "atLabAddFromDevice": "Ajouter depuis l'appareil",
+  "atLabAddFromDeviceSubtitle": "Les forfaits gratuits conservent les scans sur cet appareil. Choisissez des photos dans votre bibliothèque.",
+  "chooseLabImportMethodFree": "Ajoutez des photos scannées depuis cet appareil.",
+  "driveLabSyncProOnly": "La synchronisation des scans depuis un lien Drive nécessite Halide Pro. Ajoutez plutôt des photos depuis cet appareil.",
+  "scannedDriveSyncedHint": "Les photos viennent du lien Drive du lab. Pour les mettre à jour, resynchronisez le dossier — l'ajout manuel est désactivé pour garder l'ordre des images.",
+  "addMorePhotos": "Ajouter des photos",
+  "cameraScanning": "Numérisation de la caméra",
+  "cameraScanningSubtitle": "Balayage gyro-assisté mains libres sur table lumineuse.",
+  "scanNegatives": "Numériser les négatifs (table lumineuse)",
+  "addImages": "Ajouter des images",
+  "addMore": "Ajouter plus",
+  "uploading": "Téléchargement…",
+  "uploadingProgress": "Téléchargement{done} / {total}…",
+  "tapToSelectPhotos": "Appuyez pour sélectionner des photos",
+  "tapToSelectUpTo": "Appuyez pour sélectionner jusqu'à{count}des photos",
+  "addPhotosLeft": "Ajouter des photos ({count}gauche)",
+  "share": "Partager",
+  "sendAsPrint": "Send as postcard",
+  "printComposeTitle": "Send postcard",
+  "printSend": "Send",
+  "printNoteLabel": "Note on the back",
+  "printNoteHint": "A little love, the old-fashioned way…",
+  "printNoteRequired": "Add a note before sending.",
+  "printFontLabel": "Font",
+  "printFontHand": "Handwriting",
+  "printFontType": "Type",
+  "printSizeLabel": "Size",
+  "printPaperLabel": "Paper",
+  "printRecipientsLabel": "Friend emails",
+  "printRecipientsHint": "friend@email.com, other@email.com",
+  "printRecipientsRequired": "Add at least one email address.",
+  "printFromLabel": "From",
+  "printFromHint": "Your name",
+  "printFromRequired": "Add your name so they know who sent it.",
+  "printExpireLabel": "Link expires",
+  "printExpireDays": "{days} days",
+  "@printExpireDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "printPrivacyHint": "Anyone with the link can open the postcard (up to 30 days). Downloads include the photo and a text file of the note.",
+  "printTapBack": "Tap to flip · love note on the back",
+  "printTapFront": "Tap to see the photo",
+  "printTapToWrite": "Tap anywhere to write",
+  "printStampHint": "Drag stamp · pinch size · double-tap to lock QR",
+  "printStampLocked": "QR stamp locked",
+  "printStampRequired": "Double-tap the stamp to lock a QR image before sending.",
+  "printStampSizeHint": "Suggested stamp size · {percent}%",
+  "@printStampSizeHint": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "printVersoHint": "Back",
+  "printNeedsCloudScan": "This photo isn't on AgXel Cloud yet. Only paid plans can upload and send postcards.",
+  "printSentSuccess": "Postcard sent to {count} · link expires in {days} days",
+  "@printSentSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "printShareSubject": "A postcard for you",
+  "saveToPhotos": "Enregistrer dans Photos",
+  "couldNotRotateImage": "Impossible de faire pivoter l'image.",
+  "couldNotUploadRotated": "Nous n'avons pas pu télécharger vos photos pivotées sur le cloud. Ils sont toujours enregistrés sur ce téléphone : ouvrez le rouleau et réessayez.",
+  "editsLocalOnlyHint": "Les modifications sont enregistrées sur cet appareil. Passez à Pro pour synchroniser les images pivotées avec le cloud.",
+  "unsavedCloudChanges": "Modifications cloud non enregistrées :{count}- en laissant les téléchargements vers AgXel Cloud.",
+  "scannedDate": "Scanné :{date}",
+  "isoValue": "OIN{iso}",
+  "apertureMissing": "---",
+  "retryDownload": "Réessayez le téléchargement",
+  "copyAll": "Copier tout",
+  "lightTableLockScreen": "Écran de verrouillage",
+  "freeTierCameraLimit": "Gratuit comprend jusqu'à{count}caméras. Passez à AgXel pour un équipement illimité.",
+  "freeTierLensLimit": "Gratuit comprend un objectif par caméra. Passez à AgXel pour en monter davantage.",
+  "freeTierStandaloneLens": "Sur Free, ajoutez des objectifs à partir de l'écran Mount d'un appareil photo (un objectif par boîtier).",
+  "couldNotUpdateStatus": "Nous n'avons pas pu mettre à jour le statut. Veuillez réessayer.",
+  "savedPhotosOnDevice": "Enregistré{count}photo(s) sur cet appareil.",
+  "guidanceGotIt": "J'ai compris",
+  "guidanceNewRollStatus": "Appuyez sur le badge d'état pour changer où vous vous trouvez dans le flux de travail, par exemple. passez à Au laboratoire lorsque le film est au laboratoire, puis Numérisé lorsque vous avez des fichiers.",
+  "guidanceNewRollExif": "Appuyez sur l'icône de l'appareil photo pour enregistrer l'ouverture, l'obturateur et l'emplacement à partir de l'EXIF d'une photo, ou saisissez-les manuellement dans la feuille. Vous pouvez également vous connecter à partir de l'onglet Photomètre.",
+  "guidanceNewRollViewLogs": "Appuyez sur cette carte de rouleau pour l'ouvrir, puis utilisez l'onglet Shot Log pour voir les données techniques de chaque image pendant que vous filmez.",
+  "guidancePersonalDriveBackup": "Appuyez sur l'icône d'upload cloud (en haut à droite) pour sauvegarder vos scans en pleine qualité sur votre Google Drive personnel, dans un dossier Agxel Vault.",
+  "archiveBackupGuideBody": "Sauvegardez vos rouleaux scannés sur votre Google Drive personnel à tout moment — appuyez sur l'icône d'upload cloud ci-dessus.",
+  "guidanceSyncAfterLink": "Votre lien Drive est enregistré. Appuyez sur l'icône du nuage en surbrillance pour télécharger des analyses depuis Google Drive (vous pourrez appuyer à nouveau plus tard pour actualiser).",
+  "guidanceAtLabBadge": "AT LAB signifie que votre film est au laboratoire. Lorsque vous obtenez un lien Google Drive, utilisez le lien ou l'icône de nuage à droite pour l'ajouter et synchroniser vos analyses.",
+  "guidanceDriveLinkWithUrl": "L'icône du cloud télécharge les analyses à partir de votre lien Drive enregistré. Appuyez sur l'icône de lien si vous devez modifier l'URL.",
+  "guidanceDriveLinkNoUrl": "Appuyez sur l'icône de lien en surbrillance (en haut à droite) pour coller l'URL du dossier Google Drive lorsque votre laboratoire le partage. Après l'enregistrement, l'icône devient un nuage sur lequel vous pouvez appuyer pour télécharger des analyses.",
+  "guidanceMeterSpotIntro": "Appuyez sur le cercle pour mesurer le centre et revenir à la priorité d'ouverture. Appuyez sur f/ ou SS pour régler l'exposition, EV ou ISO pour la compensation, puis LOCK pour maintenir l'exposition pendant que vous composez.",
+  "guidanceMeterLogToRoll": "Appuyez sur LOG TO ROLL pour enregistrer les détails de l'ouverture, de l'obturateur et du compteur dans un rouleau lors de la prise de vue. Les entrées s'affichent dans Shot Log avec vos journaux EXIF ​​d'archives.",
+  "guidancePrintStampIntro": "Drag this stamp over the part of the photo you want on the QR. Pinch to resize, then double-tap to lock before you send.",
+  "guidanceGyroNegativePreview": "Le négatif brut montre le film tel qu’il repose sur la table lumineuse – base orange, pas de traitement. Utilisez-le pour vérifier l’alignement et le cadrage.",
+  "guidanceGyroPositivePreview": "L'aperçu positif inverse le masque orange en direct afin que la numérisation ressemble à une impression terminée. Il s’agit de la valeur par défaut pour évaluer l’exposition pendant l’exécution de la capture automatique.",
+  "gyroScanTitle": "GYROBALAYAGE",
+  "gyroFormat35mm": "35mm",
+  "gyroFormat120": "120",
+  "noRollsYet": "Pas encore de rouleaux",
+  "errorLoadingRolls": "Erreur lors du chargement des rouleaux",
+  "errorLoadingGear": "Erreur lors du chargement de l'équipement",
+  "rollNotFound": "Rouleau introuvable",
+  "storageLimitReached": "Limite de stockage atteinte. Veuillez mettre à niveau votre forfait.",
+  "purchaseComplete": "Achat terminé !",
+  "purchaseFailed": "L'achat n'a pas pu être finalisé.",
+  "syncComplete": "Synchronisation terminée.",
+  "syncFailed": "La synchronisation a échoué. Veuillez réessayer.",
+  "downloadComplete": "Téléchargement terminé.",
+  "downloadFailed": "Le téléchargement a échoué.",
+  "connectDriveFirst": "Connectez d'abord Google Drive dans les paramètres de stockage.",
+  "savedSuccessfully": "Enregistré avec succès.",
+  "imageCount": "{current} / {max}",
+  "updateRollStatus": "Statut du rouleau de mise à jour",
+  "statusDescShooting": "Film chargé : enregistrez les prises de vue pendant que vous filmez",
+  "statusDescLab": "Le film est dans le laboratoire : ajoutez un lien Drive ou numérisez",
+  "statusDescScanned": "Les scans sont terminés — parcourez votre galerie",
+  "statusDescArchived": "Terminé – masqué dans la liste active",
+  "statusDescSyncing": "Téléchargement de numérisations depuis Drive…",
+  "alreadyPassed": "Déjà passé",
+  "lifecycleDone": "Fait",
+  "lifecycleSync": "Synchroniser",
+  "appTheme": "Thème de l'application",
+  "language": "Langue",
+  "archive": "Archive",
+  "emptyGearTitle": "Votre casier est vide",
+  "emptyGearSubtitle": "Ajoutez votre première caméra pour commencer à enregistrer des rouleaux.",
+  "locationPermissionDenied": "Autorisation de localisation refusée.",
+  "locationUnavailable": "Emplacement indisponible.",
+  "logExifTitle": "Journal EXIF",
+  "confirm": "Confirmer",
+  "driveUrl": "URL du lecteur",
+  "noPhotosYet": "Pas encore de photo",
+  "noShotsLogged": "Aucun tir enregistré pour l'instant",
+  "selectRoll": "Sélectionnez le rouleau",
+  "meterEv": "EV",
+  "meterIso": "ISO",
+  "meterAperture": "Ouverture",
+  "meterShutter": "Obturateur",
+  "meterCompensation": "Compensation",
+  "meterSpot": "Place",
+  "meterPriorityAperture": "Priorité à l'ouverture",
+  "meterPriorityShutter": "Priorité à l'obturation",
+  "meterNoRolls": "Aucun jet actif",
+  "continueButton": "Continuer",
+  "upgradeToPro": "Passer à Pro",
+  "currentPlan": "Forfait actuel",
+  "perYear": "par année",
+  "perMonth": "par mois",
+  "free": "Gratuit",
+  "manageSubscription": "Gérer l'abonnement",
+  "productsUnavailable": "Produits indisponibles",
+  "checkingStore": "Vérification du magasin…",
+  "legalAppleEula": "CLUF standard Apple",
+  "legalAppleEulaDescription": "Les applications sous licence sont également soumises au CLUF standard d'Apple.",
+  "viewAppleEula": "Afficher le CLUF standard Apple",
+  "chooseYourPlan": "Choisissez votre forfait",
+  "paywallSubtitle": "Pro ajoute AgXel Cloud Storage et le photomètre professionnel",
+  "monthlyBilling": "Facturation mensuelle",
+  "annualBilling": "Facturation annuelle",
+  "welcomeToHalidePro": "Bienvenue chez AgXel ! Votre forfait est maintenant actif.",
+  "purchaseFailedRetry": "L'achat n'a pas pu être finalisé. Veuillez réessayer.",
+  "unableToLoadSubscription": "Impossible de charger les options d'abonnement. Veuillez réessayer.",
+  "storeNotAvailable": "Le magasin n'est pas disponible.",
+  "restoreAppleIdHint": "Il vous sera peut-être demandé de vous connecter avec votre identifiant Apple pour restaurer les achats.",
+  "startFreeTrial": "Commencer l'essai gratuit",
+  "getHalidePro": "Obtenez AgXel",
+  "save20Percent": "ÉCONOMISEZ 20 %",
+  "forever": "Pour toujours",
+  "freeTrialWhereEligible": "Essai gratuit si éligible",
+  "planNotAvailable": "Ce plan n'est pas encore disponible. Veuillez essayer une autre option.",
+  "subscriptionDisclosure": "UN{price}l'abonnement sera appliqué à votre compte iTunes lors de la confirmation. Les abonnements seront automatiquement renouvelés sauf annulation dans les 24 heures avant la fin de la période en cours. Gérez à tout moment dans les paramètres iTunes. Toute partie inutilisée d'un essai gratuit sera perdue si vous achetez un abonnement.",
+  "perYearShort": "/an",
+  "perMonthShort": "/mois",
+  "storageStrategyTitle": "STRATÉGIE DE STOCKAGE",
+  "systemCloudQuota": "QUOTA DE NUAGE SYSTÈME",
+  "storageUsedOf": "{used}utilisé de{cap}",
+  "addonStorageFromPurchases": "+{amount}des achats complémentaires",
+  "systemCloudRequiresPro": "System Cloud nécessite des fonctionnalités Pro. La synchronisation professionnelle est limitée aux comptes cloud individuels.",
+  "upgradeProStorageHint": "Mettez à niveau ci-dessus pour obtenir un stockage Pro. Chaque compte comprend 5 à 10 Go par défaut.",
+  "storageManagement": "Gestion du stockage",
+  "manageStorageAccountsSubtitle": "Gérez vos comptes cloud et de stockage local",
+  "systemCloudAfterUpgradeHint": "Mettez à niveau ci-dessus pour obtenir un stockage Pro. Après la mise à niveau, votre compte apparaîtra ici.",
+  "primaryBadge": "PRIMAIRE",
+  "setAsPrimary": "Définir comme principal",
+  "primaryTooltip": "Primaire",
+  "storageUsage": "UTILISATION DU STOCKAGE",
+  "addMoreStorage": "AJOUTER PLUS DE STOCKAGE",
+  "tierBadgeByo": "BYO",
+  "cloudProvidersTitle": "Fournisseurs de cloud",
+  "cloudProvidersSubtitle": "Ajoutez votre propre stockage cloud ou réseau. Appuyez sur un fournisseur pour vous connecter.",
+  "connectedCount": "{count}Connecté",
+  "addAction": "Ajouter",
+  "archiveStorageDescription": "Équipement de sauvegarde et rouleaux sur ce compte.",
+  "labScanSyncDescription": "Synchronisez automatiquement les numérisations de films via les URL Drive.",
+  "priBadge": "PRI",
+  "fillAllFields": "Veuillez remplir tous les champs",
+  "nasConfigurationTitle": "CONFIGURATION DU NAS",
+  "nasConfigSubtitle": "Entrez les détails de votre NAS pour configurer le stockage",
+  "googleDrive": "Google Drive",
+  "nasProvider": "NAS",
+  "addStorageTitle": "AJOUTER DU STOCKAGE",
+  "storagePurchaseIntro": "Choisissez la quantité d'espace cloud supplémentaire dont vous avez besoin. Les prix sont affichés dans votre devise locale. Vous pouvez acheter la même taille plusieurs fois : chaque achat s’ajoute à votre total.",
+  "storagePurchaseFooter": "Chaque pack s'ajoute au total de votre coffre-fort : vous pouvez racheter la même taille à tout moment. Le paiement utilise la méthode sur cet appareil ; un espace supplémentaire apparaît généralement en quelques instants.",
+  "buyTier": "Acheter{tier} — {price}",
+  "buyTierNoPrice": "ACHETER{tier}",
+  "refreshPrices": "Actualiser les prix",
+  "storageUpdated": "Stockage mis à jour. Votre nouveau quota est actif.",
+  "purchaseCancelled": "Achat annulé.",
+  "couldNotRefreshPrices": "Nous n'avons pas pu actualiser les prix. Veuillez réessayer dans un instant.",
+  "couldNotLoadStorageOptions": "Nous n'avons pas pu charger les options de stockage. Vérifiez votre connexion et réessayez.",
+  "stackable": "EMPILABLE",
+  "connectGoogleDriveTitle": "CONNECTER GOOGLE DRIVE",
+  "connectGoogleDriveBody": "Pour importer des photos à partir d'un lien Drive partagé, AgXel doit accéder à votre compte Google (lecture seule). Connectez-vous une fois dans Paramètres ou appuyez sur Connecter ci-dessous.",
+  "connectGoogleUpper": "CONNECTER GOOGLE",
+  "cancelUpper": "ANNULER",
+  "googleDriveConnected": "Google Drive connecté.",
+  "couldNotConnectGoogleDrive": "Impossible de connecter Google Drive.",
+  "downloadFolderFailed": "Impossible de télécharger le dossier. Vérifiez l'accès à Drive et réessayez.",
+  "couldNotRetrievePhotos": "Impossible de récupérer les photos. Veuillez vérifier votre lien Drive.",
+  "fetchPhotosError": "Une erreur s'est produite lors de la récupération des photos.",
+  "privacyLastUpdatedDate": "6 avril 2026",
+  "termsLastUpdatedDate": "20 avril 2026",
+  "joinHalide": "Rejoignez AgXel",
+  "registerSubtitle": "Capturez votre voyage analogique",
+  "confirmPassword": "Confirmez le mot de passe",
+  "passwordsDoNotMatch": "Les mots de passe ne correspondent pas",
+  "signInTermsFooter": "En vous connectant, vous acceptez nos termes et conditions.",
+  "displayNameHint": "Votre nom d'affichage",
+  "nicknameHint": "par ex. Film de tir",
+  "bioHint": "Une courte biographie pour votre profil",
+  "tapToUploadPhoto": "Appuyez pour télécharger une photo",
+  "photoSavedTapSaveChanges": "Photo enregistrée sur cet appareil. Appuyez sur « Enregistrer les modifications » pour mettre à jour le profil.",
+  "couldNotSavePhoto": "Impossible d'enregistrer la photo. Veuillez réessayer.",
+  "emailGreeting": "Bonjour l'équipe AgXel,",
+  "supportEmailBodyPlaceholder": "(Décrivez ce qui s'est passé / ce dont vous avez besoin)",
+  "feedbackEmailBodyPlaceholder": "(Dites-nous ce que vous avez aimé / ce que vous souhaitez améliorer)",
+  "emailBodySeparator": "—",
+  "emailAccountLine": "Compte:{email}",
+  "emailUserIdLine": "ID de l'utilisateur:{uid}",
+  "moveToArchiveTitle": "Déplacer vers les archives ?",
+  "moveToArchiveBody": "Ce jet quittera votre liste active. Vous pouvez toujours l'ouvrir à tout moment depuis l'onglet Archive de l'accueil.",
+  "archiveAction": "Archive",
+  "uploadedImages": "IMAGES TÉLÉCHARGÉES",
+  "rollInfoSection": "INFOS SUR LE ROULEAU",
+  "rollInfoUpdated": "Informations sur le rouleau mises à jour !",
+  "couldNotUpdateRollInfo": "Nous n'avons pas pu mettre à jour vos informations de rôle.",
+  "atLabSection": "AU LABO",
+  "chooseLabImportMethod": "Choisissez comment importer les scans dans ce rouleau.",
+  "nextStepLabel": "SUIVANT:{action}",
+  "sendToLab": "ENVOYER AU LABO",
+  "markScanned": "MARQUE NUMÉRISÉE",
+  "scansComplete": "Analyses terminées",
+  "moveToArchiveLink": "Déplacer vers l'archive",
+  "technicalDataCount": "DONNÉES TECHNIQUES ({count})",
+  "noTechnicalLogs": "Aucun journal technique enregistré pour ce rouleau.",
+  "alignmentCalibration": "CALIBRAGE D'ALIGNEMENT",
+  "framesOffset": "{count}décalage des images",
+  "alignmentCalibrationHint": "Ajustez si vos analyses commencent avec des images de chargement vierges.",
+  "importOptions": "OPTIONS D'IMPORTATION",
+  "driveUrlLabel": "URL du Drive partagé (dossier ou ZIP)",
+  "fetchFiles": "Récupérer des fichiers",
+  "foundFilesAtLeaf": "Trouvé{count}fichier(s) au niveau de la feuille.",
+  "pasteDriveLinkError": "Collez un dossier Google Drive partagé ou un lien ZIP.",
+  "signInToSyncDrive": "Connectez-vous pour synchroniser depuis Drive.",
+  "driveLinkSavedSyncing": "Lien Drive enregistré – synchronisation…",
+  "syncStartedInBackground": "La synchronisation a démarré en arrière-plan.",
+  "importedPhotosFromDrive": "Importé{count}photo(s) de Drive.",
+  "couldNotSyncFromDrive": "Impossible de synchroniser depuis Drive.",
+  "addedLocalImageReferences": "Ajout de références d'images locales (niveau gratuit).",
+  "couldNotAddImageReferences": "Impossible d'ajouter des références d'image. Veuillez réessayer.",
+  "successfullyUploadedCount": "Téléversé avec succès{count}image(s) !",
+  "pleasePasteDriveUrl": "Veuillez coller une URL Drive partagée (dossier ou ZIP).",
+  "mustSignInDriveSync": "Vous devez être connecté pour effectuer une synchronisation depuis Drive.",
+  "tryingCloudSync": "Essayer la synchronisation cloud…",
+  "zipDetectedSyncing": "Code postal détecté. Extraction et synchronisation de photos...",
+  "foundPhotosImporting": "Trouvé{count}photos. Importation dans le rouleau...",
+  "unexpectedDriveResponse": "Réponse inattendue de Drive.",
+  "backendErrorDetail": "Erreur back-end{status}: {detail}",
+  "syncFailedVerifyDrive": "La synchronisation a échoué. Veuillez vérifier votre lien Drive et vos autorisations.",
+  "somethingWrongDuringSync": "Une erreur s'est produite lors de la synchronisation.",
+  "successfullyImportedNewPhotos": "Importation réussie{count}de nouvelles photos !",
+  "couldNotImportFolderDevice": "Impossible d'importer le dossier sur l'appareil. Vérifiez l'accès au lecteur.",
+  "continueGyroScan": "Continuer le balayage gyroscopique",
+  "continueGyroScanHint": "Ajoutez plus de cadres, puis appuyez sur Terminer la numérisation une fois terminé.",
+  "premiumGyroScanResumeHint": "Premium : numérisez les négatifs avec le gyroscope HUD.",
+  "premiumGyroScanFeatureHint": "Fonctionnalité Premium : mise à niveau pour numériser avec le gyroscope HUD.",
+  "precisionMeterTitle": "COMPTEUR DE PRÉCISION",
+  "collapseExposurePanel": "Réduire le panneau d'exposition",
+  "expandExposurePanel": "Développer le panneau d'exposition",
+  "unlockExposure": "OUVRIR",
+  "lockExposureUpper": "VERROUILLER L'EXPOSITION",
+  "lockedStatus": "FERMÉ",
+  "stableStatus": "ÉCURIE",
+  "meteringStatus": "MESURE…",
+  "multiSpotPinStatus": "MULTI-SPOTS ·{count}ÉPINGLE{plural}",
+  "multiSpotTapAddPins": "MULTI-SPOT — APPUYEZ POUR AJOUTER DES PINS",
+  "pinsLabel": "ÉPINGLE",
+  "pinCountShort": "{count}épingle{plural}",
+  "logToRollArrow": "LOG TO ROLL →",
+  "logMeterReadingTitle": "LECTURE DU COMPTEUR DE JOURNAL",
+  "logMeterReadingHint": "Choisissez un jet en statut Tir. Enregistre les détails de l'ouverture, de l'obturateur et du compteur dans le journal de prise de vue.",
+  "couldNotLoadRolls": "Impossible de charger les rouleaux.",
+  "noRollsInShooting": "Aucun jet en statut Tir.\nDémarrez un rouleau à partir de l'archive.",
+  "meterReadingLogged": "Relevé de compteur enregistré",
+  "couldNotLogReading": "Impossible d'enregistrer la lecture. Essayer à nouveau.",
+  "untitledRoll": "Rouleau sans titre",
+  "noCamera": "Pas de caméra",
+  "proFeatureBadge": "FONCTION PRO",
+  "precisionMeterProTitle": "Une mesure de lumière de précision est incluse avec AgXel.",
+  "precisionMeterProSubtitle": "Mettez à niveau pour débloquer la mesure spot, la compensation EV, l'exposition manuelle et la connexion à vos rouleaux.",
+  "viewPlans": "VOIR LES PLANS",
+  "logMeterReadingTooltip": "Enregistrer la lecture du compteur à rouler",
+  "aperturePickerHint": "Faites glisser pour définir le f-stop. Appuyez sur le cercle du compteur pour revenir à la priorité à l'ouverture.",
+  "shutterPickerHint": "La sélection d’une vitesse d’obturation passe à la priorité à l’obturation.\nAppuyez sur le cercle du compteur pour revenir à la priorité à l'ouverture.",
+  "evCompensationValue": "Compensation:{value}",
+  "driveUrlChip": "URL du lecteur",
+  "nicknameLabel": "SURNOM",
+  "brandLabel": "MARQUE",
+  "modelLabel": "MODÈLE",
+  "gallerySection": "GALERIE",
+  "noGearImagesYet": "Aucune image d'équipement pour l'instant",
+  "opticsSection": "OPTIQUE",
+  "mountAction": "MONTER",
+  "noOpticsMounted": "Aucune optique montée",
+  "createNewLensUpper": "CRÉER UNE NOUVELLE OBJECTIF",
+  "brandAndModelRequired": "La marque et le modèle sont obligatoires.",
+  "couldNotCreateLens": "Nous n'avons pas pu créer l'objectif. Veuillez réessayer.",
+  "signInSaveGearPhotos": "Connectez-vous pour enregistrer des photos d’équipement.",
+  "uploadFailedCheckConnection": "Le téléchargement a échoué. Vérifiez la connexion ou le stockage.",
+  "gearNotFoundRefresh": "Équipement introuvable pour ce compte. Ouvrez le casier, tirez pour actualiser, puis réessayez.",
+  "storageLimitFreeSpace": "Limite de stockage atteinte. Libérez de l'espace ou mettez à niveau votre forfait.",
+  "uploadRejectedFormat": "Téléchargement rejeté. Vérifiez la taille du fichier (max 15 Mo) et son format.",
+  "brandFieldHint": "Marque (par exemple Leica)",
+  "modelFieldHint": "Modèle (par exemple 35 mm f/2 Summicron)",
+  "serialNumberOptional": "Numéro de série (facultatif)",
+  "nicknameFieldHint": "Surnom (par exemple, mon favori)",
+  "optionalField": "Facultatif",
+  "formatLabel": "Format",
+  "errorWithMessage": "Erreur:{message}",
+  "couldNotLoadAnalytics": "Impossible de charger les analyses",
+  "noShotsLoggedYear": "Aucun tir enregistré l'année dernière pour le moment. Cadres logiques à partir du compteur ou du détail du rouleau pour commencer à créer votre carte d'exposition.",
+  "shotsCount": "{count}coups de feu",
+  "last365Days": "365 derniers jours",
+  "periodRange": "{start} – {end}",
+  "lightingHabit": "HABITUDE D'ÉCLAIRAGE",
+  "goldenHour": "Heure d'or",
+  "goldenHourBiasStrong": "Vous avez un fort biais d'heure d'or : une grande partie de vos sessions se déroulent entre 16h et 18h. Vos expositions obtiennent souvent les scores les plus élevés pendant cette fenêtre.",
+  "goldenHourBiasModerate": "L'heure d'or constitue une partie importante de votre rythme de prise de vue. Pensez à vous pencher sur les séances à l’aube pour élargir votre gamme tonale.",
+  "goldenHourBiasLow": "La plupart de vos séances ont lieu en dehors de l'heure dorée. Vous préférerez peut-être une lumière constante de midi ou des configurations intérieures.",
+  "goldenHourShotsSummary": "{golden}de{total}tirs entre 16h et 18h, heure locale",
+  "refreshTooltip": "Rafraîchir",
+  "daysUnit": "jours",
+  "periodDaysOf": "/ {days}",
+  "gridOn": "Grille : activée",
+  "gridOff": "Grille : Désactivée",
+  "kelvinValue": "{kelvin}K",
+  "guidanceGotItUpper": "J'AI COMPRIS",
+  "sessionFullRoll": "Rouleau complet",
+  "sessionHeavy": "Lourd",
+  "sessionActive": "Actif",
+  "sessionLight": "Lumière",
+  "sessionNoShots": "Aucun tir",
+  "heatLess": "Moins",
+  "heatMore": "Plus",
+  "noExposuresRecorded": "Aucune exposition enregistrée",
+  "exposureCount": "{count, plural, =1{1 exposition} other{{count} expositions}}",
+  "tapCellToInspect": "Appuyez sur n'importe quelle cellule pour inspecter ce jour-là",
+  "halideDialogBarrier": "Barrière de dialogue aux halogénures",
+  "halideBottomSheetBarrier": "Barrière de feuille inférieure aux halogénures",
+  "archivedCannotModify": "Les images sont archivées et ne peuvent plus être modifiées.",
+  "fileMissed": "Fichier manqué",
+  "uploadAllCount": "Télécharger tout ({count})",
+  "uploadedSuccessfullyCount": "Téléchargé{count}image(s) avec succès.",
+  "maxImagesAllowed": "Maximum de{max}images autorisées par élément d’équipement.",
+  "onlyAddedRemainingImages": "Seulement ajouté{count}images pour rester dans la limite de{max}.",
+  "signInUploadGearPhotos": "Connectez-vous pour télécharger des photos d'équipement.",
+  "successfullyUploadedGearImages": "Téléversé avec succès{count}image(s) !",
+  "gearReady": "Ton{gearType}est prêt !",
+  "couldNotAddGear": "Nous n'avons pas pu ajouter votre{gearType}. Veuillez réessayer.",
+  "addGearTypeTitle": "AJOUTER{gearType}",
+  "saveGearType": "SAUVEGARDER{gearType}",
+  "clearPinsCount": "Effacer les épingles ({count})",
+  "zoneOverlayTitle": "SUPERPOSITION DE ZONES",
+  "zoneOverlayIntro": "Les couleurs montrent la luminosité de chaque partie de la scène par rapport à votre cible EV. Le vert (Zone V) est gris moyen à cette exposition.",
+  "zoneOverlayTip": "Astuce : verrouillez l'exposition, puis numérisez le cadre. Conservez les tons importants en dehors du violet foncé (Zone 0) et du rouge vif (Zone X), à moins que vous ne souhaitiez des ombres bloquées ou des hautes lumières soufflées.",
+  "zone0Meaning": "Noir pur – aucun détail",
+  "zoneIMeaning": "Ombre très profonde",
+  "zoneIIMeaning": "Ombre profonde, légère texture",
+  "zoneIIIMeaning": "Tons sombres avec une texture claire",
+  "zoneIVMeaning": "Feuillage foncé, peau ombrée",
+  "zoneVMeaning": "Gris moyen – votre cible EV",
+  "zoneVIMeaning": "Peau claire, pierre claire",
+  "zoneVIIMeaning": "Peau très claire, neige brillante",
+  "zoneVIIIMeaning": "Neige brillante, objets blancs",
+  "zoneIXMeaning": "Près du papier blanc",
+  "zoneXMeaning": "Reflets spéculaires, blanc pur",
+  "zone0Short": "Zone 0",
+  "zoneVShort": "Zone V",
+  "zoneXShort": "ZoneX",
+  "scanningCompleteFrames": "Numérisation terminée —{count}cadre(s)",
+  "couldNotFinishScanning": "Impossible de terminer la numérisation. Essayer à nouveau.",
+  "processing": "Traitement…",
+  "frameNumber": "Cadre{number}",
+  "reviewingFrameTapLive": "Cadre de révision{number}— appuyez pour numériser en direct",
+  "pauseAndReturn": "Pause et retour",
+  "filmFormatSection": "FORMAT DU FILM",
+  "negativeRawTooltip": "Négatif (brut)",
+  "positiveInvertedTooltip": "Positif (inversé)",
+  "captureFramesToFinish": "Capturer des images pour terminer",
+  "finishScanning": "Terminer la numérisation",
+  "historicalFramePositive": "Cadre historique — enregistré en tant qu'aperçu positif",
+  "levelPhoneOverTable": "Nivelez le téléphone au-dessus de la table lumineuse",
+  "almostLevelHoldSteady": "Presque à niveau – restez stable",
+  "leveledFocusingNegative": "Nivelé – se concentrer sur le négatif…",
+  "focusedCapturingPositive": "Concentré - capture (vue positive)",
+  "focusedCapturingNegative": "Focalisé - capture (vue négative)",
+  "mediumFormatDimensions": "Format moyen ·{dimensions}",
+  "imageNotAvailableOffline": "L'image n'est pas encore disponible hors ligne. Attendez le téléchargement ou vérifiez la connexion.",
+  "couldNotShareImage": "Impossible de partager l'image.",
+  "photosAccessDenied": "Accès à la bibliothèque de photos refusé. Activer dans les paramètres.",
+  "savedToPhotos": "Enregistré dans Photos.",
+  "couldNotSaveToPhotos": "Impossible d'enregistrer dans Photos.",
+  "cannotRotateImageType": "Impossible de faire pivoter ce type d'image.",
+  "monthJan": "Jan",
+  "monthFeb": "Fév",
+  "monthMar": "Mar",
+  "monthApr": "Avr",
+  "monthMay": "Peut",
+  "monthJun": "juin",
+  "monthJul": "Juillet",
+  "monthAug": "Août",
+  "monthSep": "Sep",
+  "monthOct": "Octobre",
+  "monthNov": "Nov",
+  "monthDec": "Déc",
+  "dowSun": "S",
+  "dowMon": "M",
+  "dowTue": "T",
+  "dowWed": "W",
+  "dowThu": "T",
+  "dowFri": "F",
+  "dowSat": "S",
+  "toggleOn": "Sur",
+  "toggleOff": "Désactivé",
+  "framesCapturedProgress": "{captured} / {max}capturé",
+  "format35mmDimensions": "35 millimètres ·{dimensions}",
+  "rotate90CounterClockwise": "90° dans le sens inverse des aiguilles d'une montre",
+  "rotate90Clockwise": "90° dans le sens des aiguilles d'une montre",
+  "languageChooseTitle": "Choisissez votre langue",
+  "languageChooseSubtitle": "Choisissez la langue à utiliser dans AgXel.",
+  "@lastUpdated": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@saveGear": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@supportDescription": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "@uploadingProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@tapToSelectUpTo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@addPhotosLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@unsavedCloudChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@scannedDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@isoValue": {
+    "placeholders": {
+      "iso": {
+        "type": "String"
+      }
+    }
+  },
+  "@freeTierCameraLimit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@savedPhotosOnDevice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@imageCount": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "@subscriptionDisclosure": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageUsedOf": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "cap": {
+        "type": "String"
+      }
+    }
+  },
+  "@addonStorageFromPurchases": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@connectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@buyTier": {
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      },
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "@buyTierNoPrice": {
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "@emailAccountLine": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "@emailUserIdLine": {
+    "placeholders": {
+      "uid": {
+        "type": "String"
+      }
+    }
+  },
+  "@nextStepLabel": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "@technicalDataCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@framesOffset": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@foundFilesAtLeaf": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@importedPhotosFromDrive": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "@successfullyUploadedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@foundPhotosImporting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backendErrorDetail": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "@successfullyImportedNewPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "@multiSpotPinStatus": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "plural": {
+        "type": "String"
+      }
+    }
+  },
+  "@pinCountShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "plural": {
+        "type": "String"
+      }
+    }
+  },
+  "@evCompensationValue": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "@errorWithMessage": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@shotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@periodRange": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "@goldenHourShotsSummary": {
+    "placeholders": {
+      "golden": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@periodDaysOf": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@kelvinValue": {
+    "placeholders": {
+      "kelvin": {
+        "type": "int"
+      }
+    }
+  },
+  "@exposureCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@uploadAllCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@uploadedSuccessfullyCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@maxImagesAllowed": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "@onlyAddedRemainingImages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "@successfullyUploadedGearImages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@gearReady": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@couldNotAddGear": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@addGearTypeTitle": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@saveGearType": {
+    "placeholders": {
+      "gearType": {
+        "type": "String"
+      }
+    }
+  },
+  "@clearPinsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@scanningCompleteFrames": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@frameNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "@reviewingFrameTapLive": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "@mediumFormatDimensions": {
+    "placeholders": {
+      "dimensions": {
+        "type": "String"
+      }
+    }
+  },
+  "@framesCapturedProgress": {
+    "placeholders": {
+      "captured": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "@format35mmDimensions": {
+    "placeholders": {
+      "dimensions": {
+        "type": "String"
+      }
+    }
+  }
+}

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import '../models/gear_status.dart';
 
 class GearStatusSelector extends StatelessWidget {
@@ -13,6 +15,7 @@ class GearStatusSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: const BoxDecoration(
@@ -26,9 +29,9 @@ class GearStatusSelector extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Update Gear Status',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Text(
+            l10n.status,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
@@ -41,7 +44,7 @@ class GearStatusSelector extends StatelessWidget {
           ...GearStatus.values.map((status) {
             final isSelected = status == currentStatus;
             return ListTile(
-              title: Text(status.label),
+              title: Text(status.localizedLabel(l10n)),
               trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
               onTap: () {
                 onStatusSelected(status);

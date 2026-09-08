@@ -1,10 +1,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/features/storage/presentation/bloc/storage_accounts_bloc.dart';
 import 'package:frontend/models/storage_account.dart';
 import '../widgets/storage_tier_selector.dart';
 import '../widgets/cloud_providers_section.dart';
+import 'package:frontend/core/theme/halide_colors.dart';
 
 class StorageAccountListView extends StatefulWidget {
   const StorageAccountListView({Key? key}) : super(key: key);
@@ -18,6 +21,7 @@ class _StorageAccountListViewState extends State<StorageAccountListView> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return BlocProvider(
       create: (context) => StorageAccountsBloc()..add(LoadStorageAccounts()),
       child: Scaffold(
@@ -36,8 +40,8 @@ class _StorageAccountListViewState extends State<StorageAccountListView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Storage Management',
+                  Text(
+                    l10n.storageManagement,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 32,
@@ -47,7 +51,7 @@ class _StorageAccountListViewState extends State<StorageAccountListView> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Manage your cloud and local storage accounts',
+                    l10n.manageStorageAccountsSubtitle,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.6),
                       fontSize: 16,
@@ -62,7 +66,7 @@ class _StorageAccountListViewState extends State<StorageAccountListView> {
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(vertical: 20),
-              child: _buildContentForTier(context),
+              child: _buildContentForTier(context, l10n),
             ),
           ),
                 ],
@@ -74,11 +78,11 @@ class _StorageAccountListViewState extends State<StorageAccountListView> {
     );
   }
 
-  Widget _buildContentForTier(BuildContext context) {
+  Widget _buildContentForTier(BuildContext context, AppLocalizations l10n) {
     return BlocBuilder<StorageAccountsBloc, StorageAccountsState>(
       builder: (context, state) {
         if (state is StorageAccountsLoading) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFFF97316)));
+          return Center(child: CircularProgressIndicator(color: HalideColors.of(context).accent));
         }
         if (state is StorageAccountsError) {
           return Center(
@@ -89,18 +93,20 @@ class _StorageAccountListViewState extends State<StorageAccountListView> {
           switch (_selectedTierIndex) {
             case 0:
               return _buildAccountList(
-                context, 
+                context,
                 state.accounts.where((a) => a.type == StorageAccountType.local).toList(),
-                title: 'LOCAL ACCOUNTS',
+                l10n: l10n,
+                title: l10n.localAccounts,
               );
             case 1:
               return CloudProvidersSection(accounts: state.accounts);
             case 2:
               return _buildAccountList(
-                context, 
+                context,
                 state.accounts.where((a) => a.type == StorageAccountType.system).toList(),
-                title: 'SYSTEM CLOUD',
-                emptyDescription: 'Upgrade above to get Pro storage. After upgrading, your account will appear here.',
+                l10n: l10n,
+                title: l10n.systemCloud,
+                emptyDescription: l10n.systemCloudAfterUpgradeHint,
               );
             default:
               return const SizedBox.shrink();
@@ -112,10 +118,12 @@ class _StorageAccountListViewState extends State<StorageAccountListView> {
   }
 
   Widget _buildAccountList(
-    BuildContext context, 
-    List<StorageAccount> accounts, 
-    {required String title, String? emptyDescription}
-  ) {
+    BuildContext context,
+    List<StorageAccount> accounts, {
+    required AppLocalizations l10n,
+    required String title,
+    String? emptyDescription,
+  }) {
     if (accounts.isEmpty && emptyDescription != null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,

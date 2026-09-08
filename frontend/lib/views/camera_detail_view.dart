@@ -2,20 +2,19 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/l10n/enum_l10n.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/widgets/glass_panel.dart';
 import '../models/camera.dart';
-import '../models/lens.dart';
 import '../models/gear_status.dart';
 import '../models/user_profile.dart';
-import '../widgets/gear_image_uploader_widget.dart';
 import '../core/providers/notification_provider.dart';
 import '../core/models/notification_model.dart';
 import '../providers/gear_provider.dart';
 import '../providers/auth_provider.dart';
 import '../core/constants/free_tier_limits.dart';
 import '../services/gear_service.dart';
-import '../core/utils/notifications.dart';
 import '../core/utils/local_image_thumb.dart';
 import '../core/constants/gear_image_upload.dart';
 
@@ -27,12 +26,13 @@ class CameraDetailView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final camera = ref.watch(cameraProvider(cameraId));
+    final l10n = context.l10n;
     final plan = ref.watch(userPlanProvider);
 
     if (camera == null) {
       return Scaffold(
         backgroundColor: const Color(0xFF0D0D0D),
-        body: Center(child: Text('Camera not found', style: TextStyle(color: Colors.white.withOpacity(0.8)))),
+        body: Center(child: Text(l10n.cameraNotFound, style: TextStyle(color: Colors.white.withOpacity(0.8)))),
       );
     }
 
@@ -98,7 +98,7 @@ class CameraDetailView extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'NICKNAME',
+                    l10n.nicknameLabel,
                     style: TextStyle(
                       fontSize: 10,
                       letterSpacing: 1.5,
@@ -124,7 +124,7 @@ class CameraDetailView extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'BRAND',
+                              l10n.brandLabel,
                               style: TextStyle(
                                 fontSize: 10,
                                 letterSpacing: 1.5,
@@ -149,7 +149,7 @@ class CameraDetailView extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'MODEL',
+                              l10n.modelLabel,
                               style: TextStyle(
                                 fontSize: 10,
                                 letterSpacing: 1.5,
@@ -185,7 +185,7 @@ class CameraDetailView extends ConsumerWidget {
                     Icon(Icons.photo_library_outlined, size: 14, color: Colors.white.withOpacity(0.3)),
                     const SizedBox(width: 8),
                     Text(
-                      'GALLERY',
+                      l10n.gallerySection,
                       style: TextStyle(
                         fontSize: 10,
                         letterSpacing: 1.5,
@@ -199,7 +199,7 @@ class CameraDetailView extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${camera.imageUrls.length} / 3',
+                      l10n.imageCount(camera.imageUrls.length, 3),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
@@ -216,7 +216,7 @@ class CameraDetailView extends ConsumerWidget {
                         plan: plan,
                       ),
                       icon: const Icon(Icons.camera_alt_outlined, size: 18, color: Colors.white70),
-                      label: const Text('PHOTOS', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500, fontSize: 11, letterSpacing: 1)),
+                      label: Text(l10n.photos.toUpperCase(), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500, fontSize: 11, letterSpacing: 1)),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         minimumSize: Size.zero,
@@ -240,7 +240,7 @@ class CameraDetailView extends ConsumerWidget {
                             Icon(Icons.photo_library_outlined, size: 32, color: Colors.white.withOpacity(0.3)),
                             const SizedBox(height: 8),
                             Text(
-                              'No gear images yet',
+                              l10n.noGearImagesYet,
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.white.withOpacity(0.5),
@@ -291,7 +291,7 @@ class CameraDetailView extends ConsumerWidget {
                     Icon(Icons.filter_tilt_shift, size: 14, color: Colors.white.withOpacity(0.3)),
                     const SizedBox(width: 8),
                     Text(
-                      'OPTICS',
+                      l10n.opticsSection,
                       style: TextStyle(
                         fontSize: 10,
                         letterSpacing: 1.5,
@@ -309,7 +309,7 @@ class CameraDetailView extends ConsumerWidget {
                       Icon(Icons.add_circle_outline, size: 16, color: Colors.white.withOpacity(0.5)),
                       const SizedBox(width: 6),
                       Text(
-                        'MOUNT',
+                        l10n.mountAction,
                         style: TextStyle(
                           fontSize: 10,
                           letterSpacing: 1.5,
@@ -336,7 +336,7 @@ class CameraDetailView extends ConsumerWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'No optics mounted',
+                            l10n.noOpticsMounted,
                             style: TextStyle(
                               fontStyle: FontStyle.italic,
                               fontSize: 13,
@@ -457,6 +457,7 @@ class _LinkLensSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final plan = ref.watch(userPlanProvider);
     final camera = ref.watch(cameraProvider(cameraId));
     final mountBlocked = camera != null && !canMountLensOnCamera(plan, camera.lenses.length);
@@ -469,7 +470,7 @@ class _LinkLensSheet extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Select Lens to Mount', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(l10n.selectLensToMount, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           if (mountBlocked) ...[
             const SizedBox(height: 12),
             Text(
@@ -486,7 +487,7 @@ class _LinkLensSheet extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (unlinked.isEmpty)
-                      const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('No lenses available', style: TextStyle(color: Colors.white54))))
+                      Center(child: Padding(padding: const EdgeInsets.all(20), child: Text(l10n.noLensesAvailable, style: const TextStyle(color: Colors.white54))))
                     else
                       ListView.builder(
                         shrinkWrap: true,
@@ -511,7 +512,7 @@ class _LinkLensSheet extends ConsumerWidget {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.add_circle_outline, color: Colors.blueAccent),
-                      title: const Text('CREATE NEW LENS', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 13)),
+                      title: Text(l10n.createNewLensUpper, style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 13)),
                       onTap: mountBlocked
                           ? null
                           : () {
@@ -524,7 +525,7 @@ class _LinkLensSheet extends ConsumerWidget {
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, __) => Text('Error: $e', style: const TextStyle(color: Colors.redAccent)),
+            error: (e, __) => Text(l10n.errorWithMessage(e.toString()), style: const TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -559,13 +560,14 @@ class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
   }
 
   Future<void> _submit() async {
+    final l10n = context.l10n;
     final nickname = _nicknameController.text.trim();
     final brand = _brandController.text.trim();
     final model = _modelController.text.trim();
     
     if (brand.isEmpty || model.isEmpty) {
       ref.read(notificationProvider.notifier).show(
-        'BRAND AND MODEL ARE REQUIRED.',
+        halideCaps(l10n.brandAndModelRequired),
         type: NotificationType.error,
       );
       return;
@@ -592,7 +594,7 @@ class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
     } catch (e) {
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-          'WE COULDN\'T CREATE THE LENS. PLEASE TRY AGAIN.',
+          halideCaps(l10n.couldNotCreateLens),
           type: NotificationType.error,
         );
       }
@@ -603,6 +605,7 @@ class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom;
 
     return Container(
@@ -617,14 +620,14 @@ class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
         children: [
           Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 24),
-          const Text('New Lens Details', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(l10n.newLensDetails, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('Create and mount a new lens to this body.', style: TextStyle(color: Colors.white54, fontSize: 13)),
+          Text(l10n.createMountLensHint, style: const TextStyle(color: Colors.white54, fontSize: 13)),
           const SizedBox(height: 24),
-          _field('Brand (e.g. Leica)', _brandController),
-          _field('Model (e.g. 35mm f/2 Summicron)', _modelController),
-          _field('Serial Number (Optional)', _serialController),
-          _field('Nickname (e.g. My Favorite)', _nicknameController),
+          _field(l10n.brandFieldHint, _brandController),
+          _field(l10n.modelFieldHint, _modelController),
+          _field(l10n.serialNumberOptional, _serialController),
+          _field(l10n.nicknameFieldHint, _nicknameController),
           const SizedBox(height: 32),
           FilledButton(
             onPressed: _isSaving ? null : _submit,
@@ -636,12 +639,12 @@ class _CreateLensSheetState extends ConsumerState<_CreateLensSheet> {
             ),
             child: _isSaving 
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-              : const Text('CREATE & MOUNT', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+              : Text(l10n.createAndMount, style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
           ),
           const SizedBox(height: 12),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: Text(l10n.cancel, style: const TextStyle(color: Colors.white54)),
           ),
         ],
       ),
@@ -735,6 +738,7 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
       return;
     }
 
+    final l10n = context.l10n;
     setState(() => _isUploading = true);
     try {
       final user = ref.read(authServiceProvider).currentUser;
@@ -742,7 +746,7 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
       if (token == null) {
         if (mounted) {
           ref.read(notificationProvider.notifier).show(
-                'SIGN IN TO SAVE GEAR PHOTOS.',
+                halideCaps(l10n.signInSaveGearPhotos),
                 type: NotificationType.error,
               );
         }
@@ -759,16 +763,15 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
       debugPrint('[GearImagesEditSheet] upload failed: $e\n$st');
       if (mounted) {
         final detail = e.detail?.toUpperCase() ?? '';
-        String message = 'UPLOAD FAILED. CHECK CONNECTION OR STORAGE.';
+        String message = halideCaps(l10n.uploadFailedCheckConnection);
         if (e.statusCode == 404 ||
             detail.contains('USER CAMERA NOT FOUND') ||
             detail.contains('NOT FOUND')) {
-          message =
-              'GEAR NOT FOUND FOR THIS ACCOUNT. OPEN THE LOCKER, PULL TO REFRESH, THEN TRY AGAIN.';
+          message = halideCaps(l10n.gearNotFoundRefresh);
         } else if (e.statusCode == 402 || detail.contains('STORAGE LIMIT')) {
-          message = 'STORAGE LIMIT REACHED. FREE SOME SPACE OR UPGRADE YOUR PLAN.';
+          message = halideCaps(l10n.storageLimitFreeSpace);
         } else if (e.statusCode == 400) {
-          message = detail.isNotEmpty ? detail : 'UPLOAD REJECTED. CHECK FILE SIZE (MAX 15 MB) AND FORMAT.';
+          message = detail.isNotEmpty ? detail : halideCaps(l10n.uploadRejectedFormat);
         }
         ref.read(notificationProvider.notifier).show(
               message,
@@ -780,7 +783,7 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
       debugPrint('[GearImagesEditSheet] upload failed: $e\n$st');
       if (mounted) {
         ref.read(notificationProvider.notifier).show(
-              'UPLOAD FAILED. CHECK CONNECTION OR STORAGE.',
+              halideCaps(l10n.uploadFailedCheckConnection),
               type: NotificationType.error,
             );
       }
@@ -791,6 +794,7 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF1C1C1C),
@@ -806,9 +810,9 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Edit gear images', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
+                Text(l10n.editGearImages, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
                 Text(
-                  '$_totalCount / $_maxImages',
+                  l10n.imageCount(_totalCount, _maxImages),
                   style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.6)),
                 ),
               ],
@@ -910,7 +914,7 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
                     OutlinedButton.icon(
                       onPressed: _isUploading ? null : _pickMore,
                       icon: const Icon(Icons.add_photo_alternate_outlined, size: 22),
-                      label: Text('Add photos (${_maxImages - _totalCount} left)'),
+                      label: Text(l10n.addPhotosLeft(_maxImages - _totalCount)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: Colors.white38),
@@ -930,7 +934,7 @@ class _GearImagesEditSheetState extends ConsumerState<_GearImagesEditSheet> {
                       ),
                       child: _isUploading
                           ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                          : const Text('Save'),
+                          : Text(l10n.save),
                     ),
                   ),
                 ],
@@ -1089,7 +1093,7 @@ class _EditGearSheetState extends State<_EditGearSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // Reserve space so save button stays above bottom nav bar (match nav bar height used in showModalBottomSheet)
+    final l10n = context.l10n;
     const navBarHeight = 88.0;
     final bottomPadding = MediaQuery.of(context).padding.bottom + MediaQuery.of(context).viewInsets.bottom + navBarHeight;
 
@@ -1112,10 +1116,10 @@ class _EditGearSheetState extends State<_EditGearSheet> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Edit gear', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                    Text(l10n.editGear, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                      child: Text(l10n.cancel, style: const TextStyle(color: Colors.white54)),
                     ),
                   ],
                 ),
@@ -1125,16 +1129,16 @@ class _EditGearSheetState extends State<_EditGearSheet> {
                   controller: scrollController,
                   padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + bottomPadding),
                   children: [
-                    _editField('Nickname', _nicknameController),
-                    _editField('Brand', _brandController),
-                    _editField('Model', _modelController),
-                    _editField('Serial number', _serialController, optional: true),
-                    _editField('Format', _formatController, optional: true),
+                    _editField(l10n.nickname, _nicknameController),
+                    _editField(l10n.manufacturer, _brandController),
+                    _editField(l10n.model, _modelController),
+                    _editField(l10n.serialNumber, _serialController, optional: true),
+                    _editField(l10n.formatLabel, _formatController, optional: true),
                     const SizedBox(height: 16),
-                    Text('Status', style: TextStyle(fontSize: 12, letterSpacing: 1, color: Colors.white.withOpacity(0.6))),
+                    Text(l10n.status, style: TextStyle(fontSize: 12, letterSpacing: 1, color: Colors.white.withOpacity(0.6))),
                     const SizedBox(height: 8),
                     ...GearStatus.values.map((s) => RadioListTile<GearStatus>(
-                      title: Text(s.label, style: const TextStyle(color: Colors.white)),
+                      title: Text(s.localizedLabel(l10n), style: const TextStyle(color: Colors.white)),
                       value: s,
                       groupValue: _status,
                       onChanged: (v) => setState(() => _status = v!),
@@ -1159,7 +1163,7 @@ class _EditGearSheetState extends State<_EditGearSheet> {
                         style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14)),
                         child: _isSaving 
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54))
-                          : const Text('Save changes'),
+                          : Text(l10n.saveChanges),
                       ),
                     ),
                   ],
@@ -1173,6 +1177,7 @@ class _EditGearSheetState extends State<_EditGearSheet> {
   }
 
   Widget _editField(String label, TextEditingController controller, {bool optional = false}) {
+    final l10n = context.l10n;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -1184,7 +1189,7 @@ class _EditGearSheetState extends State<_EditGearSheet> {
             controller: controller,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              hintText: optional ? 'Optional' : null,
+              hintText: optional ? l10n.optionalField : null,
               hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
               filled: true,
               fillColor: Colors.white.withOpacity(0.08),

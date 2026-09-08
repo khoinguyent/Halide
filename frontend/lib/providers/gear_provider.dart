@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import '../core/constants/free_tier_limits.dart';
 import '../core/models/notification_model.dart';
 import '../core/providers/notification_provider.dart';
@@ -87,10 +88,10 @@ class UserGearNotifier extends AsyncNotifier<List<Camera>> {
   }
 
   /// Null if allowed; otherwise user-facing block reason.
-  String? blockReasonForNewCamera() {
+  String? blockReasonForNewCamera(AppLocalizations l10n) {
     final plan = ref.read(userPlanProvider);
     final count = state.value?.length ?? 0;
-    if (!canAddCameraOnPlan(plan, count)) return freeTierCameraLimitMessage();
+    if (!canAddCameraOnPlan(plan, count)) return freeTierCameraLimitMessage(l10n);
     return null;
   }
 

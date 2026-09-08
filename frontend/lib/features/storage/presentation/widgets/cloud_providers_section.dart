@@ -2,24 +2,27 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:frontend/core/l10n/l10n_extension.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import 'package:frontend/core/providers/notification_provider.dart';
 import 'package:frontend/core/models/notification_model.dart';
 import 'package:frontend/core/widgets/halide_dialog.dart';
 import 'package:frontend/features/storage/presentation/bloc/storage_accounts_bloc.dart';
 import 'package:frontend/models/storage_account.dart';
 import 'package:frontend/services/storage_connection_service.dart';
+import 'package:frontend/core/theme/halide_colors.dart';
 
 class CloudProviderInfo {
   final String id;
-  final String name;
+  /// Canonical provider name from the backend (used for account matching).
+  final String backendName;
   final IconData icon;
-  final bool isConnected;
 
   const CloudProviderInfo({
     required this.id,
-    required this.name,
+    required this.backendName,
     required this.icon,
-    this.isConnected = false,
   });
 }
 
@@ -28,17 +31,29 @@ class CloudProvidersSection extends StatelessWidget {
   const CloudProvidersSection({Key? key, required this.accounts}) : super(key: key);
 
   static const List<CloudProviderInfo> _providers = [
-    CloudProviderInfo(id: 'gdrive', name: 'Google Drive', icon: Icons.drive_file_move_outlined),
-    CloudProviderInfo(id: 'nas', name: 'NAS', icon: Icons.storage_outlined),
+    CloudProviderInfo(id: 'gdrive', backendName: 'Google Drive', icon: Icons.drive_file_move_outlined),
+    CloudProviderInfo(id: 'nas', backendName: 'NAS', icon: Icons.storage_outlined),
   ];
+
+  String _providerLabel(AppLocalizations l10n, CloudProviderInfo provider) {
+    switch (provider.id) {
+      case 'gdrive':
+        return l10n.googleDrive;
+      case 'nas':
+        return l10n.nasProvider;
+      default:
+        return provider.backendName;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Cloud providers',
+        Text(
+          l10n.cloudProvidersTitle,
           style: TextStyle(
             color: Colors.white,
             fontSize: 22,
@@ -48,7 +63,7 @@ class CloudProvidersSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Add your own cloud or network storage. Tap a provider to connect.',
+          l10n.cloudProvidersSubtitle,
           style: TextStyle(
             color: Colors.white.withOpacity(0.55),
             fontSize: 13,
@@ -64,10 +79,11 @@ class CloudProvidersSection extends StatelessWidget {
           itemBuilder: (context, index) {
             final provider = _providers[index];
             final providerAccounts = accounts
-                .where((a) => a.providerName == provider.name)
+                .where((a) => a.providerName == provider.backendName)
                 .toList();
             return _CloudProviderGroup(
               provider: provider,
+              displayName: _providerLabel(l10n, provider),
               connectedAccounts: providerAccounts,
             );
           },
@@ -88,8 +104,14 @@ class _NasConfig {
 
 class _CloudProviderGroup extends ConsumerStatefulWidget {
   final CloudProviderInfo provider;
+  final String displayName;
   final List<StorageAccount> connectedAccounts;
-  const _CloudProviderGroup({Key? key, required this.provider, required this.connectedAccounts}) : super(key: key);
+  const _CloudProviderGroup({
+    Key? key,
+    required this.provider,
+    required this.displayName,
+    required this.connectedAccounts,
+  }) : super(key: key);
 
   @override
   _CloudProviderGroupState createState() => _CloudProviderGroupState();
@@ -103,6 +125,7 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
 
+    final l10n = context.l10n;
     return showHalideDialog<_NasConfig>(
       context: context,
       builder: (dialogContext) => Padding(
@@ -113,10 +136,10 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'NAS CONFIGURATION',
+              Text(
+                l10n.nasConfigurationTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -125,7 +148,7 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
               ),
               const SizedBox(height: 12),
               Text(
-                'ENTER YOUR NAS DETAILS TO SET UP STORAGE'.toUpperCase(),
+                l10n.nasConfigSubtitle.toUpperCase(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.4),
@@ -137,25 +160,25 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
               const SizedBox(height: 32),
               HalideTextField(
                 controller: hostController,
-                label: 'HOST',
+                label: l10n.host.toUpperCase(),
                 prefixIcon: Icons.dns_outlined,
               ),
               const SizedBox(height: 16),
               HalideTextField(
                 controller: usernameController,
-                label: 'USERNAME',
+                label: l10n.username.toUpperCase(),
                 prefixIcon: Icons.person_outline,
               ),
               const SizedBox(height: 16),
               HalideTextField(
                 controller: passwordController,
-                label: 'PASSWORD',
+                label: l10n.passwordField.toUpperCase(),
                 prefixIcon: Icons.lock_outline,
                 obscureText: true,
               ),
               const SizedBox(height: 48),
               HalideActionButton(
-                text: 'CONNECT NAS',
+                text: l10n.connectNas.toUpperCase(),
                 onPressed: () {
                   final host = hostController.text.trim();
                   final username = usernameController.text.trim();
@@ -163,7 +186,7 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
 
                   if (host.isEmpty || username.isEmpty || password.isEmpty) {
                     ref.read(notificationProvider.notifier).show(
-                      'PLEASE FILL IN ALL FIELDS',
+                      l10n.fillAllFields,
                       type: NotificationType.error,
                     );
                     return;
@@ -178,7 +201,7 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(null),
                 child: Text(
-                  'CANCEL'.toUpperCase(),
+                  l10n.cancelUpper,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.35),
                     fontSize: 11,
@@ -220,8 +243,8 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
           setState(() => _viewState = ConnectionState.idle);
           showHalideDialog(
             context: context,
-            builder: (context) => HalideSimpleDialog(
-              title: 'Connection Failed',
+            builder: (dialogContext) => HalideSimpleDialog(
+              title: context.l10n.connectionFailed,
               message: e.toString(),
             ),
           );
@@ -249,8 +272,8 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
           setState(() => _viewState = ConnectionState.idle);
           showHalideDialog(
             context: context,
-            builder: (context) => HalideSimpleDialog(
-              title: 'Connection Failed',
+            builder: (dialogContext) => HalideSimpleDialog(
+              title: context.l10n.connectionFailed,
               message: e.toString(),
             ),
           );
@@ -262,6 +285,7 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final hasAccounts = widget.connectedAccounts.isNotEmpty;
     final isGDrive = widget.provider.id == 'gdrive';
     // Only allow one GDrive account. If connected, hide the 'Add' action.
@@ -272,10 +296,10 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
       children: [
         _ProviderTile(
           icon: widget.provider.icon,
-          label: widget.provider.name,
-          actionLabel: hideAddAction ? null : (_viewState == ConnectionState.connecting ? '...' : 'Add'),
+          label: widget.displayName,
+          actionLabel: hideAddAction ? null : (_viewState == ConnectionState.connecting ? '...' : l10n.addAction),
           onTap: (hideAddAction || _viewState != ConnectionState.idle) ? null : _handleConnect,
-          subtitle: hasAccounts ? '${widget.connectedAccounts.length} Connected' : null,
+          subtitle: hasAccounts ? l10n.connectedCount(widget.connectedAccounts.length) : null,
           showChevron: !hideAddAction,
         ),
         if (hasAccounts) ...[
@@ -286,7 +310,7 @@ class _CloudProviderGroupState extends ConsumerState<_CloudProviderGroup> {
               children: widget.connectedAccounts
                   .map((a) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
-                        child: _GroupedAccountCard(account: a),
+                        child: _GroupedAccountCard(account: a, l10n: l10n),
                       ))
                   .toList(),
             ),
@@ -314,11 +338,11 @@ class _ProviderTile extends StatelessWidget {
     this.showChevron = true,
   });
 
-  static const _orange500 = Color(0xFFF97316);
   static const _blue400 = Color(0xFF60A5FA);
 
   @override
   Widget build(BuildContext context) {
+    final accent = HalideColors.of(context).accent;
     final subtitle = this.subtitle;
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -377,8 +401,8 @@ class _ProviderTile extends StatelessWidget {
                 if (actionLabel != null)
                   Text(
                     actionLabel!,
-                    style: const TextStyle(
-                      color: _orange500,
+                    style: TextStyle(
+                      color: accent,
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
@@ -398,7 +422,8 @@ class _ProviderTile extends StatelessWidget {
 
 class _GroupedAccountCard extends StatelessWidget {
   final StorageAccount account;
-  const _GroupedAccountCard({Key? key, required this.account}) : super(key: key);
+  final AppLocalizations l10n;
+  const _GroupedAccountCard({Key? key, required this.account, required this.l10n}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -412,7 +437,7 @@ class _GroupedAccountCard extends StatelessWidget {
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isPrimary ? const Color(0xFFF97316) : Colors.white.withOpacity(0.10),
+          color: isPrimary ? HalideColors.of(context).accent : Colors.white.withOpacity(0.10),
           width: isPrimary ? 1.5 : 1.0,
         ),
       ),
@@ -438,15 +463,15 @@ class _GroupedAccountCard extends StatelessWidget {
                           ),
                         ),
                         if (isPrimary) ...[
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF97316),
+                              color: HalideColors.of(context).accent,
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              'PRI',
+                            child: Text(
+                              l10n.priBadge,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 9,
@@ -488,8 +513,8 @@ class _GroupedAccountCard extends StatelessWidget {
           const SizedBox(height: 12),
           // Feature Toggles
           _FeatureToggleRow(
-            label: 'Archive Storage',
-            description: 'Backup gear and rolls to this account.',
+            label: l10n.archiveStorage,
+            description: l10n.archiveStorageDescription,
             value: account.isArchive,
             onChanged: (val) {
               context.read<StorageAccountsBloc>().add(
@@ -500,8 +525,8 @@ class _GroupedAccountCard extends StatelessWidget {
           if (isGDrive) ...[
             const SizedBox(height: 8),
             _FeatureToggleRow(
-              label: 'Lab Scan Sync',
-              description: 'Auto-sync film scans via Drive URLs.',
+              label: l10n.labScanSync,
+              description: l10n.labScanSyncDescription,
               value: account.isScanSync,
               onChanged: (val) {
                 context.read<StorageAccountsBloc>().add(
@@ -509,8 +534,46 @@ class _GroupedAccountCard extends StatelessWidget {
                     );
               },
             ),
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white10, height: 1),
+            const SizedBox(height: 12),
+            _BackupRollsAction(),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Entry point into the roll picker that triggers Agxel Vault backups on this
+/// connected Google Drive account. Lives here since backup is per-connection.
+class _BackupRollsAction extends StatelessWidget {
+  const _BackupRollsAction();
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = HalideColors.of(context).accent;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => context.push('/personal-drive-backup'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Icon(Icons.cloud_upload_outlined, size: 16, color: accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Backup rolls to this Drive',
+                  style: TextStyle(color: accent, fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 18, color: accent.withOpacity(0.7)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -539,7 +602,7 @@ class _FeatureToggleRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
               ),
               Text(
                 description,
@@ -553,8 +616,8 @@ class _FeatureToggleRow extends StatelessWidget {
           child: Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFFF97316),
-            activeTrackColor: const Color(0xFFF97316).withOpacity(0.2),
+            activeColor: HalideColors.of(context).accent,
+            activeTrackColor: HalideColors.of(context).accent.withOpacity(0.2),
           ),
         ),
       ],

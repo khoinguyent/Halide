@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../config/app_config.dart';
 import '../models/roll.dart';
 import '../models/roll_status.dart';
 import '../features/gyro_scan/services/gyro_scan_session_service.dart';
@@ -23,11 +24,13 @@ final dashboardRollsProvider = FutureProvider<List<Roll>>((ref) async {
       .map((e) => Roll.fromJson(Map<String, dynamic>.from(e as Map)))
       .toList();
 
-  final reconciled = await GyroScanSessionService.instance.reconcileScannedRolls(
-    rolls: rolls,
-    token: token,
-    rollService: rollService,
-  );
+  final reconciled = AppConfig.enableGyroScan
+      ? await GyroScanSessionService.instance.reconcileScannedRolls(
+          rolls: rolls,
+          token: token,
+          rollService: rollService,
+        )
+      : false;
   if (reconciled) {
     final refreshed = await rollService.fetchRolls(token);
     final refreshedList = refreshed is List ? refreshed : [];

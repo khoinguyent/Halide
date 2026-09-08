@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/halide_colors.dart';
 
 class HalideScaffold extends StatelessWidget {
   final Widget child;
@@ -26,7 +27,7 @@ class HalideScaffold extends StatelessWidget {
       appBar: appBar,
       body: Stack(
         children: [
-          Container(color: backgroundColor ?? const Color(0xFF0D0D0D)),
+          Container(color: backgroundColor ?? HalideColors.of(context).background),
           SafeArea(
             child: child,
           ),

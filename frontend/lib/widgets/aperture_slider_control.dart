@@ -91,7 +91,6 @@ class _ApertureSliderControlState extends State<ApertureSliderControl> {
                       color: Colors.orange,
                       fontSize: 32,
                       fontWeight: FontWeight.w200,
-                      fontFamily: 'monospace',
                     ),
                   ),
                 ],
